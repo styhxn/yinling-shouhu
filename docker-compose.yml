@@ -1,0 +1,29 @@
+name: yinling-shouhu
+
+services:
+  app:
+    build:
+      context: .
+    image: yinling-shouhu:latest
+    ports:
+      - "3100:3100"
+    environment:
+      NODE_ENV: production
+      DEMO_MODE: "1"
+      SESSION_SECRET: ${SESSION_SECRET:-please-change-this-in-production}
+      APP_BASE_URL: ${APP_BASE_URL:-http://localhost:3100}
+      LLM_MOCK: ${LLM_MOCK:-0}
+      AMAP_WEB_KEY: ${AMAP_WEB_KEY:-}
+      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
+      QWEN_API_KEY: ${QWEN_API_KEY:-}
+      ARK_API_KEY: ${ARK_API_KEY:-}
+      ARK_BASE_URL: ${ARK_BASE_URL:-}
+      ARK_MODEL: ${ARK_MODEL:-}
+    volumes:
+      - app-data:/app/data
+      - app-public:/app/apps/api/public
+    restart: unless-stopped
+
+volumes:
+  app-data:
+  app-public:

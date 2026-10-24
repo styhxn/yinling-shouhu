@@ -7,10 +7,11 @@
 
 ## 当前进度
 
-- 后端 W3 已完成：围栏/位置/越界告警/寻人海报、用药计划/拍照识药/服药日志、家属照护概览与本周简报。
+- 后端 W1–W4 已完成：Agent + 工具调用、反诈 RAG/图片鉴定/冷静期、记忆访谈与故事、电子围栏/越界告警/寻人海报、用药计划/拍照识药/服药日志、家属简报、反诈角色演练、WebSocket 鉴权与按老人过滤。
 - 前端已重构为「水韵江苏」视觉：角色页、今日首页、故事、健康、守护、家属简报；聊天降为右上角「小助手」。
-- W4 待做：反诈演练、MCP 工具页、导出、WS 鉴权与按老人过滤、部署与在线演示。
+- W4 已补齐：反诈演练（六维报告）、故事书导出（可打印 HTML）、MCP Server、生产静态托管与 Docker 部署。
 - 数字人静态资源来自 DH_live（MIT）；示例头像仅用于比赛演示，商业使用需遵循上游授权。
+- 待办：真实模型 Key 与在线演示环境、比赛视频/PDF、团队信息补全。
 
 ## 文档
 
@@ -19,6 +20,8 @@
 - [接口契约](docs/接口契约.md)：前后端唯一接口基线（字段、SSE 事件、错误码、权限）。
 - [前端开发文档](docs/前端开发文档.md)：页面、组件、状态、流式渲染、适老化。
 - [后端开发文档](docs/后端开发文档.md)：数据层、Agent、RAG、安全、位置、用药、部署。
+- [部署与在线演示](docs/部署.md)：生产构建、Docker Compose、Nginx、数据备份。
+- [MCP Server](apps/mcp-server/README.md)：把天气、用药、反诈、定位、围栏能力开放给外部 AI 助手。
 - [提交信息规范](docs/提交规范.md)：Conventional Commits + 中文改动详情模板。
 - [第三方开源声明](THIRD_PARTY_NOTICES.md)：DH_live / 数字人示例资源说明。
 
@@ -38,6 +41,23 @@ LLM_MOCK=1 DEMO_MODE=1 npm run dev -w apps/api
 ```
 
 演示登录：`POST /api/auth/demo-login`，body `{"role":"elder"}`。环境变量见 [apps/api/.env.example](apps/api/.env.example)。
+
+### 生产构建
+
+```bash
+npm ci
+npm run build
+NODE_ENV=production SESSION_SECRET=change-me DEMO_MODE=1 npm run start -w apps/api
+```
+
+后端会同时托管 `apps/web/dist` 并提供 SPA 回退；也可使用 `docker compose up -d --build`。详见 [部署文档](docs/部署.md)。
+
+### MCP Server
+
+```bash
+DEMO_MODE=1 LLM_MOCK=1 npm run dev -w apps/api   # 终端 1
+npm run smoke -w apps/mcp-server                # 终端 2
+```
 
 ## 校验
 
