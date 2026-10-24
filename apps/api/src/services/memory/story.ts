@@ -22,7 +22,17 @@ export function createStoryService(db: AppDb, modelRouter: ModelRouter) {
     const book = db.storyBooks.ensureForElder(input.elderId);
     const fallbackTitle = memories[0]?.title ?? "我的一段回忆";
     const fallbackContent = memories
-      .map((memory) => `${memory.title}\n\n${memory.summary ?? memory.transcript.slice(0, 300)}`)
+      .map((memory) => {
+        const answers = memory.transcript
+          .split(/\n+/)
+          .filter((line) => line.startsWith("答："))
+          .map((line) => line.replace(/^答：\s*/, "").trim())
+          .filter(Boolean);
+        const body = answers.length
+          ? answers.join("")
+          : memory.summary ?? memory.transcript;
+        return `${memory.title}\n\n${body}`;
+      })
       .join("\n\n");
 
     let title = fallbackTitle;

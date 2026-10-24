@@ -277,7 +277,8 @@ export function createAgentRunner(deps: AgentRunnerDeps): AgentRunner {
             sessionId: session.id,
             userId: ctx.user.userId,
             tool: call.name,
-            args: preparedArgs
+            args: preparedArgs,
+            ttlMs: call.name === "start_cooling_off" ? 60_000 : 5 * 60_000
           });
           saveSession(session, messages);
           yield {
