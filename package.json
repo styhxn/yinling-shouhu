@@ -16,6 +16,7 @@
     "typecheck:apps": "npm run typecheck -w apps/api && npm run typecheck -w frontend && npm run typecheck -w apps/mcp-server",
     "test": "npm run test -w packages/shared && npm run test -w packages/adapters && npm run test -w apps/api && npm run test -w frontend",
     "sync:frontend-shared": "node scripts/sync-frontend-shared.mjs",
+    "db:schema": "tsx scripts/export-schema.ts",
     "build": "npm run build:packages && npm run build:apps",
     "typecheck": "npm run typecheck:packages && npm run typecheck:apps",
     "verify": "npm run build:packages && npm run typecheck:packages && npm run typecheck:apps && npm run build:apps && npm run test"

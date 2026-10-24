@@ -20,7 +20,8 @@
 - [接口契约](docs/接口契约.md)：前后端唯一接口基线（字段、SSE 事件、错误码、权限）。
 - [前端开发文档](docs/前端开发文档.md)：页面、组件、状态、流式渲染、适老化。
 - [后端开发文档](docs/后端开发文档.md)：数据层、Agent、RAG、安全、位置、用药、部署。
-- [部署与在线演示](docs/部署.md)：生产构建、Docker Compose、Nginx、数据备份。
+- [部署与在线演示](docs/部署.md)：生产构建、Docker Compose、Nginx、数据库初始化、数据备份。
+- [数据库表结构](docs/schema.sql)：SQLite 建表 SQL（由迁移代码生成，可手动执行）。
 - [MCP Server](apps/mcp-server/README.md)：把天气、用药、反诈、定位、围栏能力开放给外部 AI 助手。
 - [提交信息规范](docs/提交规范.md)：Conventional Commits + 中文改动详情模板。
 - [第三方开源声明](THIRD_PARTY_NOTICES.md)：DH_live / 数字人示例资源说明。
