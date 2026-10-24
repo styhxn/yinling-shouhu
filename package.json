@@ -10,9 +10,9 @@
   "scripts": {
     "dev": "concurrently -n api,web -c blue,green \"npm run dev -w apps/api\" \"npm run dev -w apps/web\"",
     "build:packages": "npm run build -w packages/shared && npm run build -w packages/adapters",
-    "build:apps": "npm run build -w apps/api && npm run build -w apps/web",
+    "build:apps": "npm run build -w apps/api && npm run build -w apps/web && npm run build -w apps/mcp-server",
     "typecheck:packages": "npm run typecheck -w packages/shared && npm run typecheck -w packages/adapters",
-    "typecheck:apps": "npm run typecheck -w apps/api && npm run typecheck -w apps/web",
+    "typecheck:apps": "npm run typecheck -w apps/api && npm run typecheck -w apps/web && npm run typecheck -w apps/mcp-server",
     "test": "npm run test -w packages/shared && npm run test -w packages/adapters && npm run test -w apps/api && npm run test -w apps/web",
     "build": "npm run build:packages && npm run build:apps",
     "typecheck": "npm run typecheck:packages && npm run typecheck:apps",
