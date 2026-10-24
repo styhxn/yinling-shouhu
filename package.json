@@ -1,0 +1,25 @@
+{
+  "name": "zhiban-yinling-system",
+  "description": "智伴银龄：具身智能生活陪伴系统",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "concurrently -n api,web -c blue,green \"npm run dev -w apps/api\" \"npm run dev -w apps/web\"",
+    "build:packages": "npm run build -w packages/shared && npm run build -w packages/adapters",
+    "build:apps": "npm run build -w apps/api && npm run build -w apps/web",
+    "typecheck:packages": "npm run typecheck -w packages/shared && npm run typecheck -w packages/adapters",
+    "typecheck:apps": "npm run typecheck -w apps/api && npm run typecheck -w apps/web",
+    "test": "npm run test -w packages/shared && npm run test -w packages/adapters && npm run test -w apps/api && npm run test -w apps/web",
+    "build": "npm run build:packages && npm run build:apps",
+    "typecheck": "npm run typecheck:packages && npm run typecheck:apps",
+    "verify": "npm run build:packages && npm run typecheck:packages && npm run typecheck:apps && npm run build:apps && npm run test"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2",
+    "typescript": "^5.7.3"
+  }
+}

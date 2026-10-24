@@ -1,0 +1,191 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+    <link rel="icon" href="common/favicon.ico" type="image/x-icon">
+    <title>MiniLive</title>
+    <style>
+        :root {
+            --bg: #070a12;
+            --panel: rgba(255, 255, 255, 0.08);
+            --panel-hover: rgba(255, 255, 255, 0.12);
+            --primary: #3b82f6;
+            --text: rgba(255, 255, 255, 0.92);
+            --muted: rgba(255, 255, 255, 0.68);
+            --border: rgba(255, 255, 255, 0.1);
+        }
+
+        body {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+            background-color: transparent;
+            overflow: hidden;
+            color: var(--text);
+            font-family: 'Segoe UI', sans-serif;
+        }
+
+        video, canvas {
+            border: 0;
+        }
+
+        #canvas_video {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        #canvas_gl {
+            position: absolute;
+            top: -9999px;
+            left: -9999px;
+            width: 128px;
+            height: 128px;
+        }
+
+        #screen {
+            position: absolute;
+            bottom: -1000;
+            right: -1000;
+            width: 1px;
+            height: 1px;
+        }
+
+        #screen2 {
+            width: 100%;
+            height: 100%;
+            position: absolute;
+            top: 0;
+            left: 0;
+            border: none;
+            z-index: 5;
+            background: transparent;
+        }
+
+        #startMessage {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 18px;
+            font-weight: 500;
+            color: var(--muted);
+            z-index: -2;
+            background: var(--panel);
+            padding: 12px 24px;
+            border-radius: 99px;
+            border: 1px solid var(--border);
+            backdrop-filter: blur(5px);
+        }
+
+        #dropdownContainer, #voiceDropdownContainer {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            z-index: 10;
+        }
+
+        #voiceDropdownContainer {
+            top: 70px;
+        }
+
+        #characterDropdown, #voiceDropdown {
+            appearance: none;
+            -webkit-appearance: none;
+            -moz-appearance: none;
+            padding: 8px 32px 8px 16px;
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--text);
+            background-color: var(--panel);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+            cursor: pointer;
+            outline: none;
+            transition: all 0.2s ease;
+            backdrop-filter: blur(10px);
+        }
+
+        #characterDropdown option, #voiceDropdown option {
+            background-color: #1a1a1a;
+            color: var(--text);
+        }
+
+        #characterDropdown:hover, #voiceDropdown:hover {
+            background-color: var(--panel-hover);
+            border-color: var(--primary);
+        }
+
+        #characterDropdown:focus, #voiceDropdown:focus {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+        }
+
+        #dropdownContainer::after, #voiceDropdownContainer::after {
+            content: '▼';
+            position: absolute;
+            top: 50%;
+            right: 12px;
+            transform: translateY(-50%);
+            pointer-events: none;
+            color: var(--muted);
+            font-size: 10px;
+        }
+        #canvasEl {
+            position: absolute;
+            left: -9999px;  /* 移出可视区域 */
+            top: -9999px;
+            /* 保持canvas正常尺寸 */
+            width: 300px;
+            height: 150px;
+        }
+        
+        #loadingSpinner {
+            color: var(--muted);
+            font-family: sans-serif;
+        }
+    </style>
+</head>
+<body>
+    <div id="dropdownContainer">
+        <select id="characterDropdown">
+            <option value="assets">男性一</option>
+            <option value="assets2">女性一</option>
+<!--            <option value="assets3">男性二</option>-->
+            <!-- <option value="assets4">女性二</option> -->
+        </select>
+    </div>
+    <div id="voiceDropdownContainer">
+        <select id="voiceDropdown">
+            <option value="male-qn-qingse">青涩男</option>
+            <option value="male-qn-badao">霸气男</option>
+            <option value="wumei_yujie">妩媚女</option>
+            <option value="female-tianmei">甜美女</option>
+        </select>
+    </div>
+
+    <figure id="loadingSpinner">
+        <strong>MiniMates: loading...</strong>
+    </figure>
+    <canvas id="canvasEl"></canvas>
+    <canvas id="canvas_video"></canvas>
+    <canvas id="canvas_gl" width="128" height="128"></canvas>
+    <div id="screen"></div>
+    <iframe id="screen2" src="dialog.html" frameborder="0" style="display: none;"></iframe>
+    <div id="startMessage">加载中</div>
+
+    <script src="js/pako.min.js"></script>-->
+    <script src="js/mp4box.all.min.js"></script>
+    <script src="js/DHLiveMini.js"></script>
+    <script src="js/MiniMateLoader.js"></script>
+    <script src="js/MiniLive2.js"></script>
+</body>
+</html>

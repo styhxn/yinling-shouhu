@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="640" height="640" viewBox="0 0 640 640" fill="none">
+  <defs>
+    <linearGradient id="case" x1="160" y1="140" x2="480" y2="500" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#38BDF8" stop-opacity="0.95"/>
+      <stop offset="1" stop-color="#0F172A" stop-opacity="0.95"/>
+    </linearGradient>
+    <radialGradient id="glass" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(300 250) rotate(60) scale(260 240)">
+      <stop stop-color="#F8FAFC" stop-opacity="0.30"/>
+      <stop offset="0.55" stop-color="#F8FAFC" stop-opacity="0.10"/>
+      <stop offset="1" stop-color="#0B1224" stop-opacity="0.35"/>
+    </radialGradient>
+    <linearGradient id="strap" x1="320" y1="40" x2="320" y2="600" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#111827"/>
+      <stop offset="1" stop-color="#020617"/>
+    </linearGradient>
+    <filter id="shadow" x="0" y="0" width="640" height="640" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="18" stdDeviation="18" flood-color="#000000" flood-opacity="0.55"/>
+    </filter>
+  </defs>
+
+  <g filter="url(#shadow)">
+    <rect x="260" y="40" width="120" height="170" rx="48" fill="url(#strap)" stroke="rgba(148,163,184,0.35)" stroke-width="2"/>
+    <rect x="260" y="430" width="120" height="170" rx="48" fill="url(#strap)" stroke="rgba(148,163,184,0.35)" stroke-width="2"/>
+
+    <rect x="170" y="150" width="300" height="340" rx="90" fill="url(#case)" stroke="rgba(148,163,184,0.55)" stroke-width="4"/>
+
+    <rect x="200" y="180" width="240" height="280" rx="76" fill="#020617" stroke="rgba(56,189,248,0.55)" stroke-width="2"/>
+    <rect x="200" y="180" width="240" height="280" rx="76" fill="url(#glass)"/>
+
+    <circle cx="320" cy="320" r="96" stroke="rgba(148,163,184,0.38)" stroke-width="2"/>
+    <circle cx="320" cy="320" r="70" stroke="rgba(56,189,248,0.40)" stroke-width="2"/>
+
+    <path d="M320 320 L320 250" stroke="#38BDF8" stroke-width="10" stroke-linecap="round"/>
+    <path d="M320 320 L368 348" stroke="#F97316" stroke-width="10" stroke-linecap="round"/>
+    <circle cx="320" cy="320" r="10" fill="#F8FAFC" fill-opacity="0.85"/>
+
+    <path d="M240 250 C285 230 355 230 400 250" stroke="rgba(248,250,252,0.16)" stroke-width="10" stroke-linecap="round"/>
+    <path d="M250 420 C305 445 335 445 390 420" stroke="rgba(248,250,252,0.10)" stroke-width="10" stroke-linecap="round"/>
+  </g>
+</svg>

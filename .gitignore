@@ -1,0 +1,27 @@
+node_modules/
+dist/
+coverage/
+.vite/
+*.log
+.DS_Store
+
+# 环境与密钥
+.env
+.env.*
+!.env.example
+apps/api/data/
+apps/api/public/uploads/
+*.key
+
+# 临时文件
+tmp_*.json
+.shots/
+
+# Python / 数字人训练环境（保留 web_demo/static）
+.venv/
+__pycache__/
+*.pyc
+.idea/
+DH_live-main/.venv/
+DH_live-main/DH_live-main/__pycache__/
+DH_live-main/DH_live-main/video_data/

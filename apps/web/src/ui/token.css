@@ -1,0 +1,1264 @@
+/* =============================================================================
+ * 智伴银龄 · 前端设计令牌 (Design Tokens)
+ * -----------------------------------------------------------------------------
+ * 风格：正式、专业，参照 Apple 人机界面指南（Apple HIG）
+ * 主题：浅色正式风（配色丰富且合理，不局限于蓝白）
+ * 约束：无 emoji、无奇怪渐变、动效克制
+ *
+ * 本文件以「覆盖层」方式在 styles.css 之后导入（见 main.tsx），
+ * 统一接管颜色 / 字体 / 字号 / 间距 / 圆角 / 阴影 / 层级 / 动效 / 图标 等变量。
+ * 既有的组件样式（styles.css 中的 .btn / .card 等）大多通过 var() 引用这些变量，
+ * 因此切换为浅色主题后无需逐个重写即可整体生效。
+ * ========================================================================== */
+
+:root {
+  /* ---------------------------------------------------------------- 字体 */
+  /* 优先使用系统字体：Apple 设备走 San Francisco / 苹方，Windows 走微软雅黑，
+     其余回退 Noto Sans SC（已在 styles.css 顶部通过 Google Fonts 引入）。 */
+  --font-sans: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei",
+    "Noto Sans SC", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+
+  --font-weight-regular: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+  --font-weight-bold: 700;
+
+  /* 字号阶梯（基准，受 --font-scale 影响；新组件建议用 rem 以随模式缩放） */
+  --text-xs: 0.75rem;   /* 12px */
+  --text-sm: 0.875rem;  /* 14px */
+  --text-base: 1rem;    /* 16px */
+  --text-md: 1.125rem;  /* 18px */
+  --text-lg: 1.25rem;   /* 20px */
+  --text-xl: 1.5rem;    /* 24px */
+  --text-2xl: 1.875rem; /* 30px */
+  --text-3xl: 2.375rem; /* 38px */
+  --text-4xl: 3rem;     /* 48px */
+
+  /* ---------------------------------------------------------------- 中性色 */
+  --gray-0: #ffffff;
+  --gray-50: #f8fafc;
+  --gray-100: #f1f5f9;
+  --gray-200: #e2e8f0;
+  --gray-300: #cbd5e1;
+  --gray-400: #94a3b8;
+  --gray-500: #64748b;
+  --gray-600: #475569;
+  --gray-700: #334155;
+  --gray-800: #1e293b;
+  --gray-900: #0f172a;
+
+  /* ---------------------------------------------------------- 主色（靛蓝） */
+  --primary-50: #eef2ff;
+  --primary-100: #e0e7ff;
+  --primary-200: #c7d2fe;
+  --primary-300: #a5b4fc;
+  --primary-400: #818cf8;
+  --primary-500: #6366f1;
+  --primary-600: #4f46e5;
+  --primary-700: #4338ca;
+  --primary-800: #3730a3;
+  --primary-900: #312e81;
+
+  /* 主色别名（兼容既有组件 var(--primary) 等写法） */
+  --primary: var(--primary-600);
+  --primary-light: var(--primary-500);
+  --primary-dark: var(--primary-700);
+
+  /* ----------------------------------------------------- 强调色（青绿 / 健康） */
+  --accent-50: #f0fdfa;
+  --accent-100: #ccfbf1;
+  --accent-200: #99f6e4;
+  --accent-300: #5eead4;
+  --accent-400: #2dd4bf;
+  --accent-500: #14b8a6;
+  --accent-600: #0d9488;
+  --accent-700: #0f766e;
+  --accent-800: #115e59;
+  --accent-900: #134e4a;
+
+  --accent: var(--accent-600);
+  --accent-light: var(--accent-500);
+
+  /* ---------------------------------------------------------- 语义状态色 */
+  --success: #16a34a;
+  --success-light: #22c55e;
+  --success-bg: #dcfce7;
+  --ok: var(--success); /* 兼容既有 var(--ok) */
+
+  --warning: #d97706;
+  --warning-light: #f59e0b;
+  --warning-bg: #fef3c7;
+
+  --danger: #dc2626;
+  --danger-light: #ef4444;
+  --danger-bg: #fee2e2;
+
+  --info: #0284c7;
+  --info-light: #0ea5e9;
+  --info-bg: #e0f2fe;
+
+  /* ---------------------------------------------------------- 表面与文字 */
+  --bg: #eef1f6;            /* 应用背景（浅冷灰） */
+  --bg-subtle: #e3e8f0;
+  --surface: #ffffff;       /* 卡片 / 面板 */
+  --surface-2: #f8fafc;     /* 次级表面 */
+  --panel: var(--surface);
+  --panel-border: rgba(15, 23, 42, 0.08);
+
+  --border: #e2e8f0;        /* 发丝级分隔线（Apple 风） */
+  --border-strong: #cbd5e1;
+
+  --text: var(--gray-900);
+  --text-secondary: var(--gray-600);
+  --muted: var(--gray-500);
+  --text-on-primary: #ffffff;
+
+  /* ---------------------------------------------------------------- 圆角 */
+  --radius-xs: 6px;
+  --radius-sm: 10px;
+  --radius: 14px;
+  --radius-lg: 20px;
+  --radius-xl: 28px;
+  --radius-full: 999px;
+  --btn-radius: var(--radius-sm);
+
+  /* ---------------------------------------------------------------- 间距 */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+  --space-16: 64px;
+
+  --spacing: var(--space-4);  /* 兼容既有 var(--spacing) */
+  --grid-gap: var(--space-5); /* 兼容既有 var(--grid-gap) */
+
+  /* ---------------------------------------------------------- 阴影（克制） */
+  --shadow-xs: 0 1px 2px rgba(15, 23, 42, 0.06);
+  --shadow-sm: 0 1px 3px rgba(15, 23, 42, 0.08), 0 1px 2px rgba(15, 23, 42, 0.04);
+  --shadow-md: 0 4px 12px rgba(15, 23, 42, 0.08), 0 2px 4px rgba(15, 23, 42, 0.04);
+  --shadow-lg: 0 12px 32px rgba(15, 23, 42, 0.12), 0 4px 8px rgba(15, 23, 42, 0.06);
+  --shadow-focus: 0 0 0 3px rgba(79, 70, 229, 0.25);
+
+  /* 兼容既有组件 var(--shadow) / var(--shadow-lg) */
+  --shadow: var(--shadow-md);
+  --shadow-glow: 0 0 0 1px rgba(79, 70, 229, 0.12);
+
+  /* ---------------------------------------------------------- 层级（z-index） */
+  --z-base: 1;
+  --z-sticky: 100;
+  --z-header: 200;
+  --z-dropdown: 1000;
+  --z-modal: 1100;
+  --z-toast: 1200;
+  --z-fab: 1300;
+  --z-tooltip: 1400;
+  --z-overlay: 1500;
+
+  /* ---------------------------------------------------------- 动效（Apple HIG 缓动） */
+  --ease-standard: cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-emphasized: cubic-bezier(0.2, 0, 0, 1);
+  --motion-fast: 160ms var(--ease-standard);
+  --motion-base: 240ms var(--ease-standard);
+  --motion-slow: 360ms var(--ease-standard);
+
+  /* 兼容既有 var(--transition-*) */
+  --transition-fast: var(--motion-fast);
+  --transition-normal: var(--motion-base);
+  --transition-slow: var(--motion-slow);
+
+  /* ---------------------------------------------------------- 图标令牌 */
+  --icon-size-sm: 16px;
+  --icon-size-md: 20px;
+  --icon-size-lg: 24px;
+  --icon-size-xl: 32px;
+  --icon-stroke: 2px;
+
+  /* ---------------------------------------------------------- 模式缩放基准 */
+  --font-scale: 1;
+}
+
+/* 覆盖 body：浅色背景、系统字体、去除旧渐变与 emoji 字体回退 */
+body {
+  background-color: var(--bg);
+  background-image: none;
+  color: var(--text);
+  font-family: var(--font-sans);
+}
+
+/* ============================ 三模式缩放 ============================ */
+/* 仅调整字号 / 间距 / 圆角等尺度，配色保持统一浅色，避免模式间视觉割裂。 */
+
+/* 关键修复：styles.css 的 .mode-adult/.mode-child/.mode-elder 把 --bg/--primary/
+   --accent 重新定义为深色霓虹值（成人=青 #00d4ff、儿童=紫 #8b5cf6、深底渐变），
+   导致切换模式后整个界面骤变回深色霓虹风，与浅色主题割裂。
+   此处用相同 specificity、后加载的优势，把三模式的颜色强制锁回浅色 token。 */
+.mode-elder,
+.mode-adult,
+.mode-child {
+  --bg: var(--gray-0, #ffffff);
+  --panel: var(--surface, #ffffff);
+  --panel-border: rgba(15, 23, 42, 0.08);
+  --text: var(--gray-900, #0f172a);
+  --muted: var(--gray-500, #64748b);
+  --primary: var(--primary-600, #4f46e5);
+  --primary-light: var(--primary-500, #6366f1);
+  --primary-dark: var(--primary-700, #4338ca);
+  --accent: var(--accent-600, #0d9488);
+  --accent-light: var(--accent-500, #14b8a6);
+  --danger: var(--danger, #dc2626);
+  --danger-light: var(--danger-light, #ef4444);
+  --ok: var(--success, #16a34a);
+  --warning: var(--warning, #d97706);
+  --shadow: var(--shadow-md);
+  --shadow-lg: var(--shadow-lg);
+  --bg-gradient: none;
+}
+
+.mode-elder {
+  --font-scale: 1.22;
+  --spacing: var(--space-6);
+  --grid-gap: var(--space-7, 28px);
+  --radius: 18px;
+  --radius-sm: 14px;
+  --radius-lg: 26px;
+  --btn-radius: 16px;
+}
+
+.mode-adult {
+  --font-scale: 1;
+  --spacing: var(--space-5);
+  --grid-gap: var(--space-6);
+}
+
+.mode-child {
+  --font-scale: 1.08;
+  --spacing: var(--space-5);
+  --grid-gap: var(--space-6);
+  --radius: 18px;
+  --radius-sm: 14px;
+  --radius-lg: 26px;
+}
+
+/* 图标旋转（加载态） */
+.btnSpinner {
+  animation: eha-spin 0.9s linear infinite;
+  transform-origin: center;
+}
+@keyframes eha-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* 辅助：统一的卡片 / 面板 / 按钮 / 输入框基础令牌（供新组件或局部覆盖使用） */
+.surface-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+}
+
+/* =============================================================================
+ * 响应式布局覆盖层（多端适配统一）
+ * -----------------------------------------------------------------------------
+ * 归一断点：仅保留三档 —— 移动 <640px / 平板 640–1024px / 桌面 ≥1024px。
+ * 原 styles.css 中 480/768/900/1024 四处散落的断点在此处被统一收敛，
+ * 保证栅格、间距、组件排列在同一断点下行为一致。
+ *
+ * 核心策略：
+ *  1. 栅格用 minmax(0,1fr) 替代硬编码 span，让内容在窄屏可收缩、不溢出。
+ *  2. 触控目标统一 ≥44px（Apple HIG）。
+ *  3. 顶部操作区在窄屏由 display:none 改为「收纳 + 换行」降级，不丢功能。
+ *  4. 入口页三列在平板竖屏即塌缩为单列，消除 481–899px 的三列挤压。
+ * ========================================================================== */
+
+/* ---------- 栅格基础：内容可收缩，杜绝溢出 ---------- */
+.grid {
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+}
+
+/* ---------- 桌面端（≥1024px）：给栅格加最大宽度，避免宽屏卡片过宽 ---------- */
+@media (min-width: 1024px) {
+  .grid {
+    grid-template-columns: repeat(12, minmax(0, 1fr));
+  }
+  .card,
+  .dashMain,
+  .dashSide,
+  .dashSmall {
+    min-width: 0;
+  }
+}
+
+/* ---------- 平板（≤1024px）：卡片与主/侧栏改单列，小卡片两列 ---------- */
+@media (max-width: 1024px) {
+  .card,
+  .dashMain,
+  .dashSide {
+    grid-column: 1 / -1;
+    min-width: 0;
+  }
+  .dashSmall {
+    grid-column: span 6;
+    min-width: 0;
+  }
+  .main {
+    padding: 20px 20px 28px;
+  }
+  /* 入口页：三列改单列（消除平板竖屏挤压） */
+  .entryModesGrid {
+    grid-template-columns: 1fr;
+    max-width: 520px;
+    margin: 0 auto;
+  }
+  .modeCard {
+    flex-direction: row;
+    justify-content: flex-start;
+    text-align: left;
+    min-height: auto;
+    padding: 24px;
+    gap: 16px;
+  }
+  .modeIcon {
+    flex-shrink: 0;
+  }
+  .modeContent {
+    flex: 1;
+  }
+}
+
+/* ---------- 移动端（≤640px）：单列栅格 + 触控目标 + 顶部收纳 ---------- */
+@media (max-width: 640px) {
+  .main {
+    padding: 16px 14px 24px;
+  }
+  .grid {
+    gap: 14px;
+  }
+  .card,
+  .dashMain,
+  .dashSide,
+  .dashSmall {
+    grid-column: 1 / -1;
+  }
+  /* 触控目标 ≥44px */
+  .btn {
+    min-height: 44px;
+    padding: 10px 16px;
+  }
+  .btn--sm {
+    min-height: 44px;
+    padding: 10px 14px;
+  }
+  .userBadge {
+    min-height: 44px;
+  }
+  .quickLink {
+    min-width: 44px;
+    min-height: 44px;
+  }
+  .modeCard {
+    min-height: 72px;
+    padding: 16px;
+  }
+  /* 顶部操作区：不粗暴隐藏，改为换行收纳，保留功能入口 */
+  .topbar {
+    flex-wrap: wrap;
+    padding: 10px 14px;
+    gap: 10px;
+  }
+  .topbarActions {
+    display: flex;
+    flex: 1 1 100%;
+    justify-content: flex-end;
+    gap: 8px;
+  }
+  .quickLinks {
+    display: flex;
+    gap: 8px;
+  }
+  /* 移动端：快捷图标与「返回首页/紧急」按钮功能重复且拥挤，隐藏图标组保留按钮 */
+  @media (max-width: 480px) {
+    .quickLinks {
+      display: none;
+    }
+  }
+  /* 信息层级：标题字号下探，保证可读性 */
+  .h1 {
+    font-size: 22px;
+  }
+  .card {
+    padding: 16px;
+  }
+  /* 弹窗 / 面板在窄屏占满宽度 */
+  .avatarModal__content,
+  .emergencyDialog {
+    width: calc(100vw - 32px);
+    max-width: none;
+  }
+}
+
+/* =============================================================================
+ * 视觉与布局修复覆盖层（浅色主题适配 + 交互合理性）
+ * -----------------------------------------------------------------------------
+ * 背景：styles.css 原为深色主题，改造为浅色后，大量 rgba(255,255,255,*)、
+ * #000 等硬编码颜色未跟随 token 转换，导致对比度、分区、边框、层级全线失效。
+ * 本层在 styles.css 之后加载，逐项覆盖修复以下问题（对应排查报告 26 项）。
+ * ========================================================================== */
+
+/* ---------------------------------------------------------------
+ * 一、z-index 层级阶梯（修复 #1 #3 #4）
+ * 建立连贯阶梯：topbar 100 < 菜单 600 < fab 700 < toast 900
+ *              < 紧急遮罩 1000 < 头像弹窗 1100
+ * 关键：让 userMenu 高于 topbar，toast 高于 fab 与紧急遮罩，
+ *       头像弹窗为最高层，紧急/头像弹窗打开时 toast 仍可见。
+ * --------------------------------------------------------------- */
+.userMenu {
+  z-index: 600;
+}
+.topbar {
+  z-index: 100;
+}
+.fabEmergency {
+  z-index: 700;
+}
+.toastWrap {
+  z-index: 900;
+}
+.emergencyOverlay {
+  z-index: 1000;
+}
+.avatarModal {
+  z-index: 1100;
+}
+
+/* ---------------------------------------------------------------
+ * 二、浅色主题对比度与辨别度（修复 #5 #6 #7 #8 #9）
+ * --------------------------------------------------------------- */
+
+/* #5 segBtnActive：黑字压深蓝底对比度不足 → 白字 */
+.segBtnActive,
+.mode-elder .segBtnActive {
+  color: #ffffff;
+}
+
+/* #6 .btn 默认态：白底白边隐形 → 加清晰边框与次级底 */
+.btn {
+  border-color: var(--border-strong);
+  background: var(--surface);
+  /* 修复：按钮文字禁止逐字换行（"查询"被挤成竖排两字） */
+  white-space: nowrap;
+}
+/* 天气搜索等并排场景：按钮不被输入框挤压变窄 */
+.weatherSearch .btn {
+  flex-shrink: 0;
+}
+.btn:hover {
+  background: var(--primary-50);
+  border-color: var(--primary-300);
+  color: var(--primary-700);
+}
+.btn::before {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.4), transparent);
+}
+
+/* hover 可见度修复：实色按钮（Primary/Accent/Danger）hover 时保持实色底 + 白字，
+   避免被 .btn:hover 的浅灰底覆盖后白字看不清 */
+.btnPrimary:hover {
+  background: var(--primary-700);
+  color: #ffffff;
+  border-color: transparent;
+}
+.btnAccent:hover {
+  background: var(--accent-700);
+  color: #ffffff;
+  border-color: transparent;
+}
+.btnDanger:hover {
+  background: var(--danger);
+  color: #ffffff;
+  border-color: var(--danger);
+}
+/* ghost 按钮 hover 也保持深字可见 */
+.btn--ghost:hover {
+  color: var(--primary-700);
+}
+
+/* #7 .weatherTemp 渐变字：浅色底上浅渐变文字看不清 → 实色 */
+.weatherTemp {
+  background: none;
+  -webkit-background-clip: initial;
+  -webkit-text-fill-color: currentColor;
+  background-clip: initial;
+  color: var(--primary-600);
+}
+/* #7 .entryTitle 渐变字同理 → 实色深字 */
+.entryTitle {
+  background: none;
+  -webkit-background-clip: initial;
+  -webkit-text-fill-color: currentColor;
+  background-clip: initial;
+  color: var(--gray-900);
+}
+
+/* #8 #9 statusItem / recentEvent / kbd / input / qaViz / qaChat / qaMsgBubble
+   白色 3%~5% 透明在浅色底上不可见 → 改用中性色 token */
+.statusItem,
+.recentEvent {
+  background: var(--gray-50);
+}
+.qaViz {
+  background: var(--surface-2);
+}
+.qaChat {
+  background: var(--bg-subtle);
+}
+.qaChat::-webkit-scrollbar-thumb {
+  background: var(--gray-300);
+}
+.qaChat::-webkit-scrollbar-thumb:hover {
+  background: var(--gray-400);
+}
+.qaMsgBubble {
+  background: var(--surface);
+  border-color: var(--border);
+}
+.qaMsgUser .qaMsgBubble {
+  background: var(--primary-50);
+  border-color: var(--primary-200);
+}
+.kbd {
+  background: var(--gray-100);
+  border-color: var(--border-strong);
+  color: var(--gray-800);
+}
+.kbd:hover {
+  background: var(--gray-200);
+}
+.input {
+  background: var(--surface);
+  border-color: var(--border-strong);
+}
+.input:focus {
+  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.18);
+}
+select.input {
+  color-scheme: light;
+}
+.weatherContent {
+  background: var(--surface-2);
+}
+.weatherAdvice {
+  background: var(--primary-50);
+  border-color: var(--primary-200);
+}
+.weatherAdvice--error {
+  background: var(--danger-bg);
+  border-color: var(--danger);
+}
+.weatherError {
+  background: var(--danger-bg);
+  border-color: var(--danger);
+}
+.toast {
+  background: var(--surface);
+}
+.toastDanger {
+  background: var(--danger-bg);
+}
+.toastOk {
+  background: var(--success-bg);
+}
+/* 顶栏渐变背景在浅色下换成干净底色 */
+.topbar {
+  background: rgba(255, 255, 255, 0.75);
+  border-bottom: 1px solid var(--border);
+}
+.userMenu {
+  background: var(--surface);
+}
+.avatarModal__crop {
+  background: var(--gray-100);
+}
+/* 卡片顶部装饰条与 panel 顶部高光在浅色下不可见 → 换成 token 分隔 */
+.card::before,
+.panel::before {
+  background: linear-gradient(90deg, transparent, var(--border-strong), transparent);
+  pointer-events: none; /* 修复 #26 */
+}
+.card:hover {
+  border-color: var(--primary-300);
+}
+
+/* ---------------------------------------------------------------
+ * 三、栅格 / 间距 / 换行 / 溢出（修复 #10 #11 #12 #14 #15 #16 #17 #18 #19）
+ * --------------------------------------------------------------- */
+
+/* #10 删除 .grid 重复定义（styles.css 495/1168 两处）→ 本层统一一次 */
+.grid {
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  gap: var(--grid-gap);
+}
+
+/* #17 气泡与卡片补 min-width:0，防止长词/长串撑破容器 */
+.qaMsgBubble {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+/* #14 brandTitle span 副标题窄屏换行：改为可换行 + 溢出省略兜底 */
+.brandTitle {
+  min-width: 0;
+}
+.brandTitle strong {
+  white-space: nowrap;
+}
+.brandTitle span {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* #15 smallCard 描述：去掉强制单行，改为两行省略，中文长描述可读 */
+.smallCard__content .cardDesc {
+  white-space: normal;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* #11 qaComposer 输入框：去掉 min-width:min(520px) 强制，窄屏不挤按钮 */
+.qaComposer .input {
+  min-width: 0;
+  flex-basis: 240px;
+}
+
+/* #12 .main 超窄屏侧留白兜底 */
+.main {
+  padding-left: max(24px, env(safe-area-inset-left));
+  padding-right: max(24px, env(safe-area-inset-right));
+}
+
+/* #18 #19 弹窗与菜单窄屏横向溢出约束 */
+.emergencyDialog {
+  min-width: 0;
+  width: min(420px, calc(100vw - 32px));
+  max-width: calc(100vw - 32px);
+}
+.userMenu {
+  width: min(280px, calc(100vw - 24px));
+  right: auto;
+}
+
+/* ---------------------------------------------------------------
+ * 四、断点矛盾 + fab 遮挡（修复 #22 #23 #13 #24）
+ * --------------------------------------------------------------- */
+
+/* #13 消除 .modeCard 双定义冲突：统一 min-height（覆盖 220px/240px 两处） */
+.modeCard {
+  min-height: 240px;
+}
+
+/* #22 #23 断点矛盾：入口页三列在 ≤1024px 塌缩（与 token.css 覆盖层一致），
+   并统一 480–768 间顶部操作区的显隐（不再 display:none 丢功能） */
+@media (max-width: 1024px) {
+  .entryModesGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 768px) {
+  /* 覆盖 styles.css 768px 对 topbarActions/quickLinks 的 display:none */
+  .topbarActions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
+  .quickLinks {
+    display: flex;
+  }
+  .brandTitle span {
+    display: block; /* 覆盖 styles.css 768px 的 display:none，避免副标题消失 */
+  }
+  .pillRow {
+    display: flex; /* 覆盖 768px 的 display:none，信息不丢失，允许换行收纳 */
+    flex-wrap: wrap;
+  }
+}
+
+/* #24 fab 防遮挡：为页面底部预留安全空间，避免悬浮球遮挡长表单/底部按钮 */
+.appShell,
+.main {
+  padding-bottom: calc(32px + 76px);
+}
+
+/* ---------------------------------------------------------------
+ * 六、入口页三模式卡片配色统一（修复成人/儿童入口布局配色问题）
+ * 深色主题遗留的霓虹径向渐变（蓝/青/橙紫）在浅色正式风下突兀且三卡不统一，
+ * 改为统一浅色卡片 + 各自克制的品牌强调色（图标底/左缘高亮），视觉一致。
+ * --------------------------------------------------------------- */
+.modeCard--elder,
+.modeCard--adult,
+.modeCard--child {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-sm);
+}
+/* 覆盖 styles.css 中各自的径向渐变背景 */
+.modeCard--elder,
+.modeCard--adult,
+.modeCard--child {
+  background: var(--surface);
+}
+.modeCard--elder::before,
+.modeCard--adult::before,
+.modeCard--child::before {
+  background: none;
+}
+/* 各模式用一个克制强调色：长辈=靛蓝 / 成人=青绿 / 儿童=琥珀 */
+.modeCard--elder {
+  border-color: var(--primary-200);
+}
+.modeCard--elder:hover {
+  border-color: var(--primary-500);
+  box-shadow: var(--shadow-md);
+}
+.modeCard--adult {
+  border-color: var(--accent-200);
+}
+.modeCard--adult:hover {
+  border-color: var(--accent-500);
+  box-shadow: var(--shadow-md);
+}
+.modeCard--child {
+  border-color: #fcd34d;
+}
+.modeCard--child:hover {
+  border-color: var(--warning);
+  box-shadow: var(--shadow-md);
+}
+/* 图标底：去渐变，改用各自品牌色的浅色底 + 深色图标，浅色主题下清晰 */
+.modeIcon--elder,
+.modeIcon--adult,
+.modeIcon--child {
+  background: var(--gray-100);
+  box-shadow: none;
+}
+.modeIcon--elder {
+  background: var(--primary-100);
+}
+.modeIcon--adult {
+  background: var(--accent-100);
+}
+.modeIcon--child {
+  background: #fef3c7;
+}
+.modeIcon--elder svg {
+  color: var(--primary-600);
+}
+.modeIcon--adult svg {
+  color: var(--accent-600);
+}
+.modeIcon--child svg {
+  color: var(--warning);
+}
+/* 箭头底色去白透明 */
+.modeArrow {
+  background: var(--gray-100);
+  border-color: var(--border);
+}
+.entryFeatureIcon {
+  background: var(--surface);
+  border-color: var(--border);
+}
+
+/* ---------------------------------------------------------------
+ * 五、图标尺寸对齐（修复 #20 #21）
+ * Lucide 输出内联 width/height 属性，但 CSS 的 width/height 优先级更高，
+ * 这里统一各容器的 svg 尺寸，确保图标视觉对齐；同时让按钮图标随字号缩放。
+ * --------------------------------------------------------------- */
+/* 按钮内图标随字号缩放，避免"大字小图标"错位 */
+.btn svg,
+.btnIcon,
+.btnSpinner {
+  flex-shrink: 0;
+}
+.btn .btnIcon,
+.btn .btnSpinner {
+  width: 1em;
+  height: 1em;
+}
+/* 各容器图标尺寸归一（覆盖 Lucide 内联属性，保证对齐） */
+.userMenuItem__icon {
+  width: 18px;
+  height: 18px;
+}
+.userBadge__arrow {
+  width: 16px;
+  height: 16px;
+}
+.userMenuItem__arrow {
+  width: 16px;
+  height: 16px;
+}
+.quickLink svg {
+  width: 20px;
+  height: 20px;
+}
+.fabIcon {
+  width: 24px;
+  height: 24px;
+}
+.emergencyIcon svg {
+  width: 32px;
+  height: 32px;
+}
+.featureCard__icon svg {
+  width: 28px;
+  height: 28px;
+}
+.smallCard__icon svg {
+  width: 22px;
+  height: 22px;
+}
+.smallCard__arrow svg {
+  width: 18px;
+  height: 18px;
+}
+.modeIcon svg {
+  width: 36px;
+  height: 36px;
+}
+.entryFeatureIcon svg {
+  width: 18px;
+  height: 18px;
+}
+.modeArrow svg {
+  width: 20px;
+  height: 20px;
+}
+.weatherAdvice--error svg {
+  width: 20px;
+  height: 20px;
+}
+
+/* ---------------------------------------------------------------
+ * 七、入口页三模式卡片缩小（紧凑化）
+ * 原 .modeCard min-height 240px + padding 32px + 图标 72px 在桌面偏大，
+ * 统一收紧：卡片更矮、内边距更小、图标/箭头/字号下探，三卡更精致紧凑。
+ * --------------------------------------------------------------- */
+.modeCard {
+  min-height: 0;
+  padding: 24px 20px;
+  gap: 14px;
+}
+.modeIcon {
+  width: 56px;
+  height: 56px;
+  border-radius: 16px;
+}
+.modeIcon svg {
+  width: 28px;
+  height: 28px;
+}
+.modeContent {
+  gap: 6px;
+}
+.modeContent .cardTitle {
+  font-size: 19px;
+}
+.modeContent .cardDesc {
+  font-size: 13px;
+}
+.modeArrow {
+  width: 34px;
+  height: 34px;
+}
+.entryModesGrid {
+  max-width: 760px;
+  margin: 0 auto;
+  gap: 16px;
+}
+.entryModesTitle {
+  margin-bottom: 18px;
+}
+
+/* ---------------------------------------------------------------
+ * 八、成人/儿童模式组件级霓虹残留中和
+ * styles.css 中 .mode-adult / .mode-child 的组件覆盖仍是深色霓虹
+ * （青色描边按钮、深色渐变卡片、紫色按钮、菱形 logo、等宽字体等），
+ * 在浅色主题下切换模式后会突兀，这里统一中和回浅色 token。
+ * --------------------------------------------------------------- */
+
+/* 成人模式：去青色霓虹，回浅色卡片/按钮 */
+.mode-adult .card {
+  backdrop-filter: none;
+  background: var(--surface);
+}
+.mode-adult .card::before {
+  background: linear-gradient(90deg, transparent, var(--border-strong), transparent);
+  opacity: 1;
+}
+.mode-adult .card::after {
+  display: none;
+}
+.mode-adult .btnPrimary {
+  background: var(--primary);
+  border: 1px solid transparent;
+  color: #ffffff;
+  box-shadow: var(--shadow-sm);
+}
+.mode-adult .btnPrimary:hover {
+  background: var(--primary-dark);
+  color: #ffffff;
+  box-shadow: var(--shadow-md);
+}
+.mode-adult .btnAccent {
+  background: var(--accent);
+  border: 1px solid transparent;
+  color: #ffffff;
+  box-shadow: var(--shadow-sm);
+}
+.mode-adult .btnAccent:hover {
+  background: var(--accent-700, #0f766e);
+  color: #ffffff;
+  box-shadow: var(--shadow-md);
+}
+.mode-adult .btnDanger {
+  border: 1px solid var(--danger);
+  box-shadow: none;
+}
+.mode-adult .h1 {
+  text-transform: none;
+  letter-spacing: 0.5px;
+  font-size: 26px;
+  color: var(--text);
+}
+.mode-adult .cardTitle {
+  text-transform: none;
+  letter-spacing: 0.3px;
+  font-size: 18px;
+}
+.mode-adult .pill {
+  border-radius: 999px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+}
+.mode-adult .pillValue {
+  color: var(--text);
+  font-family: inherit;
+}
+.mode-adult .input {
+  border-radius: var(--btn-radius);
+  background: var(--surface);
+  font-family: inherit;
+}
+.mode-adult .panel {
+  box-shadow: var(--shadow-sm);
+}
+.mode-adult .kbd {
+  border-radius: 8px;
+  border-color: var(--border-strong);
+  color: var(--text);
+}
+.mode-adult .toast {
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-md);
+}
+.mode-adult .segBtnActive {
+  background: var(--primary);
+  color: #ffffff;
+  box-shadow: none;
+  border: 1px solid transparent;
+}
+/* 成人模式 logo：去掉菱形/青色描边，回统一浅色圆角 */
+.mode-adult .brandMark {
+  border-radius: 16px;
+  background: linear-gradient(135deg, var(--primary), var(--accent));
+  border: none;
+  box-shadow: var(--shadow-sm);
+}
+.mode-adult .brandMark::after {
+  display: none;
+}
+.mode-adult .brandMark::before {
+  display: block;
+}
+
+/* 儿童模式：去紫色/琥珀霓虹，回浅色按钮 */
+.mode-child .btnPrimary {
+  background: var(--primary);
+  border: none;
+  color: #ffffff;
+  box-shadow: var(--shadow-sm);
+}
+.mode-child .btnPrimary:active {
+  transform: translateY(0);
+  box-shadow: var(--shadow-sm);
+}
+.mode-child .segBtnActive {
+  background: var(--primary);
+  color: #ffffff;
+  box-shadow: none;
+}
+
+/* ---------------------------------------------------------------
+ * 九、聊天（语音问答）场景 UI 优化
+ * 针对消息框 / 发送消息 / 输入区，参照主流 IM 聊天气泡规范：
+ * 头像 + 时间戳 + 指向角气泡 + 用户/助手双色区分 + 空态引导 + 打字占位。
+ * --------------------------------------------------------------- */
+
+/* 消息列表：改用 flex 布局，气泡自适应宽度，不再贴满整行 */
+.qaChat {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 16px;
+  background: var(--bg-subtle);
+  border-color: var(--border);
+}
+
+/* 单条消息：头像 + 内容体 横向排布 */
+.qaMsg {
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+  max-width: 100%;
+}
+.qaMsgUser {
+  flex-direction: row-reverse;
+}
+.qaMsgBot {
+  flex-direction: row;
+}
+
+/* 头像：圆形，用户=主色，助手=青绿，统一尺寸 */
+.qaAvatar {
+  flex-shrink: 0;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--gray-200);
+  color: var(--gray-600);
+  box-shadow: var(--shadow-xs);
+}
+.qaMsgUser .qaAvatar {
+  background: var(--primary-600);
+  color: #ffffff;
+}
+.qaMsgBot .qaAvatar {
+  background: var(--accent-100);
+  color: var(--accent-700);
+}
+
+/* 消息体：气泡 + 元信息纵向 */
+.qaMsgBody {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-width: min(720px, 78%);
+  min-width: 0;
+}
+.qaMsgUser .qaMsgBody {
+  align-items: flex-end;
+}
+.qaMsgBot .qaMsgBody {
+  align-items: flex-start;
+}
+
+/* 气泡：用户=靛蓝实底白字（带右指向角），助手=白底描边（带左指向角） */
+.qaMsgBubble {
+  max-width: 100%;
+  padding: 12px 16px;
+  border-radius: 16px;
+  line-height: 1.6;
+  font-weight: 500;
+  font-size: 15px;
+  white-space: pre-wrap;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+  min-width: 0;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text);
+  box-shadow: var(--shadow-xs);
+}
+.qaMsgUser .qaMsgBubble {
+  background: var(--primary-600);
+  border-color: var(--primary-600);
+  color: #ffffff;
+  border-bottom-right-radius: 6px;
+  box-shadow: var(--shadow-sm);
+}
+.qaMsgBot .qaMsgBubble {
+  border-bottom-left-radius: 6px;
+}
+/* 助手错误消息：浅红底 */
+.qaMsgBot .qaMsgBubble[data-error="true"],
+.qaMsgBot .qaMsgBubble:has(+ .qaMsgMeta .qaMsgProvider) {
+  /* 由 meta 判断不可靠，交由组件 meta==="error" 的场景覆盖 */
+}
+
+/* 元信息：时间 + 服务来源，弱化显示 */
+.qaMsgMeta {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  font-size: 11px;
+  color: var(--muted);
+  padding: 0 4px;
+}
+.qaMsgProvider {
+  color: var(--gray-400);
+}
+.qaMsgUser .qaMsgProvider {
+  display: none; /* 用户消息不显示服务来源 */
+}
+
+/* 空态：引导卡片 */
+.qaEmpty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 40px 20px;
+  text-align: center;
+  color: var(--muted);
+  font-weight: 500;
+}
+.qaEmptyIcon {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--accent-100);
+  color: var(--accent-600);
+}
+.qaEmptyTitle {
+  font-size: 17px;
+  font-weight: 600;
+  color: var(--text);
+}
+.qaEmptyHint {
+  font-size: 13px;
+  color: var(--muted);
+  max-width: 360px;
+}
+
+/* 打字占位：三点跳动动画（克制） */
+.qaTyping {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 16px 18px;
+}
+.qaDot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--gray-400);
+  animation: qaBounce 1.2s infinite ease-in-out;
+}
+.qaDot:nth-child(2) {
+  animation-delay: 0.15s;
+}
+.qaDot:nth-child(3) {
+  animation-delay: 0.3s;
+}
+@keyframes qaBounce {
+  0%, 60%, 100% {
+    transform: translateY(0);
+    opacity: 0.5;
+  }
+  30% {
+    transform: translateY(-4px);
+    opacity: 1;
+  }
+}
+
+/* 消息进入动画：淡入上移（克制） */
+.qaMsg {
+  animation: qaMsgIn 240ms var(--ease-standard) both;
+}
+@keyframes qaMsgIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* 发送区：输入框 + 发送按钮不换行挤散，按钮带图标 */
+.qaComposer {
+  gap: 10px;
+  flex-wrap: nowrap;
+}
+.qaComposer .input {
+  min-width: 0;
+  flex: 1;
+  flex-basis: 0;
+  border-radius: var(--btn-radius);
+}
+.qaSendBtn {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+/* 按住说话按钮：触控目标达标、按压态高亮、禁止选中文本 */
+.qaHoldBtn {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+  min-height: 44px;
+  padding: 0 18px;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: none;
+  cursor: pointer;
+  transition: transform 120ms var(--ease-standard), background var(--motion-fast);
+}
+.qaHoldBtn:active,
+.qaHoldBtnActive {
+  background: var(--primary-700);
+  transform: scale(0.97);
+  box-shadow: var(--shadow-md);
+}
+.qaHoldBtn:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+/* 移动端：气泡宽度放宽、头像略缩 */
+@media (max-width: 640px) {
+  .qaMsgBody {
+    max-width: 84%;
+  }
+  .qaAvatar {
+    width: 30px;
+    height: 30px;
+  }
+  .qaChat {
+    padding: 12px;
+  }
+}
+
