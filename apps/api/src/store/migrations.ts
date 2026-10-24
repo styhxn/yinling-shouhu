@@ -238,6 +238,20 @@ export function migrate(db: DatabaseSync) {
       responded_at INTEGER
     );
 
+    CREATE TABLE IF NOT EXISTS roleplay_sessions (
+      id TEXT PRIMARY KEY,
+      elder_id TEXT NOT NULL,
+      scenario_id TEXT NOT NULL,
+      status TEXT NOT NULL,
+      turn INTEGER NOT NULL,
+      max_turns INTEGER NOT NULL,
+      messages_json TEXT NOT NULL,
+      report_json TEXT,
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_roleplay_elder ON roleplay_sessions(elder_id, created_at DESC);
+
     CREATE TABLE IF NOT EXISTS sessions (
       id TEXT PRIMARY KEY,
       user_id TEXT NOT NULL,

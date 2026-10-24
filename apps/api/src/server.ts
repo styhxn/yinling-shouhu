@@ -4,6 +4,7 @@ import websocket from "@fastify/websocket";
 import fastifyStatic from "@fastify/static";
 import Fastify from "fastify";
 import fs from "node:fs";
+import path from "node:path";
 import type { ConfigOverrides, AppConfig } from "./config.js";
 import { loadConfig } from "./config.js";
 import { registerRoutes } from "./routes/index.js";
@@ -77,6 +78,7 @@ export async function createServer(options: CreateServerOptions = {}) {
   server.decorate("agent", agent);
   server.decorate("antiFraud", antiFraud);
   server.decorate("coolingOff", coolingOff);
+  server.decorate("weather", weather);
   server.decorate("interview", interview);
   server.decorate("story", story);
 
@@ -140,6 +142,37 @@ export async function createServer(options: CreateServerOptions = {}) {
 
   await registerRoutes(server);
 
+  const webIndex = path.join(config.webDistDir, "index.html");
+  if (config.env === "production" && fs.existsSync(webIndex)) {
+    await server.register(fastifyStatic, {
+      root: config.webDistDir,
+      prefix: "/",
+      wildcard: false,
+      decorateReply: false,
+      index: false,
+      maxAge: "30d",
+      immutable: true
+    });
+
+    server.setNotFoundHandler(async (req, reply) => {
+      const pathname = req.url.split("?")[0] ?? "";
+      const isBackend =
+        pathname === "/api" ||
+        pathname.startsWith("/api/") ||
+        pathname === "/public" ||
+        pathname.startsWith("/public/") ||
+        pathname.startsWith("/ws") ||
+        pathname === "/health" ||
+        pathname === "/ready" ||
+        pathname.startsWith("/dh-live-api");
+      if (req.method !== "GET" || isBackend) {
+        return reply.code(404).send({ error: "not_found" });
+      }
+      const html = await fs.promises.readFile(webIndex, "utf8");
+      return reply.type("text/html; charset=utf-8").header("cache-control", "no-cache").send(html);
+    });
+  }
+
   server.addHook("onClose", async () => {
     store.close();
     db.close();
@@ -163,6 +196,7 @@ declare module "fastify" {
     agent: AgentRunner;
     antiFraud: AntiFraudService;
     coolingOff: CoolingOffService;
+    weather: ReturnType<typeof createWeatherService>;
     interview: InterviewService;
     story: StoryService;
   }

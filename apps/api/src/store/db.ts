@@ -247,6 +247,25 @@ export type DbMedicationLog = {
   ts: number;
 };
 
+export type RoleplayMessage = {
+  role: "scammer" | "elder";
+  text: string;
+  ts: number;
+};
+
+export type DbRoleplaySession = {
+  id: string;
+  elderId: string;
+  scenarioId: string;
+  status: string;
+  turn: number;
+  maxTurns: number;
+  messages: RoleplayMessage[];
+  report: unknown | null;
+  createdAt: number;
+  updatedAt: number;
+};
+
 export type CreateDbOptions = {
   masterKey: Buffer;
   seed?: boolean;
@@ -1420,6 +1439,78 @@ export function createDb(dbPath: string, options: CreateDbOptions) {
     }
   };
 
+  function mapRoleplay(row: any): DbRoleplaySession {
+    return {
+      id: String(row.id),
+      elderId: String(row.elder_id),
+      scenarioId: String(row.scenario_id),
+      status: String(row.status),
+      turn: Number(row.turn),
+      maxTurns: Number(row.max_turns),
+      messages: parseJson<RoleplayMessage[]>(row.messages_json, []),
+      report: parseJson<unknown>(row.report_json, null),
+      createdAt: Number(row.created_at),
+      updatedAt: Number(row.updated_at)
+    };
+  }
+
+  const roleplaySessions = {
+    create(input: {
+      elderId: string;
+      scenarioId: string;
+      maxTurns: number;
+      opener: string;
+    }): DbRoleplaySession {
+      const id = `rp_${randomUUID()}`;
+      const now = Date.now();
+      const messages: RoleplayMessage[] = [
+        { role: "scammer", text: input.opener, ts: now }
+      ];
+      raw
+        .prepare(
+          `INSERT INTO roleplay_sessions
+            (id, elder_id, scenario_id, status, turn, max_turns, messages_json, report_json, created_at, updated_at)
+           VALUES (?, ?, ?, 'active', 1, ?, ?, NULL, ?, ?)`
+        )
+        .run(id, input.elderId, input.scenarioId, input.maxTurns, JSON.stringify(messages), now, now);
+      return roleplaySessions.get(id)!;
+    },
+    get(id: string): DbRoleplaySession | null {
+      const row = raw.prepare("SELECT * FROM roleplay_sessions WHERE id = ?").get(id) as any;
+      return row ? mapRoleplay(row) : null;
+    },
+    update(
+      id: string,
+      patch: {
+        status?: string;
+        turn?: number;
+        messages?: RoleplayMessage[];
+        report?: unknown;
+      }
+    ): DbRoleplaySession | null {
+      const current = roleplaySessions.get(id);
+      if (!current) return null;
+      const next = {
+        ...current,
+        ...Object.fromEntries(Object.entries(patch).filter(([, value]) => value !== undefined)),
+        updatedAt: Date.now()
+      } as DbRoleplaySession;
+      raw
+        .prepare(
+          "UPDATE roleplay_sessions SET status = ?, turn = ?, messages_json = ?, report_json = ?, updated_at = ? WHERE id = ?"
+        )
+        .run(
+          next.status,
+          next.turn,
+          JSON.stringify(next.messages),
+          next.report ? JSON.stringify(next.report) : null,
+          next.updatedAt,
+          id
+        );
+      return roleplaySessions.get(id);
+    }
+  };
+
   return {
     raw,
     users,
@@ -1442,6 +1533,7 @@ export function createDb(dbPath: string, options: CreateDbOptions) {
     safetyAlerts,
     missingPosters,
     medicationLogs,
+    roleplaySessions,
     close: () => raw.close()
   };
 }

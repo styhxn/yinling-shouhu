@@ -20,6 +20,7 @@ export type AppConfig = {
   dataDir: string;
   dbPath: string;
   publicDir: string;
+  webDistDir: string;
   uploadsDir: string;
   demoMode: boolean;
   demoResetToken: string;
@@ -116,7 +117,10 @@ function gatherProviders(): LlmProviderConfig[] {
 export function loadConfig(overrides: ConfigOverrides = {}): AppConfig {
   const envName = overrides.env ?? (env("NODE_ENV") || "development");
   const dataDir = overrides.dataDir ?? path.resolve(process.cwd(), env("DATA_DIR") || "data");
-  const publicDir = overrides.publicDir ?? path.resolve(process.cwd(), "public");
+  const publicDir = overrides.publicDir ?? path.resolve(process.cwd(), env("PUBLIC_DIR") || "public");
+  const webDistDir =
+    overrides.webDistDir ??
+    path.resolve(process.cwd(), env("WEB_DIST_DIR") || path.join("..", "web", "dist"));
   const providers = overrides.llm?.providers ?? gatherProviders();
   const shouldMock =
     envName === "test" || env("LLM_MOCK") === "1" || providers.length === 0;
@@ -135,6 +139,7 @@ export function loadConfig(overrides: ConfigOverrides = {}): AppConfig {
     dataDir,
     dbPath: overrides.dbPath ?? (env("DB_PATH") || path.join(dataDir, "app.db")),
     publicDir,
+    webDistDir,
     uploadsDir: overrides.uploadsDir ?? path.join(publicDir, "uploads"),
     demoMode: overrides.demoMode ?? (env("DEMO_MODE") === "1" || envName === "test"),
     demoResetToken: overrides.demoResetToken ?? (env("DEMO_RESET_TOKEN") || "change-me"),

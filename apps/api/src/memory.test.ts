@@ -86,6 +86,23 @@ describe("memory", () => {
     });
     expect(detail.statusCode).toBe(200);
     expect(detail.json().book.elderId).toBe("e_li");
+
+    const exported = await server.inject({
+      method: "GET",
+      url: "/api/memory/story/export",
+      headers: { cookie: elderCookie }
+    });
+    expect(exported.statusCode).toBe(200);
+    expect(String(exported.headers["content-type"])).toContain("text/html");
+    expect(String(exported.headers["content-disposition"])).toContain("attachment");
+    expect(exported.body).toContain("家庭记忆册");
+    expect(exported.body).toContain("根据长辈口述整理");
+
+    const anonymous = await server.inject({
+      method: "GET",
+      url: "/api/memory/story/export"
+    });
+    expect(anonymous.statusCode).toBe(401);
   });
 
   it("lets family read the linked elder's memories but not another elder", async () => {

@@ -59,6 +59,98 @@ function resolveElderId(req: FastifyRequest, requested?: string): string | null 
   return null;
 }
 
+function escapeHtml(value: string) {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+function storyBookHtml(input: {
+  bookTitle: string;
+  elderName: string;
+  createdAt: number;
+  chapters: { title: string; content: string }[];
+}) {
+  const date = new Date(input.createdAt).toLocaleDateString("zh-CN", {
+    year: "numeric",
+    month: "long",
+    day: "numeric"
+  });
+  const chapters = input.chapters
+    .map((chapter, index) => {
+      const paragraphs = chapter.content
+        .split(/\n+/)
+        .map((line) => line.trim())
+        .filter(Boolean)
+        .map((line) => `<p>${escapeHtml(line)}</p>`)
+        .join("\n");
+      return `<section class="chapter">
+  <header><span class="no">第 ${index + 1} 篇</span><h2>${escapeHtml(chapter.title)}</h2></header>
+  ${paragraphs}
+  <footer>根据长辈口述整理，家属可修改。</footer>
+</section>`;
+    })
+    .join("\n");
+
+  return `<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>${escapeHtml(input.bookTitle)}</title>
+<style>
+  :root { color-scheme: light; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: #EDEFE8; color: #1C2724; font-family: "Songti SC", "STSong", "SimSun", serif; }
+  .paper { max-width: 720px; margin: 0 auto; padding: 56px 64px; background: #FBFBF7; }
+  .toolbar { position: sticky; top: 0; display: flex; justify-content: flex-end; padding: 12px 0; background: #FBFBF7; }
+  .toolbar button { border: 1px solid #5E7F71; background: transparent; color: #3F5A50; padding: 8px 16px; font: inherit; font-size: 14px; cursor: pointer; }
+  .cover { min-height: 78vh; display: flex; flex-direction: column; justify-content: center; border-bottom: 1px solid #DDE3DA; padding-bottom: 56px; }
+  .seal { display: inline-block; align-self: flex-start; padding: 6px 10px; border: 1px solid #8C3B2E; color: #8C3B2E; font-size: 12px; letter-spacing: 0.4em; }
+  .kicker { margin: 28px 0 8px; color: #7A8983; font-size: 13px; letter-spacing: 0.3em; }
+  .cover h1 { margin: 0 0 18px; font-size: 46px; font-weight: 600; line-height: 1.25; letter-spacing: 0.04em; }
+  .cover .name { margin: 0; font-size: 18px; color: #3F5A50; }
+  .cover .meta { margin: 6px 0 0; font-size: 13px; color: #7A8983; }
+  .cover .note { margin-top: 40px; max-width: 30em; color: #7A8983; font-size: 12px; line-height: 1.9; }
+  .chapter { padding: 56px 0; border-bottom: 1px solid #E7EBE4; }
+  .chapter header { margin-bottom: 28px; }
+  .chapter .no { color: #8C3B2E; font-size: 12px; letter-spacing: 0.25em; }
+  .chapter h2 { margin: 10px 0 0; font-size: 30px; font-weight: 600; letter-spacing: 0.03em; }
+  .chapter p { margin: 0 0 1.1em; font-size: 17px; line-height: 2; text-align: justify; }
+  .chapter footer { margin-top: 32px; color: #8A968F; font-size: 12px; }
+  .end { padding: 56px 0 8px; text-align: center; color: #5E7F71; }
+  .end .note { color: #8A968F; font-size: 12px; letter-spacing: 0.2em; }
+  @page { size: A4; margin: 20mm 18mm; }
+  @media print {
+    body { background: #fff; }
+    .paper { padding: 0; max-width: none; }
+    .toolbar { display: none; }
+    .cover { min-height: 60vh; }
+    .chapter { break-before: page; border-bottom: 0; }
+  }
+</style>
+</head>
+<body>
+<main class="paper">
+  <div class="toolbar"><button type="button" onclick="window.print()">打印 / 另存为 PDF</button></div>
+  <section class="cover">
+    <span class="seal">岁月</span>
+    <p class="kicker">家庭记忆册</p>
+    <h1>${escapeHtml(input.bookTitle)}</h1>
+    <p class="name">${escapeHtml(input.elderName)} 口述</p>
+    <p class="meta">整理于 ${escapeHtml(date)}</p>
+    <p class="note">本册由长辈口述、家人整理，AI 仅协助润色。文中事实请以家人核对为准，未公开的内容不会被分享。</p>
+  </section>
+  ${chapters}
+  <section class="end"><p>— 完 —</p><p class="note">银龄守护 · 家庭记忆</p></section>
+</main>
+</body>
+</html>`;
+}
+
 export const memoryRoutes: FastifyPluginAsync = async (server) => {
   server.get("/items", { preHandler: requireAuth }, async (req, reply) => {
     const query = ListQuerySchema.safeParse(req.query);
@@ -225,6 +317,41 @@ export const memoryRoutes: FastifyPluginAsync = async (server) => {
     const elderId = resolveElderId(req, query.data.elderId);
     if (!elderId) return reply.code(403).send({ error: "forbidden" });
     return { ok: true, ...server.story.listByElder(elderId) };
+  });
+
+  server.get("/story/export", { preHandler: requireAuth }, async (req, reply) => {
+    const query = StoryQuerySchema.safeParse(req.query);
+    if (!query.success) return reply.code(400).send({ error: "invalid_body" });
+    const elderId = resolveElderId(req, query.data.elderId);
+    if (!elderId) return reply.code(403).send({ error: "forbidden" });
+
+    const { book, chapters } = server.story.listByElder(elderId);
+    if (!book || chapters.length === 0) {
+      return reply.code(404).send({ error: "not_found", message: "还没有生成故事章节" });
+    }
+
+    const elder = server.db.elders.getById(elderId);
+    const html = storyBookHtml({
+      bookTitle: book.title,
+      elderName: elder?.displayName ?? "长辈",
+      createdAt: book.createdAt,
+      chapters
+    });
+    const filename = `${book.title}.html`.replace(/[\\/:*?"<>|]/g, "_");
+    server.db.auditLogs.insert({
+      userId: req.user!.userId,
+      action: "story.export",
+      targetType: "story_book",
+      targetId: book.id,
+      ip: req.ip
+    });
+    return reply
+      .type("text/html; charset=utf-8")
+      .header(
+        "content-disposition",
+        `attachment; filename="story-book.html"; filename*=UTF-8''${encodeURIComponent(filename)}`
+      )
+      .send(html);
   });
 
   server.get("/story/:id", { preHandler: requireAuth }, async (req, reply) => {
