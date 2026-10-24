@@ -114,11 +114,85 @@ export type DbScamCheck = {
   elderId: string;
   inputType: string;
   inputText: string | null;
+  imageUploadId?: string | null;
   url: string | null;
   riskLevel: string;
   scamType: string;
   confidence: number;
   result: unknown;
+};
+
+export type DbUpload = {
+  id: string;
+  ownerUserId: string;
+  elderId: string | null;
+  kind: string;
+  path: string;
+  mime: string;
+  size: number;
+  width: number | null;
+  height: number | null;
+  createdAt: number;
+};
+
+export type DbMemory = {
+  id: string;
+  elderId: string;
+  title: string;
+  timeRange: string | null;
+  place: string | null;
+  people: string[];
+  tags: string[];
+  photoIds: string[];
+  transcript: string;
+  summary: string | null;
+  visibility: string;
+  consent: boolean;
+  status: string;
+  createdAt: number;
+  updatedAt: number;
+};
+
+export type DbStoryBook = {
+  id: string;
+  elderId: string;
+  title: string;
+  coverUploadId: string | null;
+  shareToken: string | null;
+  createdAt: number;
+};
+
+export type DbStoryChapter = {
+  id: string;
+  bookId: string;
+  title: string;
+  memoryIds: string[];
+  content: string;
+  audioUrl: string | null;
+  orderIndex: number;
+  status: string;
+  familyNotes: string | null;
+  createdAt: number;
+  updatedAt: number;
+};
+
+export type InterviewQA = {
+  question: string;
+  answer: string;
+};
+
+export type DbInterview = {
+  id: string;
+  elderId: string;
+  topic: string | null;
+  photoId: string | null;
+  turn: number;
+  maxTurns: number;
+  status: string;
+  transcript: InterviewQA[];
+  currentQuestion: string | null;
+  createdAt: number;
+  updatedAt: number;
 };
 
 export type CreateDbOptions = {
@@ -346,6 +420,25 @@ export function createDb(dbPath: string, options: CreateDbOptions) {
         startedAt: now,
         expiresAt
       };
+    },
+    get(id: string): DbCoolingOff | null {
+      const row = raw.prepare("SELECT * FROM cooling_offs WHERE id = ?").get(id) as any;
+      if (!row) return null;
+      return {
+        id: String(row.id),
+        elderId: String(row.elder_id),
+        status: String(row.status),
+        riskLevel: String(row.risk_level),
+        questions: parseJson<string[]>(row.questions_json, []),
+        familyConfirmId: row.family_confirm_id ? String(row.family_confirm_id) : null,
+        startedAt: Number(row.started_at),
+        expiresAt: Number(row.expires_at)
+      };
+    },
+    setStatus(id: string, status: string, outcome?: string): void {
+      raw
+        .prepare("UPDATE cooling_offs SET status = ?, outcome = ? WHERE id = ?")
+        .run(status, outcome ?? null, id);
     }
   };
 
@@ -366,6 +459,18 @@ export function createDb(dbPath: string, options: CreateDbOptions) {
         payload: input.payload,
         status: "pending",
         createdAt: now
+      };
+    },
+    get(id: string): DbFamilyConfirm | null {
+      const row = raw.prepare("SELECT * FROM family_confirms WHERE id = ?").get(id) as any;
+      if (!row) return null;
+      return {
+        id: String(row.id),
+        elderId: String(row.elder_id),
+        type: String(row.type),
+        payload: parseJson<unknown>(row.payload_json, {}),
+        status: String(row.status),
+        createdAt: Number(row.created_at)
       };
     },
     listPending(elderId: string): DbFamilyConfirm[] {
@@ -513,7 +618,7 @@ export function createDb(dbPath: string, options: CreateDbOptions) {
           input.elderId,
           input.inputType,
           input.inputText ? enc(input.inputText) : null,
-          null,
+          input.imageUploadId ?? null,
           input.url ?? null,
           input.riskLevel,
           input.scamType,
@@ -522,6 +627,375 @@ export function createDb(dbPath: string, options: CreateDbOptions) {
           "rules",
           Date.now()
         );
+    }
+  };
+
+  function mapUpload(row: any): DbUpload {
+    return {
+      id: String(row.id),
+      ownerUserId: String(row.owner_user_id),
+      elderId: row.elder_id ? String(row.elder_id) : null,
+      kind: String(row.kind),
+      path: String(row.path),
+      mime: String(row.mime),
+      size: Number(row.size),
+      width: row.width === null ? null : Number(row.width),
+      height: row.height === null ? null : Number(row.height),
+      createdAt: Number(row.created_at)
+    };
+  }
+
+  function mapMemory(row: any): DbMemory {
+    return {
+      id: String(row.id),
+      elderId: String(row.elder_id),
+      title: String(row.title),
+      timeRange: row.time_range ? String(row.time_range) : null,
+      place: row.place ? String(row.place) : null,
+      people: parseJson<string[]>(row.people_json, []),
+      tags: parseJson<string[]>(row.tags_json, []),
+      photoIds: parseJson<string[]>(row.photo_ids_json, []),
+      transcript: dec<string>(row.transcript_enc) ?? "",
+      summary: row.summary ? String(row.summary) : null,
+      visibility: String(row.visibility),
+      consent: Boolean(row.consent),
+      status: String(row.status),
+      createdAt: Number(row.created_at),
+      updatedAt: Number(row.updated_at)
+    };
+  }
+
+  function mapStoryBook(row: any): DbStoryBook {
+    return {
+      id: String(row.id),
+      elderId: String(row.elder_id),
+      title: String(row.title),
+      coverUploadId: row.cover_upload_id ? String(row.cover_upload_id) : null,
+      shareToken: row.share_token ? String(row.share_token) : null,
+      createdAt: Number(row.created_at)
+    };
+  }
+
+  function mapStoryChapter(row: any): DbStoryChapter {
+    return {
+      id: String(row.id),
+      bookId: String(row.book_id),
+      title: String(row.title),
+      memoryIds: parseJson<string[]>(row.memory_ids_json, []),
+      content: String(row.content),
+      audioUrl: row.audio_url ? String(row.audio_url) : null,
+      orderIndex: Number(row.order_index),
+      status: String(row.status),
+      familyNotes: dec<string>(row.family_notes_enc),
+      createdAt: Number(row.created_at),
+      updatedAt: Number(row.updated_at)
+    };
+  }
+
+  function mapInterview(row: any): DbInterview {
+    return {
+      id: String(row.id),
+      elderId: String(row.elder_id),
+      topic: row.topic ? String(row.topic) : null,
+      photoId: row.photo_id ? String(row.photo_id) : null,
+      turn: Number(row.turn),
+      maxTurns: Number(row.max_turns),
+      status: String(row.status),
+      transcript: parseJson<InterviewQA[]>(row.transcript_json, []),
+      currentQuestion: row.current_question ? String(row.current_question) : null,
+      createdAt: Number(row.created_at),
+      updatedAt: Number(row.updated_at)
+    };
+  }
+
+  const uploads = {
+    create(input: {
+      id?: string;
+      ownerUserId: string;
+      elderId: string | null;
+      kind: string;
+      path: string;
+      mime: string;
+      size: number;
+      width: number | null;
+      height: number | null;
+      sha256?: string;
+    }): DbUpload {
+      const id = input.id ?? `up_${randomUUID()}`;
+      const now = Date.now();
+      raw
+        .prepare(
+          `INSERT INTO uploads
+            (id, owner_user_id, elder_id, kind, path, mime, size, width, height, sha256, created_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        )
+        .run(
+          id,
+          input.ownerUserId,
+          input.elderId,
+          input.kind,
+          input.path,
+          input.mime,
+          input.size,
+          input.width,
+          input.height,
+          input.sha256 ?? null,
+          now
+        );
+      return {
+        id,
+        ownerUserId: input.ownerUserId,
+        elderId: input.elderId,
+        kind: input.kind,
+        path: input.path,
+        mime: input.mime,
+        size: input.size,
+        width: input.width,
+        height: input.height,
+        createdAt: now
+      };
+    },
+    getById(id: string): DbUpload | null {
+      const row = raw.prepare("SELECT * FROM uploads WHERE id = ?").get(id) as any;
+      return row ? mapUpload(row) : null;
+    }
+  };
+
+  const memories = {
+    create(input: {
+      elderId: string;
+      title: string;
+      timeRange?: string | null;
+      place?: string | null;
+      people?: string[];
+      tags?: string[];
+      photoIds?: string[];
+      transcript: string;
+      summary?: string | null;
+      visibility?: string;
+      consent?: boolean;
+    }): DbMemory {
+      const id = `m_${randomUUID()}`;
+      const now = Date.now();
+      raw
+        .prepare(
+          `INSERT INTO memories
+            (id, elder_id, title, time_range, place, people_json, tags_json, photo_ids_json,
+             transcript_enc, summary, visibility, consent, status, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, ?)`
+        )
+        .run(
+          id,
+          input.elderId,
+          input.title,
+          input.timeRange ?? null,
+          input.place ?? null,
+          JSON.stringify(input.people ?? []),
+          JSON.stringify(input.tags ?? []),
+          JSON.stringify(input.photoIds ?? []),
+          enc(input.transcript),
+          input.summary ?? null,
+          input.visibility ?? "family",
+          input.consent ? 1 : 0,
+          now,
+          now
+        );
+      return memories.getById(id)!;
+    },
+    listByElder(elderId: string): DbMemory[] {
+      const rows = raw
+        .prepare(
+          "SELECT * FROM memories WHERE elder_id = ? AND status = 'active' ORDER BY created_at DESC"
+        )
+        .all(elderId) as any[];
+      return rows.map(mapMemory);
+    },
+    getById(id: string): DbMemory | null {
+      const row = raw.prepare("SELECT * FROM memories WHERE id = ?").get(id) as any;
+      return row ? mapMemory(row) : null;
+    },
+    update(
+      id: string,
+      patch: Partial<
+        Pick<
+          DbMemory,
+          | "title"
+          | "timeRange"
+          | "place"
+          | "people"
+          | "tags"
+          | "photoIds"
+          | "transcript"
+          | "summary"
+          | "visibility"
+          | "consent"
+        >
+      >
+    ): DbMemory | null {
+      const current = memories.getById(id);
+      if (!current) return null;
+      const next = {
+        ...current,
+        ...Object.fromEntries(Object.entries(patch).filter(([, value]) => value !== undefined)),
+        updatedAt: Date.now()
+      } as DbMemory;
+      raw
+        .prepare(
+          `UPDATE memories SET title = ?, time_range = ?, place = ?, people_json = ?, tags_json = ?,
+             photo_ids_json = ?, transcript_enc = ?, summary = ?, visibility = ?, consent = ?, updated_at = ?
+           WHERE id = ?`
+        )
+        .run(
+          next.title,
+          next.timeRange,
+          next.place,
+          JSON.stringify(next.people),
+          JSON.stringify(next.tags),
+          JSON.stringify(next.photoIds),
+          enc(next.transcript),
+          next.summary,
+          next.visibility,
+          next.consent ? 1 : 0,
+          next.updatedAt,
+          id
+        );
+      return memories.getById(id);
+    },
+    softDelete(id: string): void {
+      raw
+        .prepare("UPDATE memories SET status = 'deleted', deleted_at = ?, updated_at = ? WHERE id = ?")
+        .run(Date.now(), Date.now(), id);
+    }
+  };
+
+  const storyBooks = {
+    ensureForElder(elderId: string, title = "我的人生故事"): DbStoryBook {
+      const existing = raw
+        .prepare("SELECT * FROM story_books WHERE elder_id = ? ORDER BY created_at ASC LIMIT 1")
+        .get(elderId) as any;
+      if (existing) return mapStoryBook(existing);
+
+      const id = `sb_${randomUUID()}`;
+      const now = Date.now();
+      raw
+        .prepare(
+          "INSERT INTO story_books (id, elder_id, title, cover_upload_id, share_token, created_at) VALUES (?, ?, ?, ?, ?, ?)"
+        )
+        .run(id, elderId, title, null, null, now);
+      return { id, elderId, title, coverUploadId: null, shareToken: null, createdAt: now };
+    },
+    getById(id: string): DbStoryBook | null {
+      const row = raw.prepare("SELECT * FROM story_books WHERE id = ?").get(id) as any;
+      return row ? mapStoryBook(row) : null;
+    },
+    getByElder(elderId: string): DbStoryBook | null {
+      const row = raw
+        .prepare("SELECT * FROM story_books WHERE elder_id = ? ORDER BY created_at ASC LIMIT 1")
+        .get(elderId) as any;
+      return row ? mapStoryBook(row) : null;
+    }
+  };
+
+  const storyChapters = {
+    create(input: {
+      bookId: string;
+      title: string;
+      memoryIds: string[];
+      content: string;
+      orderIndex: number;
+      status?: string;
+    }): DbStoryChapter {
+      const id = `ch_${randomUUID()}`;
+      const now = Date.now();
+      raw
+        .prepare(
+          `INSERT INTO story_chapters
+            (id, book_id, title, memory_ids_json, content, audio_url, order_index, status, family_notes_enc, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        )
+        .run(
+          id,
+          input.bookId,
+          input.title,
+          JSON.stringify(input.memoryIds),
+          input.content,
+          null,
+          input.orderIndex,
+          input.status ?? "draft",
+          null,
+          now,
+          now
+        );
+      return storyChapters.getById(id)!;
+    },
+    getById(id: string): DbStoryChapter | null {
+      const row = raw.prepare("SELECT * FROM story_chapters WHERE id = ?").get(id) as any;
+      return row ? mapStoryChapter(row) : null;
+    },
+    listByBook(bookId: string): DbStoryChapter[] {
+      const rows = raw
+        .prepare("SELECT * FROM story_chapters WHERE book_id = ? ORDER BY order_index ASC")
+        .all(bookId) as any[];
+      return rows.map(mapStoryChapter);
+    }
+  };
+
+  const interviews = {
+    create(input: {
+      elderId: string;
+      topic: string | null;
+      photoId: string | null;
+      maxTurns: number;
+      questions: string[];
+    }): DbInterview {
+      const id = `iv_${randomUUID()}`;
+      const now = Date.now();
+      raw
+        .prepare(
+          `INSERT INTO interviews
+            (id, elder_id, topic, photo_id, turn, max_turns, status, transcript_json, current_question, created_at, updated_at)
+           VALUES (?, ?, ?, ?, 1, ?, 'asking', '[]', ?, ?, ?)`
+        )
+        .run(
+          id,
+          input.elderId,
+          input.topic,
+          input.photoId,
+          input.maxTurns,
+          input.questions[0] ?? null,
+          now,
+          now
+        );
+      return interviews.get(id)!;
+    },
+    get(id: string): DbInterview | null {
+      const row = raw.prepare("SELECT * FROM interviews WHERE id = ?").get(id) as any;
+      return row ? mapInterview(row) : null;
+    },
+    update(
+      id: string,
+      patch: { turn?: number; transcript?: InterviewQA[]; currentQuestion?: string | null; status?: string }
+    ): DbInterview | null {
+      const current = interviews.get(id);
+      if (!current) return null;
+      const next = {
+        ...current,
+        ...Object.fromEntries(Object.entries(patch).filter(([, value]) => value !== undefined)),
+        updatedAt: Date.now()
+      } as DbInterview;
+      raw
+        .prepare(
+          "UPDATE interviews SET turn = ?, transcript_json = ?, current_question = ?, status = ?, updated_at = ? WHERE id = ?"
+        )
+        .run(
+          next.turn,
+          JSON.stringify(next.transcript),
+          next.currentQuestion,
+          next.status,
+          next.updatedAt,
+          id
+        );
+      return interviews.get(id);
     }
   };
 
@@ -538,6 +1012,11 @@ export function createDb(dbPath: string, options: CreateDbOptions) {
     toolLogs,
     auditLogs,
     scamChecks,
+    uploads,
+    memories,
+    storyBooks,
+    storyChapters,
+    interviews,
     close: () => raw.close()
   };
 }

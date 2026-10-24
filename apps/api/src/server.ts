@@ -16,6 +16,10 @@ import { createEventBus } from "./services/eventBus.js";
 import { createLocationService } from "./services/location/location.js";
 import { createModelRouter } from "./services/llm/router.js";
 import type { ModelRouter } from "./services/llm/types.js";
+import { createInterviewService, type InterviewService } from "./services/memory/interview.js";
+import { createStoryService, type StoryService } from "./services/memory/story.js";
+import { createAntiFraudService, type AntiFraudService } from "./services/safety/antiFraud.js";
+import { createCoolingOffService, type CoolingOffService } from "./services/safety/coolingOff.js";
 import { createStore } from "./services/store.js";
 import { createWeatherService } from "./services/weather.js";
 import { createDb, type AppDb } from "./store/db.js";
@@ -41,7 +45,20 @@ export async function createServer(options: CreateServerOptions = {}) {
   const modelRouter = createModelRouter(config);
   const weather = createWeatherService(config);
   const location = createLocationService(db);
-  const toolRegistry = createToolRegistry({ db, store, config, eventBus, weather, location });
+  const antiFraud = createAntiFraudService(modelRouter);
+  const coolingOff = createCoolingOffService({ db, eventBus });
+  const interview = createInterviewService(db);
+  const story = createStoryService(db, modelRouter);
+  const toolRegistry = createToolRegistry({
+    db,
+    store,
+    config,
+    eventBus,
+    weather,
+    location,
+    antiFraud,
+    coolingOff
+  });
   const agent = createAgentRunner({ db, store, config, modelRouter, toolRegistry, eventBus });
 
   const server = Fastify({
@@ -58,6 +75,10 @@ export async function createServer(options: CreateServerOptions = {}) {
   server.decorate("modelRouter", modelRouter);
   server.decorate("toolRegistry", toolRegistry);
   server.decorate("agent", agent);
+  server.decorate("antiFraud", antiFraud);
+  server.decorate("coolingOff", coolingOff);
+  server.decorate("interview", interview);
+  server.decorate("story", story);
 
   server.addHook("onRequest", async (req, reply) => {
     const token = readCookie(req.headers.cookie, config.cookieName);
@@ -140,5 +161,9 @@ declare module "fastify" {
     modelRouter: ModelRouter;
     toolRegistry: ToolRegistry;
     agent: AgentRunner;
+    antiFraud: AntiFraudService;
+    coolingOff: CoolingOffService;
+    interview: InterviewService;
+    story: StoryService;
   }
 }

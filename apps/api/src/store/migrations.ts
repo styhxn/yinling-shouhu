@@ -56,6 +56,7 @@ export function migrate(db: DatabaseSync) {
       place TEXT,
       people_json TEXT,
       tags_json TEXT,
+      photo_ids_json TEXT,
       transcript_enc TEXT NOT NULL,
       summary TEXT,
       visibility TEXT NOT NULL DEFAULT 'family',
@@ -66,6 +67,21 @@ export function migrate(db: DatabaseSync) {
       deleted_at INTEGER
     );
     CREATE INDEX IF NOT EXISTS idx_memories_elder ON memories(elder_id, created_at DESC);
+
+    CREATE TABLE IF NOT EXISTS interviews (
+      id TEXT PRIMARY KEY,
+      elder_id TEXT NOT NULL,
+      topic TEXT,
+      photo_id TEXT,
+      turn INTEGER NOT NULL,
+      max_turns INTEGER NOT NULL,
+      status TEXT NOT NULL,
+      transcript_json TEXT NOT NULL,
+      current_question TEXT,
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_interviews_elder ON interviews(elder_id, created_at DESC);
 
     CREATE TABLE IF NOT EXISTS story_books (
       id TEXT PRIMARY KEY,
@@ -318,4 +334,10 @@ export function migrate(db: DatabaseSync) {
 
     PRAGMA user_version = 1;
   `);
+
+  // Additive migration for databases created before photo_ids_json existed.
+  const memoryColumns = db.prepare("PRAGMA table_info(memories)").all() as Array<{ name?: string }>;
+  if (!memoryColumns.some((column) => column.name === "photo_ids_json")) {
+    db.exec("ALTER TABLE memories ADD COLUMN photo_ids_json TEXT");
+  }
 }

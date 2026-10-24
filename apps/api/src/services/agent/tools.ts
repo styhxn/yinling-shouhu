@@ -4,6 +4,8 @@ import type { AppDb, Role } from "../../store/db.js";
 import type { SessionUser } from "../auth/types.js";
 import type { createEventBus } from "../eventBus.js";
 import type { LocationService } from "../location/location.js";
+import type { AntiFraudService } from "../safety/antiFraud.js";
+import type { CoolingOffService } from "../safety/coolingOff.js";
 import { analyzeScam } from "../safety/scam.js";
 import type { createStore } from "../store.js";
 import type { WeatherService } from "../weather.js";
@@ -43,6 +45,8 @@ export type ToolDeps = {
   eventBus: ReturnType<typeof createEventBus>;
   weather: WeatherService;
   location: LocationService;
+  antiFraud: AntiFraudService;
+  coolingOff: CoolingOffService;
 };
 
 export type ToolRegistry = {
@@ -161,23 +165,45 @@ export function createToolRegistry(deps: ToolDeps): ToolRegistry {
           ...(typeof args.text === "string" ? { text: args.text } : {}),
           ...(typeof args.url === "string" ? { url: args.url } : {})
         });
+        const query =
+          args.inputType === "url"
+            ? String(args.url ?? "")
+            : String(args.text ?? "");
+        const hits = query ? await deps.antiFraud.search(query, 2) : [];
+        const seen = new Set<string>();
+        const sources = [...result.sources, ...hits.map((hit) => hit.source)].filter((source) => {
+          const key = `${source.title}|${source.url}`;
+          if (seen.has(key)) return false;
+          seen.add(key);
+          return true;
+        });
+        const enriched = { ...result, sources };
+
         deps.db.scamChecks.insert({
           elderId: ctx.elderId ?? ctx.user.userId,
           inputType: args.inputType,
           inputText: typeof args.text === "string" ? args.text : null,
           url: typeof args.url === "string" ? args.url : null,
-          riskLevel: result.riskLevel,
-          scamType: result.scamType,
-          confidence: result.confidence,
-          result
+          riskLevel: enriched.riskLevel,
+          scamType: enriched.scamType,
+          confidence: enriched.confidence,
+          result: enriched
         });
-        const flags = result.redFlags.map((flag) => `- ${flag.quote}：${flag.reason}`).join("\n");
+
+        const flags = enriched.redFlags
+          .map((flag) => `- ${flag.quote}：${flag.reason}`)
+          .join("\n");
+        const related = hits.length
+          ? `\n相关案例：${hits.map((hit) => hit.title).join("、")}`
+          : "";
         return {
           summary:
-            `风险等级：${result.riskLevel}；类型：${result.scamType}；置信度：${result.confidence}\n` +
+            `风险等级：${enriched.riskLevel}；类型：${enriched.scamType}；置信度：${enriched.confidence}\n` +
             (flags ? `可疑点：\n${flags}\n` : "") +
-            `建议：${result.actions.join("；")}\n${result.disclaimer}`,
-          data: result
+            `建议：${enriched.actions.join("；")}` +
+            related +
+            `\n${enriched.disclaimer}`,
+          data: { ...enriched, related: hits }
         };
       }
     },
@@ -206,55 +232,26 @@ export function createToolRegistry(deps: ToolDeps): ToolRegistry {
       requiresConfirmation: true,
       async prepare(args, ctx) {
         const elderId = requireElder(ctx);
-        const confirm = deps.db.familyConfirms.create({
+        const created = deps.coolingOff.start({
           elderId,
-          type: "transfer",
-          payload: {
-            amount: args.amount ?? null,
-            counterparty: args.counterparty ?? null,
-            reason: args.reason ?? null,
-            requestedBy: ctx.user.userId
-          }
-        });
-        const cooling = deps.db.coolingOffs.create({
-          elderId,
-          riskLevel: "high",
-          questions: [
-            "对方是否要求你保密？",
-            "你是否见过对方本人？",
-            "对方是否让你共享屏幕或提供验证码？"
-          ],
-          ...(typeof args.reason === "string" ? { reason: args.reason } : {}),
-          ...(typeof args.counterparty === "string" ? { counterparty: args.counterparty } : {}),
+          userId: ctx.user.userId,
           ...(typeof args.amount === "number" ? { amount: args.amount } : {}),
-          familyConfirmId: confirm.id
-        });
-        const alert = {
-          id: `alert_${cooling.id}`,
-          type: "cooling_off",
-          level: "critical",
-          elderId,
-          createdAt: Date.now()
-        };
-        deps.eventBus.publish({ type: "safety.alert", ts: Date.now(), payload: { alert } });
-        deps.eventBus.publish({
-          type: "family.confirm.requested",
-          ts: Date.now(),
-          payload: { confirm }
+          ...(typeof args.counterparty === "string" ? { counterparty: args.counterparty } : {}),
+          ...(typeof args.reason === "string" ? { reason: args.reason } : {})
         });
         return {
           args: {
             ...args,
-            familyConfirmId: confirm.id,
-            coolingOffId: cooling.id,
-            expiresAt: cooling.expiresAt
+            familyConfirmId: created.familyConfirm.id,
+            coolingOffId: created.coolingOff.id,
+            expiresAt: created.coolingOff.expiresAt
           },
           summary:
             "检测到转账风险，已通知家属确认。请先不要转账；如对方催促、让你保密或共享屏幕，立即停止。",
           data: {
-            coolingOffId: cooling.id,
-            familyConfirmId: confirm.id,
-            expiresAt: cooling.expiresAt
+            coolingOffId: created.coolingOff.id,
+            familyConfirmId: created.familyConfirm.id,
+            expiresAt: created.coolingOff.expiresAt
           }
         };
       },

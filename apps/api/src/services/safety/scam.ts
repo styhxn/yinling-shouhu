@@ -14,6 +14,7 @@ export type ScamResult = {
   questionsToAsk: string[];
   sources: { title: string; url: string }[];
   disclaimer: string;
+  extractedText?: string;
 };
 
 type Rule = {
