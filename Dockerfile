@@ -5,7 +5,7 @@ ENV npm_config_update_notifier=false
 
 COPY package.json package-lock.json tsconfig.base.json ./
 COPY apps/api/package.json apps/api/package.json
-COPY apps/web/package.json apps/web/package.json
+COPY frontend/package.json frontend/package.json
 COPY apps/mcp-server/package.json apps/mcp-server/package.json
 COPY packages/shared/package.json packages/shared/package.json
 COPY packages/adapters/package.json packages/adapters/package.json
@@ -22,7 +22,7 @@ ENV NODE_ENV=production \
     HOST=0.0.0.0 \
     DATA_DIR=/app/data \
     PUBLIC_DIR=/app/apps/api/public \
-    WEB_DIST_DIR=/app/apps/web/dist
+    WEB_DIST_DIR=/app/frontend/dist
 
 WORKDIR /app
 
@@ -31,7 +31,7 @@ COPY --from=build /app/package.json ./package.json
 COPY --from=build /app/packages ./packages
 COPY --from=build /app/apps/api/package.json ./apps/api/package.json
 COPY --from=build /app/apps/api/dist ./apps/api/dist
-COPY --from=build /app/apps/web/dist ./apps/web/dist
+COPY --from=build /app/frontend/dist ./frontend/dist
 
 RUN mkdir -p /app/data /app/apps/api/public/uploads \
     && chown -R node:node /app/data /app/apps/api/public

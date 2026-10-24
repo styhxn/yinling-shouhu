@@ -52,10 +52,10 @@ Web 通过 Vite 在运行/构建时自动挂载并拷贝 DH_Live 静态资源：
 
 - 访问前缀：`/dh-live/*`
 - 源目录：`DH_live-main/DH_live-main/web_demo/static`
-- 构建产物目录：`apps/web/dist/dh-live`
+- 构建产物目录：`frontend/dist/dh-live`
 
 生产环境建议：
-- 将 `apps/web/dist` 作为静态站点根目录部署（包含 `dh-live` 子目录）。
+- 将 `frontend/dist` 作为静态站点根目录部署（包含 `dh-live` 子目录）。
 - 将 `/dh-live-api/*` 反向代理到 API 服务（默认 `http://127.0.0.1:3100`）。
 - DH_Live 使用 WebCodecs：生产环境必须使用 HTTPS（本地可用 localhost）。
 

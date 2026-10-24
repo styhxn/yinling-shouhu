@@ -120,7 +120,7 @@ export function loadConfig(overrides: ConfigOverrides = {}): AppConfig {
   const publicDir = overrides.publicDir ?? path.resolve(process.cwd(), env("PUBLIC_DIR") || "public");
   const webDistDir =
     overrides.webDistDir ??
-    path.resolve(process.cwd(), env("WEB_DIST_DIR") || path.join("..", "web", "dist"));
+    path.resolve(process.cwd(), env("WEB_DIST_DIR") || path.join("..", "..", "frontend", "dist"));
   const providers = overrides.llm?.providers ?? gatherProviders();
   const shouldMock =
     envName === "test" || env("LLM_MOCK") === "1" || providers.length === 0;

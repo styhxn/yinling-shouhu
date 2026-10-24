@@ -3,7 +3,7 @@
 > 会倾听，也会守护的江苏长者 AI 陪伴系统。
 > 当前处于从基础框架向 **Agent + RAG + 多模态 + 安全守护** 迁移的阶段。
 
-本仓库为“本地优先 + 可选云端”的前后端分离工程：React + Vite 前端、Fastify + TypeScript 后端、npm workspaces monorepo。现有能力包括适老化三模式、语音问答、健康记录、提醒、紧急呼叫、数字人陪伴，以及正在建设的 Agent 工具调用、反诈鉴定、记忆故事、用药与家属协同。
+本仓库为“本地优先 + 可选云端”的前后端分离工程：`frontend/`（React + Vite，可独立交接）、`apps/api`（Fastify + TypeScript）、npm workspaces monorepo。现有能力包括适老化界面、Agent 工具调用、反诈鉴定与演练、记忆故事、用药照护、家属协同、MCP 工具与生产部署。
 
 ## 当前进度
 
@@ -42,6 +42,18 @@ LLM_MOCK=1 DEMO_MODE=1 npm run dev -w apps/api
 
 演示登录：`POST /api/auth/demo-login`，body `{"role":"elder"}`。环境变量见 [apps/api/.env.example](apps/api/.env.example)。
 
+### 前端独立交接
+
+`frontend/` 已内置契约类型，不依赖仓库内其他 workspace，可单独复制或压缩后：
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+交接说明、路由表与环境变量见 [frontend/README.md](frontend/README.md)。
+
 ### 生产构建
 
 ```bash
@@ -50,7 +62,7 @@ npm run build
 NODE_ENV=production SESSION_SECRET=change-me DEMO_MODE=1 npm run start -w apps/api
 ```
 
-后端会同时托管 `apps/web/dist` 并提供 SPA 回退；也可使用 `docker compose up -d --build`。详见 [部署文档](docs/部署.md)。
+后端会同时托管 `frontend/dist` 并提供 SPA 回退；也可使用 `docker compose up -d --build`。详见 [部署文档](docs/部署.md)。
 
 ### MCP Server
 
