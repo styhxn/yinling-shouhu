@@ -67,4 +67,20 @@ export function seedDemo(db: DatabaseSync, masterKey: Buffer) {
     "demo",
     now - 120_000
   );
+
+  const geofence = db.prepare(
+    `INSERT OR IGNORE INTO geofences
+      (id, elder_id, name, shape_json, schedule_json, notify_on_json, active, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?)`
+  );
+  geofence.run(
+    "gf_home",
+    "e_li",
+    "家附近",
+    JSON.stringify({ type: "circle", center: [118.781, 32.041], radius: 800 }),
+    null,
+    JSON.stringify(["exit"]),
+    now,
+    now
+  );
 }

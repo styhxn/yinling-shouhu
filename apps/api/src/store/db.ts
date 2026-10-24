@@ -195,6 +195,58 @@ export type DbInterview = {
   updatedAt: number;
 };
 
+export type GeofenceShape = {
+  type: "circle";
+  center: [number, number];
+  radius: number;
+};
+
+export type DbGeofence = {
+  id: string;
+  elderId: string;
+  name: string;
+  shape: GeofenceShape;
+  schedule: unknown;
+  notifyOn: string[];
+  active: boolean;
+  createdAt: number;
+  updatedAt: number;
+};
+
+export type DbSafetyAlert = {
+  id: string;
+  elderId: string;
+  type: string;
+  level: string;
+  payload: unknown;
+  status: string;
+  createdAt: number;
+};
+
+export type DbMissingPoster = {
+  id: string;
+  elderId: string;
+  elderName: string;
+  birthYear: number | null;
+  lastSeenText: string;
+  lastSeenTs: number | null;
+  clothing: string | null;
+  contact: string;
+  shareToken: string;
+  expiresAt: number;
+  status: string;
+  createdAt: number;
+};
+
+export type DbMedicationLog = {
+  id: string;
+  medicationId: string;
+  elderId: string;
+  status: "taken" | "skipped" | "late";
+  scheduledTime: string | null;
+  ts: number;
+};
+
 export type CreateDbOptions = {
   masterKey: Buffer;
   seed?: boolean;
@@ -502,16 +554,79 @@ export function createDb(dbPath: string, options: CreateDbOptions) {
       const rows = raw
         .prepare("SELECT * FROM medications WHERE elder_id = ? ORDER BY created_at ASC")
         .all(elderId) as any[];
-      return rows.map((r) => ({
-        id: String(r.id),
-        elderId: String(r.elder_id),
-        name: String(r.name),
-        genericName: r.generic_name ? String(r.generic_name) : null,
-        spec: r.spec ? String(r.spec) : null,
-        dosage: r.dosage ? String(r.dosage) : null,
-        schedule: parseJson<{ time: string }[]>(r.schedule_json, []),
-        notes: dec<string>(r.notes_enc)
-      }));
+      return rows.map(mapMedication);
+    },
+    getById(id: string): DbMedication | null {
+      const row = raw.prepare("SELECT * FROM medications WHERE id = ?").get(id) as any;
+      return row ? mapMedication(row) : null;
+    },
+    create(input: {
+      elderId: string;
+      name: string;
+      genericName?: string | null;
+      spec?: string | null;
+      dosage?: string | null;
+      schedule: { time: string }[];
+      notes?: string | null;
+    }): DbMedication {
+      const id = `med_${randomUUID()}`;
+      const now = Date.now();
+      raw
+        .prepare(
+          `INSERT INTO medications
+            (id, elder_id, name, generic_name, spec, dosage, schedule_json, photo_upload_id, notes_enc, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        )
+        .run(
+          id,
+          input.elderId,
+          input.name,
+          input.genericName ?? null,
+          input.spec ?? null,
+          input.dosage ?? null,
+          JSON.stringify(input.schedule),
+          null,
+          input.notes ? enc(input.notes) : null,
+          now,
+          now
+        );
+      return medications.getById(id)!;
+    },
+    update(
+      id: string,
+      patch: Partial<{
+        name: string;
+        genericName: string | null;
+        spec: string | null;
+        dosage: string | null;
+        schedule: { time: string }[];
+        notes: string | null;
+      }>
+    ): DbMedication | null {
+      const current = medications.getById(id);
+      if (!current) return null;
+      const next = {
+        ...current,
+        ...Object.fromEntries(Object.entries(patch).filter(([, value]) => value !== undefined))
+      } as DbMedication;
+      raw
+        .prepare(
+          `UPDATE medications SET name = ?, generic_name = ?, spec = ?, dosage = ?, schedule_json = ?, notes_enc = ?, updated_at = ? WHERE id = ?`
+        )
+        .run(
+          next.name,
+          next.genericName,
+          next.spec,
+          next.dosage,
+          JSON.stringify(next.schedule),
+          next.notes ? enc(next.notes) : null,
+          Date.now(),
+          id
+        );
+      return medications.getById(id);
+    },
+    remove(id: string): void {
+      raw.prepare("DELETE FROM medications WHERE id = ?").run(id);
     }
   };
 
@@ -551,6 +666,28 @@ export function createDb(dbPath: string, options: CreateDbOptions) {
         source: String(row.source),
         ts: Number(row.ts)
       };
+    },
+    history(elderId: string, from: number, to: number): DbLocation[] {
+      const rows = raw
+        .prepare(
+          "SELECT * FROM location_points WHERE elder_id = ? AND ts >= ? AND ts <= ? ORDER BY ts ASC"
+        )
+        .all(elderId, from, to) as any[];
+      return rows
+        .map((row) => {
+          const lat = dec<number>(row.lat_enc);
+          const lng = dec<number>(row.lng_enc);
+          if (typeof lat !== "number" || typeof lng !== "number") return null;
+          return {
+            elderId: String(row.elder_id),
+            lat,
+            lng,
+            accuracy: row.accuracy === null ? null : Number(row.accuracy),
+            source: String(row.source),
+            ts: Number(row.ts)
+          } satisfies DbLocation;
+        })
+        .filter((point): point is DbLocation => point !== null);
     }
   };
 
@@ -705,6 +842,66 @@ export function createDb(dbPath: string, options: CreateDbOptions) {
       currentQuestion: row.current_question ? String(row.current_question) : null,
       createdAt: Number(row.created_at),
       updatedAt: Number(row.updated_at)
+    };
+  }
+
+  function mapMedication(row: any): DbMedication {
+    return {
+      id: String(row.id),
+      elderId: String(row.elder_id),
+      name: String(row.name),
+      genericName: row.generic_name ? String(row.generic_name) : null,
+      spec: row.spec ? String(row.spec) : null,
+      dosage: row.dosage ? String(row.dosage) : null,
+      schedule: parseJson<{ time: string }[]>(row.schedule_json, []),
+      notes: dec<string>(row.notes_enc)
+    };
+  }
+
+  function mapGeofence(row: any): DbGeofence {
+    return {
+      id: String(row.id),
+      elderId: String(row.elder_id),
+      name: String(row.name),
+      shape: parseJson<GeofenceShape>(row.shape_json, {
+        type: "circle",
+        center: [0, 0],
+        radius: 0
+      }),
+      schedule: parseJson<unknown>(row.schedule_json, null),
+      notifyOn: parseJson<string[]>(row.notify_on_json, ["exit"]),
+      active: Boolean(row.active),
+      createdAt: Number(row.created_at),
+      updatedAt: Number(row.updated_at)
+    };
+  }
+
+  function mapAlert(row: any): DbSafetyAlert {
+    return {
+      id: String(row.id),
+      elderId: String(row.elder_id),
+      type: String(row.type),
+      level: String(row.level),
+      payload: parseJson<unknown>(row.payload_json, {}),
+      status: String(row.status),
+      createdAt: Number(row.created_at)
+    };
+  }
+
+  function mapPoster(row: any): DbMissingPoster {
+    return {
+      id: String(row.id),
+      elderId: String(row.elder_id),
+      elderName: String(row.elder_name ?? "老人"),
+      birthYear: row.birth_year === null || typeof row.birth_year === "undefined" ? null : Number(row.birth_year),
+      lastSeenText: dec<string>(row.last_seen_text_enc) ?? "",
+      lastSeenTs: row.last_seen_ts === null ? null : Number(row.last_seen_ts),
+      clothing: dec<string>(row.clothing_enc),
+      contact: dec<string>(row.contact_enc) ?? "",
+      shareToken: String(row.share_token),
+      expiresAt: Number(row.expires_at),
+      status: String(row.status),
+      createdAt: Number(row.created_at)
     };
   }
 
@@ -999,6 +1196,230 @@ export function createDb(dbPath: string, options: CreateDbOptions) {
     }
   };
 
+  const geofences = {
+    listByElder(elderId: string): DbGeofence[] {
+      const rows = raw
+        .prepare("SELECT * FROM geofences WHERE elder_id = ? AND active = 1 ORDER BY created_at ASC")
+        .all(elderId) as any[];
+      return rows.map(mapGeofence);
+    },
+    getById(id: string): DbGeofence | null {
+      const row = raw.prepare("SELECT * FROM geofences WHERE id = ?").get(id) as any;
+      return row ? mapGeofence(row) : null;
+    },
+    create(input: {
+      elderId: string;
+      name: string;
+      shape: GeofenceShape;
+      notifyOn?: string[];
+      schedule?: unknown;
+    }): DbGeofence {
+      const id = `gf_${randomUUID()}`;
+      const now = Date.now();
+      raw
+        .prepare(
+          `INSERT INTO geofences
+            (id, elder_id, name, shape_json, schedule_json, notify_on_json, active, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?)`
+        )
+        .run(
+          id,
+          input.elderId,
+          input.name,
+          JSON.stringify(input.shape),
+          input.schedule ? JSON.stringify(input.schedule) : null,
+          JSON.stringify(input.notifyOn ?? ["exit"]),
+          now,
+          now
+        );
+      return geofences.getById(id)!;
+    },
+    update(
+      id: string,
+      patch: Partial<{
+        name: string;
+        shape: GeofenceShape;
+        notifyOn: string[];
+        schedule: unknown;
+        active: boolean;
+      }>
+    ): DbGeofence | null {
+      const current = geofences.getById(id);
+      if (!current) return null;
+      const next = {
+        ...current,
+        ...Object.fromEntries(Object.entries(patch).filter(([, value]) => value !== undefined))
+      } as DbGeofence;
+      raw
+        .prepare(
+          `UPDATE geofences SET name = ?, shape_json = ?, schedule_json = ?, notify_on_json = ?, active = ?, updated_at = ? WHERE id = ?`
+        )
+        .run(
+          next.name,
+          JSON.stringify(next.shape),
+          next.schedule ? JSON.stringify(next.schedule) : null,
+          JSON.stringify(next.notifyOn),
+          next.active ? 1 : 0,
+          Date.now(),
+          id
+        );
+      return geofences.getById(id);
+    },
+    remove(id: string): void {
+      raw.prepare("DELETE FROM geofences WHERE id = ?").run(id);
+    }
+  };
+
+  const safetyAlerts = {
+    create(input: {
+      elderId: string;
+      type: string;
+      level: string;
+      payload: unknown;
+    }): DbSafetyAlert {
+      const id = `al_${randomUUID()}`;
+      const now = Date.now();
+      raw
+        .prepare(
+          `INSERT INTO safety_alerts (id, elder_id, type, level, payload_json, status, created_at)
+           VALUES (?, ?, ?, ?, ?, 'open', ?)`
+        )
+        .run(id, input.elderId, input.type, input.level, JSON.stringify(input.payload), now);
+      return {
+        id,
+        elderId: input.elderId,
+        type: input.type,
+        level: input.level,
+        payload: input.payload,
+        status: "open",
+        createdAt: now
+      };
+    },
+    listByElder(elderId: string, status?: string): DbSafetyAlert[] {
+      const rows = status
+        ? (raw
+            .prepare(
+              "SELECT * FROM safety_alerts WHERE elder_id = ? AND status = ? ORDER BY created_at DESC LIMIT 50"
+            )
+            .all(elderId, status) as any[])
+        : (raw
+            .prepare(
+              "SELECT * FROM safety_alerts WHERE elder_id = ? ORDER BY created_at DESC LIMIT 50"
+            )
+            .all(elderId) as any[]);
+      return rows.map(mapAlert);
+    },
+    ack(id: string, status: string): void {
+      raw
+        .prepare("UPDATE safety_alerts SET status = ?, handled_at = ? WHERE id = ?")
+        .run(status, Date.now(), id);
+    },
+    hasRecent(elderId: string, type: string, sinceTs: number): boolean {
+      const row = raw
+        .prepare(
+          "SELECT COUNT(*) AS n FROM safety_alerts WHERE elder_id = ? AND type = ? AND created_at >= ?"
+        )
+        .get(elderId, type, sinceTs) as any;
+      return Number(row?.n ?? 0) > 0;
+    }
+  };
+
+  const missingPosters = {
+    create(input: {
+      elderId: string;
+      lastSeenText: string;
+      lastSeenTs: number | null;
+      clothing?: string | null;
+      contact: string;
+      shareToken: string;
+      expiresAt: number;
+      photoUploadId?: string | null;
+    }): DbMissingPoster {
+      const id = `mp_${randomUUID()}`;
+      const now = Date.now();
+      raw
+        .prepare(
+          `INSERT INTO missing_posters
+            (id, elder_id, last_seen_text_enc, last_seen_ts, clothing_enc, photo_upload_id, contact_enc, image_url, share_token, expires_at, status, created_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', ?)`
+        )
+        .run(
+          id,
+          input.elderId,
+          enc(input.lastSeenText),
+          input.lastSeenTs,
+          input.clothing ? enc(input.clothing) : null,
+          input.photoUploadId ?? null,
+          enc(input.contact),
+          null,
+          input.shareToken,
+          input.expiresAt,
+          now
+        );
+      return missingPosters.getByToken(input.shareToken)!;
+    },
+    getByToken(token: string): DbMissingPoster | null {
+      const row = raw
+        .prepare(
+          `SELECT p.*, e.display_name AS elder_name, e.birth_year
+           FROM missing_posters p
+           JOIN elders e ON e.id = p.elder_id
+           WHERE p.share_token = ?`
+        )
+        .get(token) as any;
+      return row ? mapPoster(row) : null;
+    }
+  };
+
+  const medicationLogs = {
+    create(input: {
+      medicationId: string;
+      elderId: string;
+      status: "taken" | "skipped" | "late";
+      scheduledTime?: string | null;
+      ts?: number;
+    }): DbMedicationLog {
+      const id = `ml_${randomUUID()}`;
+      const ts = input.ts ?? Date.now();
+      raw
+        .prepare(
+          `INSERT INTO medication_logs (id, medication_id, elder_id, status, scheduled_time, ts)
+           VALUES (?, ?, ?, ?, ?, ?)`
+        )
+        .run(
+          id,
+          input.medicationId,
+          input.elderId,
+          input.status,
+          input.scheduledTime ?? null,
+          ts
+        );
+      return {
+        id,
+        medicationId: input.medicationId,
+        elderId: input.elderId,
+        status: input.status,
+        scheduledTime: input.scheduledTime ?? null,
+        ts
+      };
+    },
+    listByElder(elderId: string, from: number, to: number): DbMedicationLog[] {
+      const rows = raw
+        .prepare(
+          "SELECT * FROM medication_logs WHERE elder_id = ? AND ts >= ? AND ts <= ? ORDER BY ts DESC"
+        )
+        .all(elderId, from, to) as any[];
+      return rows.map((row) => ({
+        id: String(row.id),
+        medicationId: String(row.medication_id),
+        elderId: String(row.elder_id),
+        status: row.status as DbMedicationLog["status"],
+        scheduledTime: row.scheduled_time ? String(row.scheduled_time) : null,
+        ts: Number(row.ts)
+      }));
+    }
+  };
+
   return {
     raw,
     users,
@@ -1017,6 +1438,10 @@ export function createDb(dbPath: string, options: CreateDbOptions) {
     storyBooks,
     storyChapters,
     interviews,
+    geofences,
+    safetyAlerts,
+    missingPosters,
+    medicationLogs,
     close: () => raw.close()
   };
 }

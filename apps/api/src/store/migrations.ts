@@ -126,6 +126,7 @@ export function migrate(db: DatabaseSync) {
       medication_id TEXT NOT NULL,
       elder_id TEXT NOT NULL,
       status TEXT NOT NULL,
+      scheduled_time TEXT,
       ts INTEGER NOT NULL,
       note_enc TEXT
     );
@@ -339,5 +340,12 @@ export function migrate(db: DatabaseSync) {
   const memoryColumns = db.prepare("PRAGMA table_info(memories)").all() as Array<{ name?: string }>;
   if (!memoryColumns.some((column) => column.name === "photo_ids_json")) {
     db.exec("ALTER TABLE memories ADD COLUMN photo_ids_json TEXT");
+  }
+
+  const medicationLogColumns = db
+    .prepare("PRAGMA table_info(medication_logs)")
+    .all() as Array<{ name?: string }>;
+  if (!medicationLogColumns.some((column) => column.name === "scheduled_time")) {
+    db.exec("ALTER TABLE medication_logs ADD COLUMN scheduled_time TEXT");
   }
 }
