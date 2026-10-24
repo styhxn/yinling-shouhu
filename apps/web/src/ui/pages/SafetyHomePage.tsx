@@ -142,9 +142,10 @@ export function SafetyHomePage() {
           <h1>位置、围栏与寻人</h1>
           <p>先看老人最后在哪里。需要时，一键生成寻人海报，家属和社区都能看到。</p>
         </div>
-        <Link to="/elder/safety/scam" className="btn">
-          可疑信息鉴定
-        </Link>
+        <div className="ys-inlineActions">
+          <Link to="/elder/safety/roleplay" className="btn">反诈演练</Link>
+          <Link to="/elder/safety/scam" className="btn">可疑信息鉴定</Link>
+        </div>
       </section>
 
       <div className="ys-locationLayout">

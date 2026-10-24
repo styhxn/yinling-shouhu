@@ -255,3 +255,28 @@ export type MissingPosterResult = {
   shareUrl: string;
   expiresAt: number;
 };
+
+export type RoleplayScenario = {
+  id: string;
+  title: string;
+  subtitle: string;
+  opener: string;
+  maxTurns: number;
+};
+
+export type RoleplayMessage = {
+  role: "scammer" | "elder";
+  text: string;
+  ts: number;
+};
+
+export type RoleplayReport = {
+  scenario: { id: string; title: string };
+  total: number;
+  level: string;
+  dimensions: { name: string; score: number; comment: string }[];
+  redFlags: string[];
+  advice: string[];
+  transcript: RoleplayMessage[];
+  disclaimer: string;
+};

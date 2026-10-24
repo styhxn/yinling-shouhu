@@ -1,4 +1,4 @@
-import { httpJson } from "./http.js";
+import { httpBlob, httpJson } from "./http.js";
 import type {
   AgentTool,
   AntiFraudHit,
@@ -16,6 +16,8 @@ import type {
   MemoryItem,
   MissingPosterResult,
   Role,
+  RoleplayReport,
+  RoleplayScenario,
   SafetyAlert,
   ScamResult,
   StoryBook,
@@ -100,6 +102,9 @@ export const api = {
       return httpJson<{ ok: boolean; book: StoryBook | null; chapters: StoryChapter[] }>(
         `/memory/story${query({ elderId })}`
       );
+    },
+    exportStory(elderId?: string) {
+      return httpBlob(`/memory/story/export${query({ elderId })}`);
     }
   },
 
@@ -240,6 +245,44 @@ export const api = {
         {
           method: "POST",
           body: JSON.stringify(input)
+        }
+      );
+    },
+    roleplayScenarios() {
+      return httpJson<{ items: RoleplayScenario[] }>("/safety/roleplay/scenarios");
+    },
+    startRoleplay(scenarioId: string) {
+      return httpJson<{
+        ok: boolean;
+        sessionId: string;
+        message: string;
+        turn: number;
+        maxTurns: number;
+        scenario: { id: string; title: string; subtitle: string; maxTurns: number };
+      }>("/safety/roleplay/start", {
+        method: "POST",
+        body: JSON.stringify({ scenarioId })
+      });
+    },
+    roleplayTurn(id: string, text: string) {
+      return httpJson<{
+        ok: boolean;
+        done: boolean;
+        reply: string;
+        turn?: number;
+        maxTurns?: number;
+        report?: RoleplayReport;
+      }>(`/safety/roleplay/${id}/turn`, {
+        method: "POST",
+        body: JSON.stringify({ text })
+      });
+    },
+    endRoleplay(id: string) {
+      return httpJson<{ ok: boolean; report: RoleplayReport }>(
+        `/safety/roleplay/${id}/end`,
+        {
+          method: "POST",
+          body: JSON.stringify({})
         }
       );
     }

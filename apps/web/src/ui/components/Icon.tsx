@@ -45,6 +45,7 @@ import {
   ChevronLeft,
   Play,
   Square,
+  Download,
   type LucideIcon,
 } from "lucide-react";
 
@@ -98,6 +99,7 @@ const REGISTRY = {
   chevronLeft: ChevronLeft,
   play: Play,
   stop: Square,
+  download: Download,
 } as const;
 
 export type IconName = keyof typeof REGISTRY;

@@ -8,6 +8,7 @@ import { ElderHomePage } from "./pages/ElderHomePage.js";
 import { AgentChatPage } from "./pages/AgentChatPage.js";
 import { SafetyHomePage } from "./pages/SafetyHomePage.js";
 import { ScamCheckPage } from "./pages/ScamCheckPage.js";
+import { RoleplayPage } from "./pages/RoleplayPage.js";
 import { MemoryListPage } from "./pages/MemoryListPage.js";
 import { MemoryInterviewPage } from "./pages/MemoryInterviewPage.js";
 import { StoryChapterPage } from "./pages/StoryChapterPage.js";
@@ -38,6 +39,7 @@ export function App() {
               <Route path="meds" element={<MedicationsPage />} />
               <Route path="safety" element={<SafetyHomePage />} />
               <Route path="safety/scam" element={<ScamCheckPage />} />
+              <Route path="safety/roleplay" element={<RoleplayPage />} />
             </Route>
 
             <Route
