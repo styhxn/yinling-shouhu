@@ -3,6 +3,7 @@ import ReactDOM from "react-dom/client";
 import { App } from "./ui/App.js";
 import "./ui/styles.css";
 import "./ui/token.css";
+import "./ui/new-ui.css";
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>

@@ -88,6 +88,22 @@ export default defineConfig({
     port: 5173,
     strictPort: true,
     proxy: {
+      "/api": {
+        target: "http://127.0.0.1:3100",
+        changeOrigin: false
+      },
+      "/health": {
+        target: "http://127.0.0.1:3100",
+        changeOrigin: false
+      },
+      "/public": {
+        target: "http://127.0.0.1:3100",
+        changeOrigin: false
+      },
+      "/ws": {
+        target: "ws://127.0.0.1:3100",
+        ws: true
+      },
       "/dh-live-api": {
         target: "http://127.0.0.1:3100",
         changeOrigin: true
