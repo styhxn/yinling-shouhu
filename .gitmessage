@@ -1,0 +1,16 @@
+<type>(<scope>): <中文简述，50 字以内>
+
+背景：
+
+改动：
+- 
+
+验证：
+- 
+
+影响/备注：
+- 
+
+# type: feat | fix | docs | refactor | test | perf | chore | build | ci
+# scope: web | api | shared | docs | repo | deps | dh-live
+# 示例：feat(web): 接入长者首页与 Agent 流式对话
