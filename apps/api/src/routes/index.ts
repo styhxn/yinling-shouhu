@@ -1,0 +1,36 @@
+import type { FastifyInstance } from "fastify";
+import { authRoutes } from "./auth.js";
+import { agentRoutes } from "./agent.js";
+import { healthRoutes } from "./health.js";
+import { privacyRoutes } from "./privacy.js";
+import { profileRoutes } from "./profile.js";
+import { recordsRoutes } from "./records.js";
+import { qaRoutes } from "./qa.js";
+import { mockRoutes } from "./mock.js";
+import { wsRoutes } from "./ws.js";
+import { emergencyRoutes } from "./emergency.js";
+import { remindersRoutes } from "./reminders.js";
+import { weatherRoutes } from "./weather.js";
+import { vitalityRoutes } from "./vitality.js";
+import { dhLiveRoutes } from "./dhLive.js";
+import { adviceRoutes } from "./advice.js";
+import { analysisRoutes } from "./analysis.js";
+
+export async function registerRoutes(server: FastifyInstance) {
+  await server.register(authRoutes);
+  await server.register(agentRoutes, { prefix: "/api/agent" });
+  await server.register(healthRoutes);
+  await server.register(privacyRoutes, { prefix: "/privacy" });
+  await server.register(profileRoutes, { prefix: "/profile" });
+  await server.register(recordsRoutes, { prefix: "/records" });
+  await server.register(qaRoutes, { prefix: "/qa" });
+  await server.register(emergencyRoutes, { prefix: "/emergency" });
+  await server.register(remindersRoutes, { prefix: "/reminders" });
+  await server.register(weatherRoutes, { prefix: "/weather" });
+  await server.register(vitalityRoutes, { prefix: "/vitality" });
+  await server.register(adviceRoutes, { prefix: "/advice" });
+  await server.register(analysisRoutes, { prefix: "/analysis" });
+  await server.register(mockRoutes, { prefix: "/mock" });
+  await server.register(wsRoutes);
+  await server.register(dhLiveRoutes, { prefix: "/dh-live-api" });
+}
