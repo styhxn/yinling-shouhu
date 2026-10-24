@@ -1,0 +1,1721 @@
+/* 水韵江苏 · 银龄守护视觉层
+ * 纸感底色、墨色正文、青瓷绿点缀、宋体标题、细线分隔。
+ * 不使用紫色渐变、玻璃拟态和重阴影。
+ */
+
+.yl-shell,
+.ys-rolePage {
+  --ys-paper: #f2f4ef;
+  --ys-paper-deep: #e7ebe3;
+  --ys-surface: #fafbf7;
+  --ys-ink: #1c2724;
+  --ys-ink-soft: #46554f;
+  --ys-muted: #65736d;
+  --ys-line: #d9e0d8;
+  --ys-line-strong: #c3cdc3;
+  --ys-celadon: #5e7f71;
+  --ys-celadon-deep: #3e5a4e;
+  --ys-celadon-soft: #e4ece5;
+  --ys-water: #7e9aa1;
+  --ys-seal: #8c3b2e;
+  --ys-warn: #9a5b45;
+  --ys-radius: 2px;
+  --ys-serif: "Songti SC", "Noto Serif SC", "STSong", "SimSun", "Source Han Serif SC", serif;
+  --ys-sans: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+
+  /* 兼容旧组件使用的设计变量 */
+  --bg: var(--ys-paper);
+  --text: var(--ys-ink);
+  --muted: var(--ys-muted);
+  --panel: var(--ys-surface);
+  --border: var(--ys-line);
+  --border-strong: var(--ys-line-strong);
+  --primary: var(--ys-celadon);
+  --primary-600: var(--ys-celadon);
+  --primary-700: var(--ys-celadon-deep);
+  --primary-50: var(--ys-celadon-soft);
+  --accent: var(--ys-celadon);
+  --danger: var(--ys-seal);
+  --ok: var(--ys-celadon-deep);
+  --radius: var(--ys-radius);
+
+  background: var(--ys-paper);
+  color: var(--ys-ink);
+  font-family: var(--ys-sans);
+}
+
+body {
+  background: #f2f4ef;
+  color: #1c2724;
+  font-family: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+}
+
+.yl-shell h1,
+.yl-shell h2,
+.yl-shell h3,
+.ys-rolePage h1,
+.ys-rolePage h2,
+.ys-rolePage h3,
+.ys-home h1,
+.ys-home h2,
+.ys-home h3,
+.ys-pageHeader h1,
+.ys-pageHeader h2,
+.yl-pageHeader h1,
+.yl-pageHeader h2 {
+  font-family: var(--ys-serif);
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+.yl-shell a,
+.ys-rolePage a {
+  color: inherit;
+}
+
+/* ---------- 顶栏 ---------- */
+.yl-topbar {
+  min-height: 64px;
+  padding: 0 24px;
+  background: var(--ys-paper);
+  border-bottom: 1px solid var(--ys-line);
+  backdrop-filter: none;
+}
+
+.yl-brandMark {
+  width: 30px;
+  height: 30px;
+  border-radius: 2px;
+  background: var(--ys-celadon-deep);
+  box-shadow: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-family: var(--ys-serif);
+  font-size: 16px;
+}
+
+.yl-brandMark::after {
+  content: "银";
+}
+
+.yl-brandText strong {
+  font-family: var(--ys-serif);
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+}
+
+.yl-brandText small {
+  color: var(--ys-muted);
+  font-size: 11px;
+  letter-spacing: 0.14em;
+}
+
+.yl-navLink {
+  border-radius: 2px;
+  color: var(--ys-muted);
+  font-size: 14px;
+  padding: 8px 10px;
+}
+
+.yl-navLink:hover {
+  background: var(--ys-celadon-soft);
+  color: var(--ys-ink);
+}
+
+.yl-navLink--active {
+  background: transparent;
+  color: var(--ys-ink);
+  font-weight: 600;
+  border-radius: 0;
+  border-bottom: 2px solid var(--ys-celadon);
+  padding-bottom: 6px;
+}
+
+.ys-assistantLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 10px;
+  border: 1px solid var(--ys-line);
+  border-radius: 2px;
+  color: var(--ys-celadon-deep);
+  text-decoration: none;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.ys-assistantLink:hover {
+  border-color: var(--ys-celadon);
+  background: var(--ys-celadon-soft);
+}
+
+.yl-rolePill {
+  background: transparent;
+  border: 1px solid var(--ys-line);
+  color: var(--ys-muted);
+  border-radius: 999px;
+  font-size: 11px;
+}
+
+.yl-userName {
+  color: var(--ys-ink-soft);
+}
+
+.yl-switchBtn {
+  border: 1px solid var(--ys-line);
+  border-radius: 2px;
+  background: transparent;
+  color: var(--ys-muted);
+}
+
+.yl-switchBtn:hover {
+  border-color: var(--ys-celadon);
+  color: var(--ys-ink);
+}
+
+.yl-main {
+  padding: 32px 24px 72px;
+}
+
+/* ---------- 通用控件 ---------- */
+.yl-shell .btn,
+.ys-rolePage .btn {
+  border-radius: 2px;
+  border-color: var(--ys-line);
+  background: var(--ys-surface);
+  color: var(--ys-ink);
+  box-shadow: none;
+  white-space: nowrap;
+  font-weight: 500;
+}
+
+.yl-shell .btn:hover,
+.ys-rolePage .btn:hover {
+  border-color: var(--ys-celadon);
+  background: var(--ys-celadon-soft);
+}
+
+.yl-shell .btnPrimary,
+.ys-rolePage .btnPrimary {
+  background: var(--ys-celadon-deep);
+  border-color: var(--ys-celadon-deep);
+  color: #fff;
+}
+
+.yl-shell .btnPrimary:hover,
+.ys-rolePage .btnPrimary:hover {
+  background: #324b40;
+  border-color: #324b40;
+  color: #fff;
+}
+
+.yl-shell .btnDanger,
+.ys-rolePage .btnDanger {
+  background: var(--ys-seal);
+  border-color: var(--ys-seal);
+  color: #fff;
+}
+
+.yl-shell .input,
+.ys-rolePage .input {
+  border-radius: 2px;
+  border-color: var(--ys-line);
+  background: var(--ys-surface);
+  color: var(--ys-ink);
+  box-shadow: none;
+}
+
+.yl-shell .input::placeholder,
+.ys-rolePage .input::placeholder {
+  color: #8a968f;
+}
+
+.yl-shell .input:focus,
+.ys-rolePage .input:focus {
+  border-color: var(--ys-celadon);
+  outline: 2px solid rgba(94, 127, 113, 0.18);
+  outline-offset: 1px;
+}
+
+.yl-panel,
+.ys-panel,
+.yl-card,
+.yl-storyCard,
+.yl-memoryBody,
+.yl-confirmCard,
+.yl-resultPanel,
+.yl-coolingPanel,
+.yl-successPanel,
+.yl-modal,
+.yl-chatList,
+.yl-uploadBox,
+.yl-featureCard,
+.ys-mapCard,
+.ys-scanPanel,
+.ys-scanResult,
+.ys-report {
+  border-radius: 2px;
+  border: 1px solid var(--ys-line);
+  background: var(--ys-surface);
+  box-shadow: none;
+}
+
+.yl-panel {
+  padding: 22px;
+}
+
+.yl-badge {
+  background: var(--ys-celadon-soft);
+  color: var(--ys-celadon-deep);
+}
+
+.yl-tag {
+  background: var(--ys-paper-deep);
+  color: var(--ys-ink-soft);
+}
+
+.yl-emptyState {
+  border: 1px dashed var(--ys-line-strong);
+  border-radius: 2px;
+  background: var(--ys-paper);
+  color: var(--ys-muted);
+}
+
+.yl-errorBar {
+  border-radius: 2px;
+  background: #f7e9e6;
+  color: #7f2f24;
+}
+
+.yl-errorBar .yl-linkBtn {
+  color: #7f2f24;
+}
+
+.ys-mutedText {
+  margin: 0;
+  color: var(--ys-muted);
+  line-height: 1.7;
+  font-size: 13px;
+}
+
+.ys-finePrint {
+  margin: 0;
+  color: var(--ys-muted);
+  font-size: 11px;
+  line-height: 1.6;
+}
+
+.ys-kicker {
+  display: inline-block;
+  color: var(--ys-muted);
+  font-size: 11px;
+  letter-spacing: 0.12em;
+}
+
+.ys-textLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--ys-celadon-deep);
+  text-decoration: none;
+  border-bottom: 1px solid var(--ys-celadon);
+  padding-bottom: 1px;
+  font-size: 13px;
+}
+
+.ys-textLink:hover {
+  color: var(--ys-ink);
+}
+
+.ys-pageHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 20px;
+  padding-bottom: 18px;
+  border-bottom: 1px solid var(--ys-line);
+}
+
+.ys-pageHeader h1 {
+  margin: 4px 0 6px;
+  font-size: clamp(28px, 3.4vw, 38px);
+  line-height: 1.2;
+}
+
+.ys-pageHeader p {
+  margin: 0;
+  color: var(--ys-ink-soft);
+  line-height: 1.7;
+  max-width: 42em;
+}
+
+/* ---------- 角色页 ---------- */
+.ys-rolePage {
+  min-height: 100dvh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 24px;
+  background:
+    radial-gradient(circle at 12% 0%, rgba(94, 127, 113, 0.07), transparent 36%),
+    var(--ys-paper);
+}
+
+.ys-rolePanel {
+  width: min(1120px, 100%);
+  display: grid;
+  grid-template-columns: minmax(0, 1.02fr) minmax(0, 0.98fr);
+  border: 1px solid var(--ys-line);
+  background: var(--ys-surface);
+}
+
+.ys-roleIntro {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: clamp(32px, 5vw, 64px);
+}
+
+.ys-seal {
+  align-self: flex-start;
+  padding: 5px 9px;
+  border: 1px solid var(--ys-seal);
+  color: var(--ys-seal);
+  font-family: var(--ys-serif);
+  font-size: 11px;
+  letter-spacing: 0.22em;
+}
+
+.ys-roleTitle {
+  margin: 8px 0 0;
+  font-family: var(--ys-serif);
+  font-size: clamp(42px, 5.2vw, 68px);
+  font-weight: 600;
+  line-height: 1.05;
+  letter-spacing: 0.06em;
+  color: var(--ys-ink);
+}
+
+.ys-roleSubtitle {
+  margin: 0;
+  font-family: var(--ys-serif);
+  font-size: clamp(18px, 2vw, 22px);
+  color: var(--ys-ink-soft);
+}
+
+.ys-roleLine {
+  margin: 0 0 10px;
+  color: var(--ys-muted);
+  line-height: 1.8;
+  max-width: 30em;
+}
+
+.ys-roleList {
+  border-top: 1px solid var(--ys-line);
+  margin-top: 6px;
+}
+
+.ys-roleRow {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 88px 1fr auto;
+  align-items: center;
+  gap: 14px;
+  padding: 18px 4px;
+  border: 0;
+  border-bottom: 1px solid var(--ys-line);
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+
+.ys-roleRow:hover:not(:disabled) {
+  background: var(--ys-celadon-soft);
+}
+
+.ys-roleRow:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.ys-roleRowTitle {
+  font-family: var(--ys-serif);
+  font-size: 22px;
+  color: var(--ys-ink);
+}
+
+.ys-roleRowDesc {
+  color: var(--ys-muted);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.ys-roleArrow {
+  display: inline-flex;
+  color: var(--ys-celadon-deep);
+}
+
+.ys-currentIdentity {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--ys-muted);
+  font-size: 12px;
+}
+
+.ys-roleFooter {
+  margin-top: auto;
+  padding-top: 16px;
+  border-top: 1px solid var(--ys-line);
+  display: flex;
+  gap: 16px;
+  color: var(--ys-muted);
+  font-size: 11px;
+  letter-spacing: 0.06em;
+}
+
+.ys-roleMedia {
+  margin: 0;
+  position: relative;
+  min-height: 100%;
+  border-left: 1px solid var(--ys-line);
+  overflow: hidden;
+}
+
+.ys-roleImage {
+  width: 100%;
+  height: 100%;
+  min-height: 440px;
+  object-fit: cover;
+  display: block;
+  filter: saturate(0.82) contrast(0.98);
+}
+
+.ys-roleCaption {
+  position: absolute;
+  left: 18px;
+  bottom: 16px;
+  color: #fff;
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.45);
+}
+
+/* ---------- 今日首页 ---------- */
+.ys-home {
+  width: min(1080px, 100%);
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 34px;
+}
+
+.ys-homeHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 20px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--ys-line);
+}
+
+.ys-homeDate {
+  margin: 0 0 4px;
+  color: var(--ys-muted);
+  font-size: 12px;
+  letter-spacing: 0.08em;
+}
+
+.ys-homeHeader h1 {
+  margin: 0;
+  font-family: var(--ys-serif);
+  font-size: clamp(36px, 4.4vw, 52px);
+  line-height: 1.1;
+}
+
+.ys-homeGreeting {
+  margin: 6px 0 0;
+  color: var(--ys-ink-soft);
+  line-height: 1.7;
+}
+
+.ys-homeHero {
+  display: grid;
+  grid-template-columns: 1.05fr 0.95fr;
+  gap: 36px;
+  align-items: center;
+}
+
+.ys-homeHeroText h2 {
+  margin: 0 0 12px;
+  font-family: var(--ys-serif);
+  font-size: clamp(28px, 3.5vw, 42px);
+  line-height: 1.28;
+  font-weight: 600;
+}
+
+.ys-homeHeroText p {
+  margin: 0 0 20px;
+  color: var(--ys-ink-soft);
+  line-height: 1.85;
+  max-width: 28em;
+}
+
+.ys-homeHeroActions {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  flex-wrap: wrap;
+}
+
+.ys-homeHeroMedia {
+  margin: 0;
+}
+
+.ys-homeHeroImage {
+  width: 100%;
+  height: 300px;
+  object-fit: cover;
+  display: block;
+  border: 1px solid var(--ys-line);
+  filter: saturate(0.82) contrast(0.98);
+}
+
+.ys-homeHeroMedia figcaption {
+  margin-top: 8px;
+  color: var(--ys-muted);
+  font-size: 11px;
+  letter-spacing: 0.06em;
+}
+
+.ys-todayStrip {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  border-top: 1px solid var(--ys-line);
+  border-bottom: 1px solid var(--ys-line);
+}
+
+.ys-todayItem {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 16px 20px;
+  border-right: 1px solid var(--ys-line);
+}
+
+.ys-todayItem:last-child {
+  border-right: 0;
+}
+
+.ys-todayItem span {
+  color: var(--ys-muted);
+  font-size: 12px;
+}
+
+.ys-todayItem strong {
+  font-family: var(--ys-serif);
+  font-size: 22px;
+  font-weight: 600;
+}
+
+.ys-todayItem small {
+  color: var(--ys-muted);
+  font-size: 12px;
+}
+
+.ys-homeGrid {
+  display: grid;
+  grid-template-columns: 1.2fr 0.8fr;
+  gap: 18px;
+}
+
+.ys-storyFeature {
+  grid-row: span 2;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 26px;
+  border: 1px solid var(--ys-line);
+  background: var(--ys-surface);
+  text-decoration: none;
+  color: inherit;
+}
+
+.ys-storyFeature h2 {
+  margin: 0;
+  font-family: var(--ys-serif);
+  font-size: clamp(24px, 2.4vw, 30px);
+  line-height: 1.4;
+}
+
+.ys-storyQuote {
+  margin: 0;
+  color: var(--ys-ink-soft);
+  line-height: 1.85;
+  flex: 1;
+}
+
+.ys-storyImage {
+  height: 120px;
+  margin-top: auto;
+  border: 1px solid var(--ys-line);
+  background-size: cover;
+  background-position: center 58%;
+  filter: saturate(0.8);
+}
+
+.ys-module {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 20px;
+  border: 1px solid var(--ys-line);
+  background: var(--ys-surface);
+  text-decoration: none;
+  color: inherit;
+}
+
+.ys-module h3 {
+  margin: 0;
+  font-family: var(--ys-serif);
+  font-size: 20px;
+}
+
+.ys-module p {
+  margin: 0;
+  color: var(--ys-muted);
+  line-height: 1.65;
+  font-size: 13px;
+  flex: 1;
+}
+
+.ys-moduleIcon {
+  color: var(--ys-celadon-deep);
+}
+
+.ys-moduleLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  align-self: flex-start;
+  color: var(--ys-celadon-deep);
+  font-size: 12px;
+  border-bottom: 1px solid var(--ys-celadon);
+  padding-bottom: 1px;
+}
+
+.ys-scamBand {
+  grid-column: 1 / -1;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 24px;
+  padding: 22px 24px;
+  border: 1px solid var(--ys-line);
+  border-left: 3px solid var(--ys-seal);
+  background: var(--ys-surface);
+  text-decoration: none;
+  color: inherit;
+}
+
+.ys-scamBand h3 {
+  margin: 4px 0 6px;
+  font-family: var(--ys-serif);
+  font-size: 22px;
+}
+
+.ys-scamBand p {
+  margin: 0;
+  color: var(--ys-muted);
+  line-height: 1.65;
+  font-size: 13px;
+}
+
+.ys-scamArrow {
+  color: var(--ys-seal);
+  flex: 0 0 auto;
+}
+
+.ys-assistantRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  padding: 14px 0;
+  border-top: 1px solid var(--ys-line);
+  border-bottom: 1px solid var(--ys-line);
+  color: var(--ys-muted);
+  font-size: 13px;
+}
+
+.ys-quoteStrip {
+  text-align: center;
+  padding: 8px 0 0;
+}
+
+.ys-quoteStrip p {
+  margin: 0 0 4px;
+  font-family: var(--ys-serif);
+  font-size: 20px;
+  color: var(--ys-ink-soft);
+}
+
+.ys-quoteStrip small {
+  color: var(--ys-muted);
+  font-size: 11px;
+}
+
+/* ---------- 健康照护 ---------- */
+.ys-medLayout {
+  display: grid;
+  grid-template-columns: 1.2fr 0.8fr;
+  gap: 22px;
+  align-items: start;
+}
+
+.ys-medSummary {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  border-top: 1px solid var(--ys-line);
+  border-bottom: 1px solid var(--ys-line);
+  margin-bottom: 8px;
+}
+
+.ys-medSummary > div {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 16px 18px;
+  border-right: 1px solid var(--ys-line);
+}
+
+.ys-medSummary > div:last-child {
+  border-right: 0;
+}
+
+.ys-medSummary strong {
+  font-family: var(--ys-serif);
+  font-size: 26px;
+  font-weight: 600;
+}
+
+.ys-medSummary small {
+  color: var(--ys-muted);
+  font-size: 12px;
+}
+
+.ys-medList {
+  border-top: 1px solid var(--ys-line);
+}
+
+.ys-medItem {
+  display: grid;
+  grid-template-columns: 64px 1fr auto;
+  align-items: center;
+  gap: 14px;
+  padding: 16px 0;
+  border-bottom: 1px solid var(--ys-line);
+}
+
+.ys-medTime {
+  font-family: var(--ys-serif);
+  font-size: 20px;
+  color: var(--ys-ink-soft);
+}
+
+.ys-medInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.ys-medInfo strong {
+  font-size: 15px;
+}
+
+.ys-medInfo small {
+  color: var(--ys-muted);
+  font-size: 12px;
+}
+
+.ys-medActions {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.ys-medActions .btn {
+  padding: 6px 10px;
+  font-size: 12px;
+}
+
+.ys-medState {
+  padding: 4px 9px;
+  border-radius: 999px;
+  font-size: 12px;
+  border: 1px solid var(--ys-line);
+  color: var(--ys-muted);
+}
+
+.ys-medState--taken {
+  border-color: var(--ys-celadon);
+  color: var(--ys-celadon-deep);
+  background: var(--ys-celadon-soft);
+}
+
+.ys-medState--skipped {
+  border-color: #d8c1b8;
+  color: var(--ys-warn);
+  background: #f8eee9;
+}
+
+.ys-medState--late {
+  border-color: #d8c9b5;
+  color: var(--ys-warn);
+  background: #f8f2e8;
+}
+
+.ys-scanPanel {
+  padding: 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.ys-scanPanel h2 {
+  margin: 0;
+  font-family: var(--ys-serif);
+  font-size: 24px;
+}
+
+.ys-scanPanel p {
+  margin: 0;
+  color: var(--ys-muted);
+  line-height: 1.7;
+  font-size: 13px;
+}
+
+.ys-uploadBox {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 22px 16px;
+  border: 1px dashed var(--ys-line-strong);
+  background: var(--ys-paper);
+  color: var(--ys-muted);
+  text-align: center;
+  cursor: pointer;
+}
+
+.ys-uploadBox strong {
+  color: var(--ys-ink);
+  font-size: 14px;
+}
+
+.ys-uploadBox span {
+  font-size: 11px;
+}
+
+.ys-uploadBox input {
+  display: none;
+}
+
+.ys-scanResult {
+  padding: 22px;
+}
+
+.ys-scanHead {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.ys-scanHead h2 {
+  margin: 4px 0;
+  font-family: var(--ys-serif);
+  font-size: 26px;
+}
+
+.ys-scanHead p {
+  margin: 0;
+  color: var(--ys-muted);
+  font-size: 13px;
+}
+
+.ys-confidence {
+  color: var(--ys-muted);
+  font-size: 12px;
+}
+
+.ys-scanWarnings {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--ys-line);
+  font-size: 13px;
+}
+
+.ys-scanWarnings strong {
+  display: block;
+  margin-bottom: 6px;
+}
+
+.ys-scanWarnings ul {
+  margin: 0;
+  padding-left: 18px;
+  color: var(--ys-ink-soft);
+  line-height: 1.7;
+}
+
+.ys-emptyBlock {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 40px 20px;
+  text-align: center;
+  border: 1px dashed var(--ys-line-strong);
+  background: var(--ys-paper);
+  color: var(--ys-muted);
+}
+
+.ys-emptyBlock strong {
+  color: var(--ys-ink);
+}
+
+.ys-emptyBlock p {
+  margin: 0;
+  line-height: 1.6;
+  max-width: 30em;
+}
+
+.ys-emptyBlock--inline {
+  border: 0;
+  background: transparent;
+  padding: 24px 12px;
+}
+
+/* ---------- 安心守护 ---------- */
+.ys-locationLayout {
+  display: grid;
+  grid-template-columns: 1.25fr 0.75fr;
+  gap: 22px;
+  align-items: start;
+}
+
+.ys-mapCard {
+  padding: 22px;
+}
+
+.ys-mapHead {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  margin-bottom: 14px;
+}
+
+.ys-mapHead h2 {
+  margin: 4px 0 0;
+  font-family: var(--ys-serif);
+  font-size: 26px;
+}
+
+.ys-stateMark {
+  padding: 4px 9px;
+  border: 1px solid var(--ys-celadon);
+  color: var(--ys-celadon-deep);
+  background: var(--ys-celadon-soft);
+  font-size: 11px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+.ys-stateMark--warn {
+  border-color: var(--ys-seal);
+  color: var(--ys-seal);
+  background: #f7e9e6;
+}
+
+.ys-mapSvg {
+  width: 100%;
+  height: auto;
+  display: block;
+  border: 1px solid var(--ys-line);
+}
+
+.ys-mapMeta {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--ys-line);
+  color: var(--ys-muted);
+  font-size: 11px;
+}
+
+.ys-mapCard .ys-inlineActions {
+  margin-top: 14px;
+}
+
+.ys-safetySide {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+
+.ys-sideBlock {
+  padding-bottom: 18px;
+  border-bottom: 1px solid var(--ys-line);
+}
+
+.ys-sideBlock:last-child {
+  border-bottom: 0;
+}
+
+.ys-alertList {
+  display: flex;
+  flex-direction: column;
+}
+
+.ys-alertItem {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--ys-line);
+}
+
+.ys-alertItem:last-child {
+  border-bottom: 0;
+}
+
+.ys-alertDot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--ys-seal);
+  margin-top: 6px;
+  flex: 0 0 auto;
+}
+
+.ys-alertItem strong {
+  display: block;
+  font-size: 13px;
+}
+
+.ys-alertItem small {
+  color: var(--ys-muted);
+  font-size: 11px;
+}
+
+.ys-posterForm {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.ys-posterForm label {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.ys-posterForm label span {
+  color: var(--ys-muted);
+  font-size: 11px;
+}
+
+.ys-shareResult {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--ys-line);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 12px;
+}
+
+.ys-inlineActions,
+.yl-inlineActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* ---------- 家属 ---------- */
+.ys-summaryStrip {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  border-top: 1px solid var(--ys-line);
+  border-bottom: 1px solid var(--ys-line);
+}
+
+.ys-summaryItem {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 16px 18px;
+  border-right: 1px solid var(--ys-line);
+}
+
+.ys-summaryItem:last-child {
+  border-right: 0;
+}
+
+.ys-summaryItem span {
+  color: var(--ys-muted);
+  font-size: 11px;
+}
+
+.ys-summaryItem strong {
+  font-family: var(--ys-serif);
+  font-size: 24px;
+  font-weight: 600;
+}
+
+.ys-summaryItem small {
+  color: var(--ys-muted);
+  font-size: 11px;
+}
+
+.ys-report {
+  padding: 24px;
+}
+
+.ys-reportHead {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  flex-wrap: wrap;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--ys-line);
+}
+
+.ys-reportHead h2 {
+  margin: 4px 0 0;
+  font-family: var(--ys-serif);
+  font-size: clamp(22px, 2.4vw, 28px);
+  line-height: 1.45;
+}
+
+.ys-reportPeriod {
+  color: var(--ys-muted);
+  font-size: 11px;
+}
+
+.ys-reportGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0 24px;
+}
+
+.ys-reportSection {
+  padding: 14px 0;
+  border-bottom: 1px solid var(--ys-line);
+}
+
+.ys-reportSection strong {
+  display: block;
+  margin-bottom: 4px;
+  font-family: var(--ys-serif);
+  font-size: 16px;
+}
+
+.ys-reportSection p {
+  margin: 0;
+  color: var(--ys-ink-soft);
+  line-height: 1.7;
+  font-size: 13px;
+}
+
+.ys-reportSuggestions {
+  padding-top: 14px;
+}
+
+.ys-reportSuggestions strong {
+  display: block;
+  margin-bottom: 6px;
+  font-family: var(--ys-serif);
+  font-size: 16px;
+}
+
+.ys-reportSuggestions ul {
+  margin: 0 0 10px;
+  padding-left: 18px;
+  color: var(--ys-ink-soft);
+  line-height: 1.8;
+  font-size: 13px;
+}
+
+.ys-confirmList {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.ys-confirmCard {
+  padding: 14px 16px;
+  border: 1px solid #e5cfc8;
+  background: #fbf6f3;
+}
+
+.ys-confirmTop {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.ys-confirmType {
+  color: var(--ys-seal);
+  font-weight: 600;
+  font-size: 13px;
+}
+
+.ys-confirmTime {
+  color: var(--ys-muted);
+  font-size: 11px;
+}
+
+.ys-confirmDesc {
+  margin: 6px 0 10px;
+  color: var(--ys-ink-soft);
+  line-height: 1.65;
+  font-size: 13px;
+}
+
+/* ---------- 旧页面组件的水韵化覆盖 ---------- */
+.yl-pageHeader {
+  border-bottom: 1px solid var(--ys-line);
+  padding-bottom: 16px;
+}
+
+.yl-pageHeader h1 {
+  font-size: clamp(28px, 3.3vw, 38px);
+  margin: 0 0 6px;
+}
+
+.yl-pageHeader p {
+  color: var(--ys-ink-soft);
+  line-height: 1.7;
+}
+
+.yl-bubble {
+  border-radius: 2px;
+  background: var(--ys-paper-deep);
+  color: var(--ys-ink);
+}
+
+.yl-chatMsg--user .yl-bubble {
+  background: var(--ys-celadon-deep);
+  color: #fff;
+}
+
+.yl-chatList {
+  background: var(--ys-surface);
+}
+
+.yl-chatAvatar {
+  border-radius: 2px;
+  background: var(--ys-paper-deep);
+  color: var(--ys-muted);
+}
+
+.yl-chatMsg--bot .yl-chatAvatar {
+  background: var(--ys-celadon-soft);
+  color: var(--ys-celadon-deep);
+}
+
+.yl-toolChip {
+  border-radius: 2px;
+  border-color: var(--ys-line);
+  background: var(--ys-paper);
+}
+
+.yl-toolIcon {
+  color: var(--ys-celadon-deep);
+}
+
+.yl-toolChip--error {
+  border-color: #e5cfc8;
+  background: #fbf6f3;
+}
+
+.yl-riskInline {
+  border-radius: 2px;
+  background: #f7e9e6;
+  color: var(--ys-seal);
+}
+
+.yl-modal {
+  border-radius: 2px;
+}
+
+.yl-modalIcon {
+  border-radius: 2px;
+  background: #f7e9e6;
+  color: var(--ys-seal);
+}
+
+.yl-modalCountdown {
+  border-radius: 2px;
+  background: #f8f2e8;
+  color: var(--ys-warn);
+}
+
+.yl-tabs {
+  border-radius: 2px;
+  background: var(--ys-paper-deep);
+}
+
+.yl-tab--active {
+  border-radius: 2px;
+  background: var(--ys-surface);
+  box-shadow: none;
+  color: var(--ys-ink);
+}
+
+.yl-resultPanel {
+  border-radius: 2px;
+}
+
+.yl-risk--high {
+  border-color: #e5cfc8;
+  background: #fbf6f3;
+}
+
+.yl-risk--medium {
+  border-color: #d8c9b5;
+  background: #fbf8f1;
+}
+
+.yl-riskBadge {
+  background: var(--ys-paper-deep);
+  color: var(--ys-ink-soft);
+}
+
+.yl-risk--high .yl-riskBadge {
+  background: #f7e9e6;
+  color: var(--ys-seal);
+}
+
+.yl-risk--medium .yl-riskBadge {
+  background: #f8f2e8;
+  color: var(--ys-warn);
+}
+
+.yl-redFlag {
+  border-radius: 2px;
+  background: #f7e9e6;
+  color: var(--ys-seal);
+}
+
+.yl-redFlag p {
+  color: #7f2f24;
+}
+
+.yl-actionChip {
+  border-radius: 999px;
+  background: var(--ys-celadon-soft);
+  color: var(--ys-celadon-deep);
+  border-color: #c9d8ce;
+}
+
+.yl-coolingPanel {
+  border-color: #d8c9b5;
+  background: #fbf8f1;
+}
+
+.yl-coolingCta {
+  border-radius: 2px;
+  border-color: #e5cfc8;
+  background: #fbf6f3;
+}
+
+.yl-coolingCount {
+  color: var(--ys-warn);
+}
+
+.yl-relatedItem {
+  border-top-color: var(--ys-line);
+}
+
+.yl-disclaimer {
+  border-top-color: var(--ys-line);
+  color: var(--ys-muted);
+}
+
+.yl-storyReader {
+  border-radius: 2px;
+  border-color: var(--ys-line);
+  background: var(--ys-surface);
+  box-shadow: none;
+}
+
+.yl-storyReader p {
+  font-family: var(--ys-serif);
+  font-size: 17px;
+  line-height: 2;
+}
+
+.yl-memoryDot {
+  background: var(--ys-celadon);
+  box-shadow: 0 0 0 2px var(--ys-celadon-soft);
+}
+
+.yl-memoryBody,
+.yl-storyCard {
+  border-radius: 2px;
+}
+
+.yl-successPanel {
+  border-color: #c9d8ce;
+  background: var(--ys-celadon-soft);
+}
+
+.yl-successIcon {
+  border-radius: 2px;
+  background: #d5e3d9;
+  color: var(--ys-celadon-deep);
+}
+
+.yl-topicCard {
+  border-radius: 2px;
+}
+
+.yl-topicCard--active {
+  border-color: var(--ys-celadon);
+  background: var(--ys-celadon-soft);
+  color: var(--ys-celadon-deep);
+}
+
+.yl-progressBar {
+  background: var(--ys-celadon);
+}
+
+.yl-uploadBox {
+  border-radius: 2px;
+  border-color: var(--ys-line-strong);
+  background: var(--ys-paper);
+}
+
+.yl-cardLink,
+.yl-linkBtn {
+  color: var(--ys-celadon-deep);
+}
+
+.yl-badge {
+  background: var(--ys-celadon-soft);
+  color: var(--ys-celadon-deep);
+}
+
+.yl-tipPanel {
+  border-radius: 2px;
+  border-color: #d8c9b5;
+  background: #fbf8f1;
+}
+
+.yl-warnBanner {
+  border-radius: 2px;
+  border-color: #e5cfc8;
+  background: #fbf6f3;
+}
+
+.yl-loading {
+  color: var(--ys-muted);
+}
+
+/* ---------- 响应式 ---------- */
+@media (max-width: 960px) {
+  .ys-rolePanel {
+    grid-template-columns: 1fr;
+  }
+
+  .ys-roleMedia {
+    border-left: 0;
+    border-top: 1px solid var(--ys-line);
+    order: -1;
+    min-height: 240px;
+  }
+
+  .ys-roleImage {
+    min-height: 240px;
+    max-height: 320px;
+  }
+
+  .ys-homeHero {
+    grid-template-columns: 1fr;
+    gap: 20px;
+  }
+
+  .ys-homeHeroImage {
+    height: 240px;
+  }
+
+  .ys-homeGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .ys-storyFeature {
+    grid-row: auto;
+  }
+
+  .ys-medLayout,
+  .ys-locationLayout {
+    grid-template-columns: 1fr;
+  }
+
+  .ys-summaryStrip {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .ys-summaryItem:nth-child(2) {
+    border-right: 0;
+  }
+
+  .ys-summaryItem:nth-child(-n + 2) {
+    border-bottom: 1px solid var(--ys-line);
+  }
+
+  .ys-reportGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 720px) {
+  .yl-topbar {
+    min-height: 60px;
+    padding: 8px 14px;
+    gap: 8px;
+  }
+
+  .yl-main {
+    padding: 22px 14px 56px;
+  }
+
+  .ys-rolePage {
+    padding: 20px 12px;
+  }
+
+  .ys-roleIntro {
+    padding: 26px 20px;
+  }
+
+  .ys-roleRow {
+    grid-template-columns: 64px 1fr auto;
+    gap: 10px;
+  }
+
+  .ys-roleRowTitle {
+    font-size: 19px;
+  }
+
+  .ys-homeHeader {
+    flex-direction: column;
+  }
+
+  .ys-todayStrip {
+    grid-template-columns: 1fr;
+  }
+
+  .ys-todayItem {
+    border-right: 0;
+    border-bottom: 1px solid var(--ys-line);
+  }
+
+  .ys-todayItem:last-child {
+    border-bottom: 0;
+  }
+
+  .ys-summaryStrip {
+    grid-template-columns: 1fr;
+  }
+
+  .ys-summaryItem {
+    border-right: 0;
+    border-bottom: 1px solid var(--ys-line);
+  }
+
+  .ys-summaryItem:last-child {
+    border-bottom: 0;
+  }
+
+  .ys-students,
+  .ys-assistantRow {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .ys-medItem {
+    grid-template-columns: 52px 1fr;
+  }
+
+  .ys-medActions {
+    grid-column: 1 / -1;
+    justify-content: flex-start;
+  }
+
+  .ys-scamBand {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .ys-mapMeta {
+    flex-direction: column;
+    gap: 4px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .yl-shell *,
+  .ys-rolePage * {
+    transition: none !important;
+    animation: none !important;
+  }
+}
+
+/* 长者模式：更宽松的字号与点击区域 */
+.mode-elder .yl-navLink {
+  font-size: 15px;
+}
+
+.mode-elder .yl-shell .btn {
+  font-size: 15px;
+  padding: 10px 16px;
+}
+
+.mode-elder .ys-kicker {
+  font-size: 12px;
+}
+
+.mode-elder .ys-home p,
+.mode-elder .ys-module p,
+.mode-elder .ys-todayItem small,
+.mode-elder .ys-medInfo small,
+.mode-elder .ys-mutedText,
+.mode-elder .ys-scanPanel p {
+  font-size: 15px;
+}
+
+.mode-elder .ys-todayItem strong,
+.mode-elder .ys-medSummary strong {
+  font-size: 26px;
+}
+
+.mode-elder .ys-medInfo strong {
+  font-size: 17px;
+}
+
+.mode-elder .ys-medTime {
+  font-size: 22px;
+}

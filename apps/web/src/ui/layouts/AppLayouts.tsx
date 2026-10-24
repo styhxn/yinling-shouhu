@@ -9,7 +9,7 @@ function Brand({ home }: { home: string }) {
       <span className="yl-brandMark" />
       <span className="yl-brandText">
         <strong>银龄守护</strong>
-        <small>会倾听，也会守护</small>
+        <small>水韵江苏</small>
       </span>
     </Link>
   );
@@ -67,11 +67,15 @@ export function ElderLayout() {
       <header className="yl-topbar">
         <Brand home="/elder" />
         <nav className="yl-nav">
-          <NavItem to="/elder" icon="home">首页</NavItem>
-          <NavItem to="/elder/chat" icon="message">说说话</NavItem>
-          <NavItem to="/elder/story" icon="bookOpen">我的故事</NavItem>
-          <NavItem to="/elder/safety/scam" icon="shieldCheck">反诈</NavItem>
+          <NavItem to="/elder" icon="home">今日</NavItem>
+          <NavItem to="/elder/story" icon="bookOpen">故事</NavItem>
+          <NavItem to="/elder/meds" icon="pill">健康</NavItem>
+          <NavItem to="/elder/safety" icon="shieldCheck">守护</NavItem>
         </nav>
+        <Link to="/elder/chat" className="ys-assistantLink">
+          <Icon name="message" size="sm" />
+          小助手
+        </Link>
         <Identity label="长者端" />
       </header>
       <main className="yl-main">

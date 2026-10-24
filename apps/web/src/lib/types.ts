@@ -161,3 +161,97 @@ export type InterviewAnswer = {
   maxTurns?: number;
   memory?: MemoryItem;
 };
+
+export type LocationPoint = {
+  elderId: string;
+  lat: number;
+  lng: number;
+  accuracy: number | null;
+  source: string;
+  ts: number;
+};
+
+export type Geofence = {
+  id: string;
+  elderId: string;
+  name: string;
+  shape: { type: "circle"; center: [number, number]; radius: number };
+  schedule: unknown;
+  notifyOn: string[];
+  active: boolean;
+  createdAt: number;
+  updatedAt: number;
+};
+
+export type SafetyAlert = {
+  id: string;
+  elderId: string;
+  type: string;
+  level: string;
+  payload: Record<string, unknown>;
+  status: string;
+  createdAt: number;
+};
+
+export type FamilySummary = {
+  elder: { id: string; displayName: string; birthYear: number | null };
+  location: LocationPoint | null;
+  medications: {
+    items: number;
+    dueToday: number;
+    taken: number;
+    logged: number;
+    adherencePct: number | null;
+  };
+  alerts: { open: number; items: SafetyAlert[] };
+  pendingConfirms: number;
+  memoryCount: number;
+};
+
+export type WeeklyReport = {
+  period: { from: number; to: number };
+  elder: { id: string; displayName: string };
+  adherencePct: number | null;
+  summary: string;
+  sections: { title: string; content: string }[];
+  suggestions: string[];
+  disclaimer: string;
+};
+
+export type Medication = {
+  id: string;
+  elderId: string;
+  name: string;
+  genericName: string | null;
+  spec: string | null;
+  dosage: string | null;
+  schedule: { time: string }[];
+  notes: string | null;
+};
+
+export type MedicationLog = {
+  id: string;
+  medicationId: string;
+  elderId: string;
+  status: "taken" | "skipped" | "late";
+  scheduledTime: string | null;
+  ts: number;
+};
+
+export type MedicationScanResult = {
+  name: string;
+  genericName: string | null;
+  spec: string | null;
+  dosage: string | null;
+  confidence: number;
+  warnings: string[];
+  contraindications: string[];
+  sources: { title: string; url: string }[];
+  disclaimer: string;
+};
+
+export type MissingPosterResult = {
+  id: string;
+  shareUrl: string;
+  expiresAt: number;
+};

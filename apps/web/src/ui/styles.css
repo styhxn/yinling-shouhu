@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;600;700;900&display=swap');
+/* 字体使用系统字体栈，避免依赖 Google Fonts CDN；标题字体在 jiangsu.css 中定义。 */
 
 :root {
   --bg: #0a0f1a;

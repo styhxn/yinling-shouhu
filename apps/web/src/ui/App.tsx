@@ -11,6 +11,7 @@ import { ScamCheckPage } from "./pages/ScamCheckPage.js";
 import { MemoryListPage } from "./pages/MemoryListPage.js";
 import { MemoryInterviewPage } from "./pages/MemoryInterviewPage.js";
 import { StoryChapterPage } from "./pages/StoryChapterPage.js";
+import { MedicationsPage } from "./pages/MedicationsPage.js";
 import { FamilyDashboardPage } from "./pages/FamilyDashboardPage.js";
 
 export function App() {
@@ -34,6 +35,7 @@ export function App() {
               <Route path="story" element={<MemoryListPage />} />
               <Route path="story/new" element={<MemoryInterviewPage />} />
               <Route path="story/:id" element={<StoryChapterPage />} />
+              <Route path="meds" element={<MedicationsPage />} />
               <Route path="safety" element={<SafetyHomePage />} />
               <Route path="safety/scam" element={<ScamCheckPage />} />
             </Route>

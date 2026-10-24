@@ -1,9 +1,10 @@
 import React from "react";
 import { Link } from "react-router-dom";
+import heroUrl from "../assets/jiangsu-hero.webp";
 import { Icon } from "../components/Icon.js";
 import { api } from "../../lib/api.js";
+import type { FamilySummary, MemoryItem } from "../../lib/types.js";
 import { useAuth } from "../state/auth.js";
-import { useToast } from "../state/toast.js";
 
 function greeting() {
   const hour = new Date().getHours();
@@ -14,121 +15,174 @@ function greeting() {
   return "晚上好";
 }
 
+function formatClock(ts: number | null | undefined) {
+  if (!ts) return "暂无记录";
+  return new Date(ts).toLocaleTimeString("zh-CN", {
+    hour: "2-digit",
+    minute: "2-digit"
+  });
+}
+
 export function ElderHomePage() {
   const { me } = useAuth();
-  const toast = useToast();
-  const [memoryCount, setMemoryCount] = React.useState<number | null>(null);
+  const [summary, setSummary] = React.useState<FamilySummary | null>(null);
+  const [latestMemory, setLatestMemory] = React.useState<MemoryItem | null>(null);
 
   React.useEffect(() => {
     let alive = true;
-    api.memory
-      .list()
-      .then((res) => {
-        if (alive) setMemoryCount(res.items.length);
+    Promise.all([api.family.summary(), api.memory.list()])
+      .then(([summaryRes, memoryRes]) => {
+        if (!alive) return;
+        setSummary(summaryRes.summary);
+        setLatestMemory(memoryRes.items[0] ?? null);
       })
-      .catch(() => {
-        if (alive) setMemoryCount(null);
-      });
+      .catch(() => undefined);
     return () => {
       alive = false;
     };
   }, []);
 
+  const date = new Date().toLocaleDateString("zh-CN", {
+    month: "long",
+    day: "numeric",
+    weekday: "long"
+  });
+  const due = summary?.medications.dueToday ?? 0;
+  const taken = summary?.medications.taken ?? 0;
+  const logged = summary?.medications.logged ?? 0;
+  const adherence =
+    summary?.medications.adherencePct === null ||
+    typeof summary?.medications.adherencePct === "undefined"
+      ? "暂无记录"
+      : `${summary.medications.adherencePct}%`;
+
   return (
-    <div className="yl-page">
-      <section className="yl-hello">
+    <div className="ys-home">
+      <header className="ys-homeHeader">
         <div>
-          <h1>
-            {me?.user.displayName ?? "您好"}，{greeting()}
-          </h1>
-          <p>今天想聊点什么，或者需要我帮您办点事？</p>
+          <p className="ys-homeDate">{date}</p>
+          <h1>今日</h1>
+          <p className="ys-homeGreeting">
+            {me?.user.displayName ?? "您好"}，{greeting()}。今天先照顾好自己。
+          </p>
         </div>
-        <div className="yl-helloStatus">
-          <span className="yl-statusPill">
-            <Icon name="bookOpen" size="sm" />
-            {memoryCount === null ? "回忆加载中" : `已记录 ${memoryCount} 段回忆`}
-          </span>
-          <span className="yl-statusPill yl-statusPill--ok">
-            <span className="yl-dot" />
-            家属已连接
-          </span>
+        <span className="ys-seal">水韵江苏</span>
+      </header>
+
+      <section className="ys-homeHero">
+        <div className="ys-homeHeroText">
+          <h2>把日子过稳，把故事留下。</h2>
+          <p>用药、位置、家人的消息，都在这里。想说话的时候，小助手也在。</p>
+          <div className="ys-homeHeroActions">
+            <Link to="/elder/story" className="btn btnPrimary">
+              看看我的故事
+            </Link>
+            <Link to="/elder/chat" className="ys-textLink">
+              问小助手
+              <Icon name="arrowRight" size="sm" />
+            </Link>
+          </div>
+        </div>
+        <figure className="ys-homeHeroMedia">
+          <img src={heroUrl} alt="江南水乡清晨" className="ys-homeHeroImage" />
+          <figcaption>水韵江苏 · 清晨的水巷</figcaption>
+        </figure>
+      </section>
+
+      <section className="ys-todayStrip">
+        <div className="ys-todayItem">
+          <span>用药</span>
+          <strong>{logged === 0 ? "待记录" : `${taken}/${due} 次`}</strong>
+          <small>{logged === 0 ? "今天还没有打卡" : `依从率 ${adherence}`}</small>
+        </div>
+        <div className="ys-todayItem">
+          <span>位置</span>
+          <strong>{summary?.location ? "已更新" : "暂无"}</strong>
+          <small>
+            {summary?.location ? `最后更新 ${formatClock(summary.location.ts)}` : "家属可设置安全区域"}
+          </small>
+        </div>
+        <div className="ys-todayItem">
+          <span>待确认</span>
+          <strong>{summary?.pendingConfirms ?? 0}</strong>
+          <small>{summary?.pendingConfirms ? "家属需要处理" : "暂时没有"}</small>
         </div>
       </section>
 
-      <section className="yl-bigActions">
-        <Link to="/elder/chat" className="yl-bigAction yl-bigAction--talk">
-          <span className="yl-bigIcon">
-            <Icon name="message" size={36} />
+      <section className="ys-homeGrid">
+        <Link to="/elder/story" className="ys-storyFeature">
+          <span className="ys-kicker">记忆故事</span>
+          <h2>{latestMemory ? latestMemory.title : "还有一段故事没讲完"}</h2>
+          <p className="ys-storyQuote">
+            {latestMemory
+              ? latestMemory.summary || latestMemory.transcript.slice(0, 90)
+              : "一次只问一个问题，您按着说话，我帮您整理成可以读、可以听的故事。"}
+          </p>
+          <div className="ys-storyImage" style={{ backgroundImage: `url(${heroUrl})` }} aria-hidden="true" />
+          <span className="ys-moduleLink">
+            进入故事
+            <Icon name="arrowRight" size="sm" />
           </span>
-          <span className="yl-bigTitle">我想说说话</span>
-          <span className="yl-bigDesc">问天气、聊家常、让我帮您查一查</span>
         </Link>
 
-        <Link to="/elder/safety" className="yl-bigAction yl-bigAction--lost">
-          <span className="yl-bigIcon">
-            <Icon name="mapPin" size={36} />
+        <Link to="/elder/safety" className="ys-module">
+          <span className="ys-moduleIcon">
+            <Icon name="mapPin" size="lg" />
           </span>
-          <span className="yl-bigTitle">我找不到家了</span>
-          <span className="yl-bigDesc">联系家人 · 位置守护（W3 上线）</span>
+          <span className="ys-kicker">安心守护</span>
+          <h3>位置与安全</h3>
+          <p>
+            {summary?.alerts.open
+              ? `${summary.alerts.open} 条安全提醒待查看`
+              : "围栏、寻人、紧急联系，都放在这里。"}
+          </p>
+          <span className="ys-moduleLink">
+            去看看
+            <Icon name="arrowRight" size="sm" />
+          </span>
         </Link>
 
-        <Link to="/elder/safety/scam?mode=transfer" className="yl-bigAction yl-bigAction--scam">
-          <span className="yl-bigIcon">
-            <Icon name="shieldCheck" size={36} />
+        <Link to="/elder/meds" className="ys-module">
+          <span className="ys-moduleIcon">
+            <Icon name="pill" size="lg" />
           </span>
-          <span className="yl-bigTitle">有人让我转账</span>
-          <span className="yl-bigDesc">先别转，我帮您看看是不是骗子</span>
+          <span className="ys-kicker">健康照护</span>
+          <h3>今天的药</h3>
+          <p>
+            {due > 0
+              ? `计划 ${due} 次，已记录 ${taken} 次。`
+              : "还没有用药计划，可以拍照识药。"}
+          </p>
+          <span className="ys-moduleLink">
+            去记录
+            <Icon name="arrowRight" size="sm" />
+          </span>
+        </Link>
+
+        <Link to="/elder/safety/scam" className="ys-scamBand">
+          <div>
+            <span className="ys-kicker">反诈守护</span>
+            <h3>有人让您转账时，先来这里看一眼。</h3>
+            <p>文字、短信截图、链接都可以帮您看看。拿不准就先问家人，或拨打 96110。</p>
+          </div>
+          <span className="ys-scamArrow">
+            <Icon name="shieldCheck" size="lg" />
+          </span>
         </Link>
       </section>
 
-      <section className="yl-quickRow">
-        <Link to="/elder/story" className="yl-quickCard">
-          <Icon name="bookOpen" size="lg" />
-          <span>
-            <strong>我的故事</strong>
-            <small>把回忆整理成故事</small>
-          </span>
-          <Icon name="chevronRight" size="sm" />
+      <div className="ys-assistantRow">
+        <span>有事可以问小助手，不用打字，按着说话就行。</span>
+        <Link to="/elder/chat" className="ys-textLink">
+          去问问
+          <Icon name="arrowRight" size="sm" />
         </Link>
+      </div>
 
-        <button
-          type="button"
-          className="yl-quickCard"
-          onClick={() =>
-            toast.push({
-              kind: "normal",
-              title: "用药提醒",
-              detail: "W3 上线，届时可拍照识药、按时提醒"
-            })
-          }
-        >
-          <Icon name="pill" size="lg" />
-          <span>
-            <strong>吃药提醒</strong>
-            <small>W3 上线</small>
-          </span>
-          <Icon name="chevronRight" size="sm" />
-        </button>
-
-        <button
-          type="button"
-          className="yl-quickCard"
-          onClick={() =>
-            toast.push({
-              kind: "normal",
-              title: "联系家人",
-              detail: "请让家属在后续设置页绑定联系电话"
-            })
-          }
-        >
-          <Icon name="phone" size="lg" />
-          <span>
-            <strong>联系家人</strong>
-            <small>让家属知道您现在的情况</small>
-          </span>
-          <Icon name="chevronRight" size="sm" />
-        </button>
-      </section>
+      <footer className="ys-quoteStrip">
+        <p>君到姑苏见，人家尽枕河。</p>
+        <small>唐 · 杜荀鹤《送人游吴》</small>
+      </footer>
     </div>
   );
 }

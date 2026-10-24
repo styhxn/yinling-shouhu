@@ -4,15 +4,24 @@ import type {
   AntiFraudHit,
   CoolingOff,
   FamilyConfirm,
+  FamilySummary,
+  Geofence,
   InterviewAnswer,
   InterviewStart,
+  LocationPoint,
+  Medication,
+  MedicationLog,
+  MedicationScanResult,
   MeResponse,
   MemoryItem,
+  MissingPosterResult,
   Role,
+  SafetyAlert,
   ScamResult,
   StoryBook,
   StoryChapter,
-  UploadResult
+  UploadResult,
+  WeeklyReport
 } from "./types.js";
 
 function query(params: Record<string, string | undefined>) {
@@ -149,6 +158,160 @@ export const api = {
           method: "POST",
           body: JSON.stringify({ decision, ...(note ? { note } : {}) })
         }
+      );
+    },
+    geofences(elderId?: string) {
+      return httpJson<{ items: Geofence[] }>(`/safety/geofence${query({ elderId })}`);
+    },
+    createGeofence(input: {
+      elderId?: string;
+      name: string;
+      shape: { type: "circle"; center: [number, number]; radius: number };
+      notifyOn?: ("exit" | "enter")[];
+    }) {
+      return httpJson<{ ok: boolean; geofence: Geofence }>("/safety/geofence", {
+        method: "POST",
+        body: JSON.stringify(input)
+      });
+    },
+    updateGeofence(id: string, input: Record<string, unknown>) {
+      return httpJson<{ ok: boolean; geofence: Geofence }>(`/safety/geofence/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify(input)
+      });
+    },
+    deleteGeofence(id: string) {
+      return httpJson<{ ok: boolean }>(`/safety/geofence/${id}`, { method: "DELETE" });
+    },
+    reportLocation(input: {
+      elderId?: string;
+      lat: number;
+      lng: number;
+      accuracy?: number;
+      source?: "browser" | "demo" | "wearable";
+    }) {
+      return httpJson<{
+        ok: boolean;
+        point: LocationPoint;
+        inside: boolean;
+        alerts: SafetyAlert[];
+      }>("/safety/location", {
+        method: "POST",
+        body: JSON.stringify(input)
+      });
+    },
+    latestLocation(elderId?: string) {
+      return httpJson<{ point: LocationPoint | null }>(
+        `/safety/location/latest${query({ elderId })}`
+      );
+    },
+    locationHistory(elderId?: string, from?: number, to?: number) {
+      const search = new URLSearchParams();
+      if (elderId) search.set("elderId", elderId);
+      if (from) search.set("from", String(from));
+      if (to) search.set("to", String(to));
+      const text = search.toString();
+      return httpJson<{ points: LocationPoint[] }>(
+        `/safety/location/history${text ? `?${text}` : ""}`
+      );
+    },
+    alerts(elderId?: string, status?: string) {
+      const search = new URLSearchParams();
+      if (elderId) search.set("elderId", elderId);
+      if (status) search.set("status", status);
+      const text = search.toString();
+      return httpJson<{ items: SafetyAlert[] }>(`/safety/alerts${text ? `?${text}` : ""}`);
+    },
+    ackAlert(id: string, status: "ack" | "resolved" = "ack") {
+      return httpJson<{ ok: boolean }>(`/safety/alerts/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ status })
+      });
+    },
+    createMissingPoster(input: {
+      elderId?: string;
+      lastSeenText: string;
+      lastSeenTs?: number;
+      clothing?: string;
+      contact: string;
+    }) {
+      return httpJson<{ ok: boolean; poster: MissingPosterResult }>(
+        "/safety/missing-poster",
+        {
+          method: "POST",
+          body: JSON.stringify(input)
+        }
+      );
+    }
+  },
+
+  family: {
+    summary(elderId?: string) {
+      return httpJson<{ ok: boolean; summary: FamilySummary }>(
+        `/family/summary${query({ elderId })}`
+      );
+    },
+    weeklyReport(elderId?: string) {
+      return httpJson<{ ok: boolean; report: WeeklyReport }>(
+        `/family/report/weekly${query({ elderId })}`
+      );
+    }
+  },
+
+  medications: {
+    list(elderId?: string) {
+      return httpJson<{
+        items: Medication[];
+        logs: MedicationLog[];
+        dueToday: number;
+        takenToday: number;
+        logged: number;
+        adherencePct: number | null;
+      }>(`/medications${query({ elderId })}`);
+    },
+    create(input: {
+      elderId?: string;
+      name: string;
+      genericName?: string;
+      spec?: string;
+      dosage?: string;
+      schedule: { time: string }[];
+      notes?: string;
+    }) {
+      return httpJson<{ ok: boolean; medication: Medication }>("/medications", {
+        method: "POST",
+        body: JSON.stringify(input)
+      });
+    },
+    update(id: string, input: Record<string, unknown>) {
+      return httpJson<{ ok: boolean; medication: Medication }>(`/medications/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify(input)
+      });
+    },
+    remove(id: string) {
+      return httpJson<{ ok: boolean }>(`/medications/${id}`, { method: "DELETE" });
+    },
+    scan(imageId: string) {
+      return httpJson<{ ok: boolean; result: MedicationScanResult }>("/medications/scan", {
+        method: "POST",
+        body: JSON.stringify({ imageId })
+      });
+    },
+    log(medicationId: string, status: "taken" | "skipped" | "late", time?: string) {
+      return httpJson<{ ok: boolean; log: MedicationLog }>("/medications/log", {
+        method: "POST",
+        body: JSON.stringify({ medicationId, status, ...(time ? { time } : {}) })
+      });
+    },
+    logs(elderId?: string, from?: number, to?: number) {
+      const search = new URLSearchParams();
+      if (elderId) search.set("elderId", elderId);
+      if (from) search.set("from", String(from));
+      if (to) search.set("to", String(to));
+      const text = search.toString();
+      return httpJson<{ items: MedicationLog[] }>(
+        `/medications/logs${text ? `?${text}` : ""}`
       );
     }
   },

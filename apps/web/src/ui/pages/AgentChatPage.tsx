@@ -366,8 +366,8 @@ export function AgentChatPage() {
     <div className="yl-chatPage">
       <div className="yl-chatHeader">
         <div>
-          <h1>和银龄守护说说话</h1>
-          <p>可以问天气、吃药，也可以直接说“有人让我转账”。</p>
+          <h1>小助手</h1>
+          <p>有事可以问我，不用打字，按着说话就行。</p>
         </div>
         <button
           type="button"
