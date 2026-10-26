@@ -2,7 +2,7 @@ import React from "react";
 import type { AppEvent } from "@eha/shared";
 import { useToast } from "./toast.js";
 import { usePrivacy } from "./privacy.js";
-import { speakNow } from "../voice/tts.js";
+import { announce, speakNow } from "../voice/tts.js";
 
 type WsApi = {
   connected: boolean;
@@ -41,7 +41,7 @@ export function WsProvider({ wsUrl, children }: { wsUrl: string; children: React
         }
         if (event.type === "reminder.due") {
           toast.push({ kind: "ok", title: "智能提醒", detail: event.payload.title });
-          if (!(event as any)?.payload?.__silentTts) speakNow(event.payload.title);
+          if (!(event as any)?.payload?.__silentTts) announce(event.payload.title);
         }
         if (event.type === "emergency.triggered") {
           toast.push({ kind: "danger", title: "紧急呼救已触发", detail: event.payload.reason });
@@ -66,7 +66,7 @@ export function WsProvider({ wsUrl, children }: { wsUrl: string; children: React
           const content = typeof p.content === "string" ? p.content : "";
           if (!content) return;
           toast.push({ kind: "ok", title: "收到陪伴消息", detail: content });
-          if (!(event as any)?.payload?.__silentTts && autoSpeakRef.current) speakNow(content);
+          if (!(event as any)?.payload?.__silentTts && autoSpeakRef.current) announce(content);
         }
       } catch {
         undefined;

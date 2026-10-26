@@ -1,0 +1,242 @@
+/* =============================================================================
+ * 无障碍工具条（长者友好）
+ * -----------------------------------------------------------------------------
+ * 左下角常驻控件：字号缩放 / 语音播报开关 / 语速 / 朗读本页。
+ * 视觉沿用「水韵江苏」纸感配色（宣纸底 + 青瓷绿点缀 + 细线描边）。
+ * 触控区一律 ≥44px，符合 Apple HIG 与长者触控习惯。
+ * ========================================================================== */
+
+.yl-a11y {
+  position: fixed;
+  left: 16px;
+  bottom: 16px;
+  z-index: 1300;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 252px;
+  padding: 10px;
+  background: #fafbf7;
+  border: 1px solid #d9e0d8;
+  border-radius: 4px;
+  box-shadow: 0 8px 24px rgba(28, 39, 36, 0.14), 0 1px 2px rgba(28, 39, 36, 0.08);
+  color: #1c2724;
+  font-family: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+  font-size: 13px;
+  box-sizing: border-box;
+}
+
+.yl-a11y *,
+.yl-a11y *::before,
+.yl-a11y *::after {
+  box-sizing: border-box;
+}
+
+.yl-a11y__row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.yl-a11y__row--compact {
+  gap: 4px;
+  padding-top: 2px;
+  border-top: 1px solid #e7ebe3;
+}
+
+/* ---------- 主按钮 ---------- */
+.yl-a11y__btn {
+  flex: 1 1 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  min-height: 44px;
+  min-width: 0;
+  padding: 0 8px;
+  border: 1px solid #d9e0d8;
+  border-radius: 2px;
+  background: #ffffff;
+  color: #1c2724;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.2;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background 160ms ease, border-color 160ms ease, color 160ms ease;
+}
+
+.yl-a11y__btn:hover:not(:disabled) {
+  background: #eef2ec;
+  border-color: #c3cdc3;
+}
+
+.yl-a11y__btn:active:not(:disabled) {
+  background: #e4ece5;
+}
+
+.yl-a11y__btn:disabled {
+  opacity: 0.42;
+  cursor: not-allowed;
+}
+
+.yl-a11y__btn:focus-visible {
+  outline: 2px solid #5e7f71;
+  outline-offset: 2px;
+}
+
+/* 播报开启态：青瓷绿实底，一眼看出"正在播报" */
+.yl-a11y__btn--on {
+  background: #e4ece5;
+  border-color: #5e7f71;
+  color: #3e5a4e;
+  font-weight: 600;
+}
+
+.yl-a11y__label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ---------- 字号示意字形 ---------- */
+.yl-a11y__glyph {
+  font-family: var(--ys-serif, "Songti SC", "Noto Serif SC", serif);
+  font-weight: 700;
+  line-height: 1;
+}
+
+.yl-a11y__glyph--sm {
+  font-size: 12px;
+}
+
+.yl-a11y__glyph--lg {
+  font-size: 18px;
+}
+
+/* ---------- 当前倍率 ---------- */
+.yl-a11y__value {
+  flex: 0 0 auto;
+  min-width: 46px;
+  text-align: center;
+  font-size: 13px;
+  font-weight: 600;
+  color: #3e5a4e;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------- 收起按钮 ---------- */
+.yl-a11y__close {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 2px;
+  background: transparent;
+  color: #65736d;
+  cursor: pointer;
+}
+
+.yl-a11y__close:hover {
+  background: #eef2ec;
+  color: #1c2724;
+}
+
+/* ---------- 语速胶囊 ---------- */
+.yl-a11y__hint {
+  flex: 0 0 auto;
+  padding-left: 2px;
+  font-size: 12px;
+  color: #65736d;
+}
+
+.yl-a11y__chip {
+  flex: 1 1 0;
+  min-height: 30px;
+  padding: 0 6px;
+  border: 1px solid #d9e0d8;
+  border-radius: 2px;
+  background: #ffffff;
+  color: #46554f;
+  font-family: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.yl-a11y__chip--on {
+  background: #e4ece5;
+  border-color: #5e7f71;
+  color: #3e5a4e;
+  font-weight: 600;
+}
+
+.yl-a11y__warn {
+  margin: 0;
+  font-size: 11px;
+  line-height: 1.4;
+  color: #8c3b2e;
+}
+
+/* ---------- 收起态 ---------- */
+.yl-a11y--collapsed {
+  width: auto;
+  padding: 0;
+  background: transparent;
+  border: none;
+  box-shadow: none;
+}
+
+.yl-a11y__reopen {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+  padding: 0 14px;
+  border: 1px solid #d9e0d8;
+  border-radius: 999px;
+  background: #fafbf7;
+  color: #3e5a4e;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  box-shadow: 0 4px 14px rgba(28, 39, 36, 0.12);
+}
+
+.yl-a11y__reopen:hover {
+  background: #eef2ec;
+}
+
+/* ---------- 页面底部留白：避免工具条遮挡正文 ---------- */
+.yl-main {
+  padding-bottom: 168px;
+}
+
+/* ---------- 窄屏：贴边显示，按钮不挤压 ---------- */
+@media (max-width: 640px) {
+  .yl-a11y {
+    left: 8px;
+    right: 8px;
+    bottom: 8px;
+    width: auto;
+  }
+
+  .yl-a11y__btn {
+    font-size: 14px;
+  }
+
+  .yl-main {
+    padding-bottom: 200px;
+  }
+}
+
+/* ---------- 打印 / 大屏投影：隐藏悬浮控件 ---------- */
+@media print {
+  .yl-a11y {
+    display: none;
+  }
+}

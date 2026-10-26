@@ -5,6 +5,7 @@ import "./ui/styles.css";
 import "./ui/token.css";
 import "./ui/new-ui.css";
 import "./ui/jiangsu.css";
+import "./ui/a11y.css";
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>

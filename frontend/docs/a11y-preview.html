@@ -1,0 +1,313 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>无障碍工具条 · 效果预览</title>
+    <!-- 直接引用项目里的真实样式，改样式后刷新即可看到 -->
+    <link rel="stylesheet" href="../src/ui/a11y.css" />
+    <style>
+      :root {
+        --paper: #f2f4ef;
+        --surface: #fafbf7;
+        --ink: #1c2724;
+        --ink-soft: #46554f;
+        --muted: #65736d;
+        --line: #d9e0d8;
+        --celadon: #5e7f71;
+        --celadon-deep: #3e5a4e;
+        --seal: #8c3b2e;
+        --serif: "Songti SC", "Noto Serif SC", "STSong", "SimSun", serif;
+        --sans: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+      }
+      body {
+        margin: 0;
+        padding: 0;
+        background: var(--paper);
+        color: var(--ink);
+        font-family: var(--sans);
+        font-size: 16px;
+      }
+      .demo-note {
+        padding: 10px 16px;
+        background: #e4ece5;
+        border-bottom: 1px solid var(--line);
+        font-size: 13px;
+        color: var(--celadon-deep);
+      }
+      main {
+        max-width: 760px;
+        margin: 0 auto;
+        padding: 28px 20px 200px;
+      }
+      h1 {
+        font-family: var(--serif);
+        font-size: 30px;
+        margin: 4px 0 6px;
+      }
+      h2 {
+        font-family: var(--serif);
+        font-size: 20px;
+        margin: 0 0 8px;
+      }
+      .date {
+        margin: 0;
+        font-size: 13px;
+        color: var(--muted);
+        letter-spacing: 0.04em;
+      }
+      .greeting {
+        margin: 0 0 20px;
+        color: var(--ink-soft);
+      }
+      .card {
+        background: var(--surface);
+        border: 1px solid var(--line);
+        padding: 18px 20px;
+        margin-bottom: 14px;
+      }
+      .card p {
+        margin: 0;
+        line-height: 1.7;
+        color: var(--ink-soft);
+      }
+      .row {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+        margin-top: 12px;
+      }
+      .tag {
+        display: inline-block;
+        padding: 4px 10px;
+        border: 1px solid var(--line);
+        font-size: 13px;
+        color: var(--celadon-deep);
+        background: #eef2ec;
+      }
+      [hidden] {
+        display: none !important;
+      }
+    </style>
+  </head>
+  <body>
+    <p class="demo-note">
+      预览页：左下角就是接入后的真实工具条，可以直接点「放大 / 缩小 / 语音播报 / 朗读本页」体验效果。
+    </p>
+
+    <main>
+      <p class="date">十月二十六日 · 星期一</p>
+      <h1>今日</h1>
+      <p class="greeting">王阿姨，早上好。今天先照顾好自己。</p>
+
+      <section class="card">
+        <h2>把日子过稳，把故事留下。</h2>
+        <p>
+          用药、位置、家人的消息，都在这里。想说话的时候，小助手也在。
+          今天需要服用降压药两次，早饭后一次，晚饭后一次。上午九点记得量一次血压。
+        </p>
+        <div class="row">
+          <span class="tag">用药 2 次</span>
+          <span class="tag">天气 多云 18°C</span>
+          <span class="tag">家人留言 1 条</span>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>语音播报在什么时候响</h2>
+        <p>
+          跌倒检测、紧急呼救属于安全类，无论开关是否打开都会播报。
+          用药提醒、家人陪伴消息属于日常类，跟随工具条上的「语音播报」开关。
+          用户自己点「朗读」按钮时永远立即朗读，不受开关限制。
+        </p>
+      </section>
+    </main>
+
+    <!-- 与 A11yDock.tsx 完全一致的结构与类名 -->
+    <div class="yl-a11y yl-a11y--collapsed" id="reopen" hidden style="padding: 0; border: none; background: none; box-shadow: none; width: auto">
+      <button type="button" class="yl-a11y__reopen">无障碍</button>
+    </div>
+
+    <div class="yl-a11y" id="dock" role="region" aria-label="无障碍工具">
+      <div class="yl-a11y__row">
+        <button type="button" class="yl-a11y__btn" id="shrink" aria-label="缩小字号">
+          <span class="yl-a11y__glyph yl-a11y__glyph--sm" aria-hidden="true">A</span>
+          <span class="yl-a11y__label">缩小</span>
+        </button>
+        <span class="yl-a11y__value" id="value" aria-live="polite">100%</span>
+        <button type="button" class="yl-a11y__btn" id="enlarge" aria-label="放大字号">
+          <span class="yl-a11y__glyph yl-a11y__glyph--lg" aria-hidden="true">A</span>
+          <span class="yl-a11y__label">放大</span>
+        </button>
+        <button type="button" class="yl-a11y__close" id="collapse" aria-label="收起无障碍工具">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+            <path d="M18 6 6 18M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+
+      <div class="yl-a11y__row">
+        <button type="button" class="yl-a11y__btn yl-a11y__btn--on" id="voice" aria-pressed="true">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M11 5 6 9H2v6h4l5 4V5Z" />
+            <path d="M15.5 8.5a5 5 0 0 1 0 7" />
+          </svg>
+          <span class="yl-a11y__label" id="voiceLabel">语音播报开</span>
+        </button>
+        <button type="button" class="yl-a11y__btn" id="readPage">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M2 4h6a4 4 0 0 1 4 4v12a3 3 0 0 0-3-3H2Z" />
+            <path d="M22 4h-6a4 4 0 0 0-4 4v12a3 3 0 0 1 3-3h7Z" />
+          </svg>
+          <span class="yl-a11y__label">朗读本页</span>
+        </button>
+      </div>
+
+      <div class="yl-a11y__row yl-a11y__row--compact">
+        <span class="yl-a11y__hint">语速</span>
+        <button type="button" class="yl-a11y__chip" data-rate="0.8">慢</button>
+        <button type="button" class="yl-a11y__chip yl-a11y__chip--on" data-rate="0.95">正常</button>
+        <button type="button" class="yl-a11y__chip" data-rate="1.15">快</button>
+      </div>
+    </div>
+
+    <script>
+      const STEPS = [1, 1.15, 1.3, 1.5];
+      const MAX_CHUNK = 90;
+      let step = 0;
+      let rate = 0.95;
+      let voiceEnabled = true;
+      let gen = 0;
+      let queue = [];
+
+      /* ---------- 字号 ---------- */
+      function applyFont() {
+        const scale = STEPS[step];
+        document.documentElement.style.setProperty("zoom", String(scale));
+        document.getElementById("value").textContent = Math.round(scale * 100) + "%";
+        document.getElementById("shrink").disabled = step === 0;
+        document.getElementById("enlarge").disabled = step === STEPS.length - 1;
+      }
+
+      /* ---------- 语音（与 tts.ts 同逻辑的迷你版） ---------- */
+      function split(text) {
+        const clean = text.replace(/\s+/g, " ").trim();
+        const sentences = clean.match(/[^。！？!?；;\n]+[。！？!?；;]?/g) || [clean];
+        const out = [];
+        for (const raw of sentences) {
+          let rest = raw.trim();
+          while (rest.length > MAX_CHUNK) {
+            let cut = -1;
+            for (let i = Math.min(MAX_CHUNK, rest.length - 1); i > 20; i -= 1) {
+              if ("，,、：:）)".includes(rest.charAt(i))) {
+                cut = i + 1;
+                break;
+              }
+            }
+            if (cut <= 0) cut = MAX_CHUNK;
+            out.push(rest.slice(0, cut).trim());
+            rest = rest.slice(cut).trim();
+          }
+          if (rest) out.push(rest);
+        }
+        return out.filter(Boolean);
+      }
+
+      function pickVoice() {
+        const voices = window.speechSynthesis ? window.speechSynthesis.getVoices() : [];
+        const zh = voices.filter((v) => /^zh/i.test(v.lang));
+        return zh.find((v) => v.localService) || zh[0] || null;
+      }
+
+      function playNext(myGen) {
+        if (myGen !== gen) return;
+        const next = queue.shift();
+        if (!next) return;
+        const ut = new SpeechSynthesisUtterance(next);
+        const v = pickVoice();
+        if (v) ut.voice = v;
+        ut.lang = "zh-CN";
+        ut.rate = rate;
+        ut.pitch = 1;
+        ut.volume = 1;
+        ut.onend = () => setTimeout(() => playNext(myGen), 40);
+        ut.onerror = () => playNext(myGen);
+        window.speechSynthesis.speak(ut);
+      }
+
+      function speakNow(text) {
+        if (!("speechSynthesis" in window)) return;
+        const chunks = split(text);
+        if (!chunks.length) return;
+        const busy = window.speechSynthesis.speaking || window.speechSynthesis.pending;
+        gen += 1;
+        window.speechSynthesis.cancel();
+        const myGen = gen;
+        queue = chunks.slice();
+        if (busy) setTimeout(() => playNext(myGen), 90);
+        else playNext(myGen);
+      }
+
+      function stop() {
+        gen += 1;
+        queue = [];
+        if ("speechSynthesis" in window) window.speechSynthesis.cancel();
+      }
+
+      /* ---------- 交互 ---------- */
+      document.getElementById("enlarge").addEventListener("click", () => {
+        step = Math.min(STEPS.length - 1, step + 1);
+        applyFont();
+      });
+
+      document.getElementById("shrink").addEventListener("click", () => {
+        step = Math.max(0, step - 1);
+        applyFont();
+      });
+
+      document.getElementById("voice").addEventListener("click", (e) => {
+        voiceEnabled = !voiceEnabled;
+        const btn = e.currentTarget;
+        btn.classList.toggle("yl-a11y__btn--on", voiceEnabled);
+        btn.setAttribute("aria-pressed", String(voiceEnabled));
+        document.getElementById("voiceLabel").textContent = voiceEnabled ? "语音播报开" : "语音播报关";
+        if (voiceEnabled) {
+          speakNow("语音播报已打开。");
+        } else {
+          stop();
+        }
+      });
+
+      document.getElementById("readPage").addEventListener("click", () => {
+        const main = document.querySelector("main");
+        speakNow(main ? main.innerText : "");
+      });
+
+      document.getElementById("collapse").addEventListener("click", () => {
+        document.getElementById("dock").classList.add("yl-a11y--collapsed");
+        document.getElementById("reopen").hidden = false;
+      });
+
+      document.getElementById("reopen").addEventListener("click", () => {
+        document.getElementById("dock").classList.remove("yl-a11y--collapsed");
+        document.getElementById("reopen").hidden = true;
+      });
+
+      document.querySelectorAll(".yl-a11y__chip").forEach((chip) => {
+        chip.addEventListener("click", () => {
+          rate = Number(chip.dataset.rate);
+          document
+            .querySelectorAll(".yl-a11y__chip")
+            .forEach((c) => c.classList.toggle("yl-a11y__chip--on", c === chip));
+          speakNow("这是当前语速。");
+        });
+      });
+
+      applyFont();
+      if ("speechSynthesis" in window) {
+        window.speechSynthesis.getVoices();
+        window.speechSynthesis.onvoiceschanged = () => window.speechSynthesis.getVoices();
+      }
+    </script>
+  </body>
+</html>
