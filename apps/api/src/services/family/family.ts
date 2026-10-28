@@ -21,7 +21,7 @@ export function createFamilyService(db: AppDb) {
       dueToday > 0 && logged > 0 ? Math.round((taken / dueToday) * 100) : null;
     const alerts = db.safetyAlerts.listByElder(elderId, "open");
     const pending = db.familyConfirms.listPending(elderId);
-    const memories = db.memories.listByElder(elderId);
+    const memoryCount = db.memories.countByElder(elderId);
 
     return {
       elder: {
@@ -50,7 +50,7 @@ export function createFamilyService(db: AppDb) {
         items: alerts.slice(0, 3)
       },
       pendingConfirms: pending.length,
-      memoryCount: memories.length
+      memoryCount
     };
   }
 
@@ -65,9 +65,7 @@ export function createFamilyService(db: AppDb) {
     const alerts = db.safetyAlerts
       .listByElder(elderId)
       .filter((alert) => alert.createdAt >= from);
-    const memories = db.memories
-      .listByElder(elderId)
-      .filter((memory) => memory.createdAt >= from);
+    const memoryCount = db.memories.countByElderSince(elderId, from);
     const pending = db.familyConfirms.listPending(elderId);
 
     const scheduled = medications.reduce((count, med) => count + med.schedule.length, 0) * 7;
@@ -97,8 +95,8 @@ export function createFamilyService(db: AppDb) {
       {
         title: "陪伴",
         content:
-          memories.length > 0
-            ? `本周新增 ${memories.length} 段回忆，可以挑一段整理成故事。`
+          memoryCount > 0
+            ? `本周新增 ${memoryCount} 段回忆，可以挑一段整理成故事。`
             : "本周还没有新回忆，可以找个时间陪老人聊 10 分钟。"
       },
       {
@@ -113,7 +111,7 @@ export function createFamilyService(db: AppDb) {
     }
     if (logged === 0) suggestions.push("本周还没有用药记录，可以从今天开始打卡。");
     if (alerts.length > 0) suggestions.push("本周出现过安全提醒，建议和老人一起回顾一次出行路线。");
-    if (memories.length === 0) suggestions.push("本周没有新增回忆，可以问一个童年问题，录 3 分钟就够。");
+    if (memoryCount === 0) suggestions.push("本周没有新增回忆，可以问一个童年问题，录 3 分钟就够。");
     if (pending.length > 0) suggestions.push("有待确认事项，请先处理转账/用药相关的高风险请求。");
     if (suggestions.length === 0) suggestions.push("本周整体平稳，保持规律作息和每天一次简短通话即可。");
 
@@ -123,7 +121,7 @@ export function createFamilyService(db: AppDb) {
       adherencePct,
       summary:
         `${adherencePct === null ? "本周暂无用药记录" : `本周用药依从率约 ${adherencePct}%`}，` +
-        `安全提醒 ${alerts.length} 条，新增回忆 ${memories.length} 段。`,
+        `安全提醒 ${alerts.length} 条，新增回忆 ${memoryCount} 段。`,
       sections,
       suggestions,
       disclaimer: "本简报由系统根据记录生成，仅供参考，不构成医疗建议。"

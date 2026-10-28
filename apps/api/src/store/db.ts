@@ -721,6 +721,10 @@ export function createDb(dbPath: string, options: CreateDbOptions) {
           } satisfies DbLocation;
         })
         .filter((point): point is DbLocation => point !== null);
+    },
+    deleteBefore(ts: number): number {
+      const result = raw.prepare("DELETE FROM location_points WHERE ts < ?").run(ts);
+      return Number(result.changes ?? 0);
     }
   };
 
@@ -745,6 +749,10 @@ export function createDb(dbPath: string, options: CreateDbOptions) {
           input.riskLevel,
           Date.now()
         );
+    },
+    deleteBefore(ts: number): number {
+      const result = raw.prepare("DELETE FROM tool_logs WHERE ts < ?").run(ts);
+      return Number(result.changes ?? 0);
     }
   };
 
@@ -772,6 +780,10 @@ export function createDb(dbPath: string, options: CreateDbOptions) {
           input.ip ?? null,
           Date.now()
         );
+    },
+    deleteBefore(ts: number): number {
+      const result = raw.prepare("DELETE FROM audit_logs WHERE ts < ?").run(ts);
+      return Number(result.changes ?? 0);
     }
   };
 
@@ -1040,6 +1052,20 @@ export function createDb(dbPath: string, options: CreateDbOptions) {
         )
         .all(elderId) as any[];
       return rows.map(mapMemory);
+    },
+    countByElder(elderId: string): number {
+      const row = raw
+        .prepare("SELECT COUNT(*) AS n FROM memories WHERE elder_id = ? AND status = 'active'")
+        .get(elderId) as any;
+      return Number(row?.n ?? 0);
+    },
+    countByElderSince(elderId: string, sinceTs: number): number {
+      const row = raw
+        .prepare(
+          "SELECT COUNT(*) AS n FROM memories WHERE elder_id = ? AND status = 'active' AND created_at >= ?"
+        )
+        .get(elderId, sinceTs) as any;
+      return Number(row?.n ?? 0);
     },
     getById(id: string): DbMemory | null {
       const row = raw.prepare("SELECT * FROM memories WHERE id = ?").get(id) as any;
@@ -1357,6 +1383,14 @@ export function createDb(dbPath: string, options: CreateDbOptions) {
         )
         .get(elderId, type, sinceTs) as any;
       return Number(row?.n ?? 0) > 0;
+    },
+    deleteHandledBefore(ts: number): number {
+      const result = raw
+        .prepare(
+          "DELETE FROM safety_alerts WHERE created_at < ? AND status IN ('ack', 'resolved')"
+        )
+        .run(ts);
+      return Number(result.changes ?? 0);
     }
   };
 
@@ -1404,6 +1438,10 @@ export function createDb(dbPath: string, options: CreateDbOptions) {
         )
         .get(token) as any;
       return row ? mapPoster(row) : null;
+    },
+    deleteExpiredBefore(ts: number): number {
+      const result = raw.prepare("DELETE FROM missing_posters WHERE expires_at < ?").run(ts);
+      return Number(result.changes ?? 0);
     }
   };
 

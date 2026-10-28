@@ -348,6 +348,14 @@ export function migrate(db: DatabaseSync) {
       ts INTEGER NOT NULL
     );
 
+    CREATE INDEX IF NOT EXISTS idx_sessions_user ON sessions(user_id, updated_at DESC);
+    CREATE INDEX IF NOT EXISTS idx_tool_logs_user ON tool_logs(user_id, ts DESC);
+    CREATE INDEX IF NOT EXISTS idx_scam_checks_elder ON scam_checks(elder_id, created_at DESC);
+    CREATE INDEX IF NOT EXISTS idx_story_chapters_book ON story_chapters(book_id, order_index);
+    CREATE INDEX IF NOT EXISTS idx_audit_logs_ts ON audit_logs(ts DESC);
+    CREATE INDEX IF NOT EXISTS idx_missing_posters_expires ON missing_posters(expires_at);
+    CREATE INDEX IF NOT EXISTS idx_users_role ON users(role);
+
     PRAGMA user_version = 1;
   `);
 

@@ -157,6 +157,21 @@ function ConfirmationDialog({
 }) {
   const [remaining, setRemaining] = React.useState(() => Math.max(0, pending.expiresAt - Date.now()));
   const expiredRef = React.useRef(false);
+  const cancelRef = React.useRef<HTMLButtonElement>(null);
+
+  React.useEffect(() => {
+    cancelRef.current?.focus();
+  }, []);
+
+  React.useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      event.preventDefault();
+      onDecision("cancel");
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [onDecision]);
 
   React.useEffect(() => {
     const timer = window.setInterval(() => {
@@ -185,7 +200,14 @@ function ConfirmationDialog({
           {expired ? "确认已过期，请重新发起" : `${seconds} 秒内确认`}
         </div>
         <div className="yl-modalActions">
-          <button type="button" className="btn" onClick={() => onDecision("cancel")}>取消</button>
+          <button
+            ref={cancelRef}
+            type="button"
+            className="btn"
+            onClick={() => onDecision("cancel")}
+          >
+            取消
+          </button>
           <button
             type="button"
             className="btn btnDanger"

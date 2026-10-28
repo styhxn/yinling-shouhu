@@ -2,6 +2,7 @@ import dotenv from "dotenv";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 import { createServer } from "./server.js";
+import { createMaintenance } from "./services/maintenance.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 dotenv.config({ path: path.join(__dirname, "..", ".env") });
@@ -25,3 +26,15 @@ try {
   server.log.error(err);
   process.exit(1);
 }
+
+const maintenance = createMaintenance(server.db, server.config);
+function runRetention() {
+  try {
+    server.log.info(maintenance.prune(), "retention pruned");
+  } catch (err) {
+    server.log.error(err, "retention failed");
+  }
+}
+runRetention();
+const retentionTimer = setInterval(runRetention, 24 * 60 * 60 * 1000);
+retentionTimer.unref();

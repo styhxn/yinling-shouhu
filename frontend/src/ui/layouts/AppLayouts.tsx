@@ -65,6 +65,9 @@ export function ElderLayout() {
 
   return (
     <div className="yl-shell">
+      <a className="yl-skipLink" href="#main">
+        跳到主要内容
+      </a>
       <header className="yl-topbar">
         <Brand home="/elder" />
         <nav className="yl-nav">
@@ -80,7 +83,7 @@ export function ElderLayout() {
         <RealtimeBadge />
         <Identity label="长者端" />
       </header>
-      <main className="yl-main">
+      <main className="yl-main" id="main" tabIndex={-1}>
         <Outlet />
       </main>
     </div>
@@ -90,6 +93,9 @@ export function ElderLayout() {
 export function FamilyLayout() {
   return (
     <div className="yl-shell">
+      <a className="yl-skipLink" href="#main">
+        跳到主要内容
+      </a>
       <header className="yl-topbar">
         <Brand home="/family" />
         <nav className="yl-nav">
@@ -98,7 +104,7 @@ export function FamilyLayout() {
         <RealtimeBadge />
         <Identity label="家属端" />
       </header>
-      <main className="yl-main">
+      <main className="yl-main" id="main" tabIndex={-1}>
         <Outlet />
       </main>
     </div>

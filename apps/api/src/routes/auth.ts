@@ -45,7 +45,7 @@ export const authRoutes: FastifyPluginAsync = async (server) => {
         name: server.config.cookieName,
         token,
         ttlMs: server.config.sessionTtlMs,
-        secure: server.config.env === "production"
+        secure: server.config.cookieSecure
       })
     );
 
@@ -79,7 +79,7 @@ export const authRoutes: FastifyPluginAsync = async (server) => {
   server.post("/api/auth/logout", async (req, reply) => {
     reply.header(
       "set-cookie",
-      clearSessionCookie(server.config.cookieName, server.config.env === "production")
+      clearSessionCookie(server.config.cookieName, server.config.cookieSecure)
     );
     if (req.user) {
       server.db.auditLogs.insert({ userId: req.user.userId, action: "auth.logout", ip: req.ip });

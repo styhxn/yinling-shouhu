@@ -272,7 +272,7 @@ export function MemoryInterviewPage() {
             ) : null}
           </div>
 
-          <div className="yl-interviewQuestion">
+          <div className="yl-interviewQuestion" aria-live="polite">
             <Icon name="bot" size="lg" />
             <h2>{question}</h2>
           </div>
