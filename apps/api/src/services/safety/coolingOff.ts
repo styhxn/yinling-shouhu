@@ -39,13 +39,17 @@ export function createCoolingOffService(deps: CoolingOffDeps) {
       familyConfirmId: familyConfirm.id
     });
 
-    const alert = {
-      id: `alert_${coolingOff.id}`,
+    const alert = deps.db.safetyAlerts.create({
+      elderId: input.elderId,
       type: "cooling_off",
       level: "critical",
-      elderId: input.elderId,
-      createdAt: Date.now()
-    };
+      payload: {
+        coolingOffId: coolingOff.id,
+        familyConfirmId: familyConfirm.id,
+        amount: input.amount ?? null,
+        counterparty: input.counterparty ?? null
+      }
+    });
     deps.eventBus.publish({ type: "safety.alert", ts: Date.now(), payload: { alert } });
     deps.eventBus.publish({
       type: "family.confirm.requested",

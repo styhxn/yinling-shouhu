@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { Icon } from "../components/Icon.js";
 import { api } from "../../lib/api.js";
 import type { Geofence, LocationPoint, SafetyAlert } from "../../lib/types.js";
+import { useRealtime } from "../state/realtime.js";
 import { useToast } from "../state/toast.js";
 
 function formatTime(ts: number) {
@@ -21,6 +22,19 @@ function alertLabel(type: string) {
   return "安全提醒";
 }
 
+function alertDetail(alert: SafetyAlert) {
+  const payload = alert.payload ?? {};
+  if (alert.type === "geofence.exit") {
+    const name = typeof payload.geofenceName === "string" ? payload.geofenceName : "安全区域";
+    const distance =
+      typeof payload.distanceMeters === "number" ? `，距离约 ${payload.distanceMeters} 米` : "";
+    return `已离开${name}${distance}`;
+  }
+  if (alert.type === "scam.high") return "检测到高风险信息，请先停止转账";
+  if (alert.type === "cooling_off") return "转账已进入冷静期，等待家属确认";
+  return "";
+}
+
 export function SafetyHomePage() {
   const toast = useToast();
   const [geofences, setGeofences] = React.useState<Geofence[]>([]);
@@ -35,6 +49,14 @@ export function SafetyHomePage() {
   const [contact, setContact] = React.useState("138****8888");
   const [posterUrl, setPosterUrl] = React.useState<string | null>(null);
   const [posterBusy, setPosterBusy] = React.useState(false);
+
+  const { lastEvent, connected } = useRealtime();
+  const [sharing, setSharing] = React.useState(false);
+  const [shareError, setShareError] = React.useState<string | null>(null);
+  const [lastShareAt, setLastShareAt] = React.useState<number | null>(null);
+  const [ackId, setAckId] = React.useState<string | null>(null);
+  const watchIdRef = React.useRef<number | null>(null);
+  const lastSentRef = React.useRef<{ ts: number; lat: number; lng: number } | null>(null);
 
   async function load() {
     setLoading(true);
@@ -58,6 +80,122 @@ export function SafetyHomePage() {
   React.useEffect(() => {
     void load();
   }, []);
+
+  React.useEffect(() => {
+    const event = lastEvent;
+    if (!event) return;
+    if (event.type === "location.updated") {
+      setLatest(event.payload.point as LocationPoint);
+      return;
+    }
+    if (event.type === "safety.alert" || event.type === "safety.alert.updated") {
+      const alert = event.payload.alert as SafetyAlert;
+      setAlerts((prev) => {
+        if (alert.status !== "open") return prev.filter((item) => item.id !== alert.id);
+        if (prev.some((item) => item.id === alert.id)) {
+          return prev.map((item) => (item.id === alert.id ? alert : item));
+        }
+        return [alert, ...prev];
+      });
+    }
+  }, [lastEvent]);
+
+  React.useEffect(() => {
+    return () => {
+      if (watchIdRef.current !== null) {
+        navigator.geolocation.clearWatch(watchIdRef.current);
+      }
+    };
+  }, []);
+
+  function stopSharing() {
+    if (watchIdRef.current !== null) {
+      navigator.geolocation.clearWatch(watchIdRef.current);
+      watchIdRef.current = null;
+    }
+    setSharing(false);
+  }
+
+  async function reportBrowserLocation(position: GeolocationPosition) {
+    const now = Date.now();
+    const last = lastSentRef.current;
+    const moved =
+      !last ||
+      Math.abs(last.lat - position.coords.latitude) > 0.0002 ||
+      Math.abs(last.lng - position.coords.longitude) > 0.0002;
+    if (last && now - last.ts < 20_000 && !moved) return;
+    lastSentRef.current = {
+      ts: now,
+      lat: position.coords.latitude,
+      lng: position.coords.longitude
+    };
+    try {
+      const result = await api.safety.reportLocation({
+        lat: position.coords.latitude,
+        lng: position.coords.longitude,
+        accuracy: Math.min(5000, Math.round(position.coords.accuracy || 0)),
+        source: "browser"
+      });
+      setLatest(result.point);
+      setLastShareAt(Date.now());
+      setShareError(null);
+      if (result.alerts.length > 0) {
+        setAlerts((prev) => [
+          ...result.alerts.filter((alert) => !prev.some((item) => item.id === alert.id)),
+          ...prev
+        ]);
+        if (!connected) {
+          toast.push({
+            kind: "danger",
+            title: "已离开安全区域",
+            detail: "位置已记录，请尽快联系家人。"
+          });
+        }
+      }
+    } catch (err) {
+      setShareError(err instanceof Error ? err.message : "位置上报失败，正在重试");
+    }
+  }
+
+  function startSharing() {
+    if (!("geolocation" in navigator)) {
+      setShareError("当前浏览器不支持定位，请换用手机浏览器。");
+      return;
+    }
+    if (watchIdRef.current !== null) return;
+    setShareError(null);
+    setSharing(true);
+    watchIdRef.current = navigator.geolocation.watchPosition(
+      (position) => {
+        void reportBrowserLocation(position);
+      },
+      (geoError) => {
+        if (geoError.code === geoError.PERMISSION_DENIED) {
+          stopSharing();
+          setShareError("定位权限被拒绝。请在浏览器里允许定位后重试。");
+          return;
+        }
+        setShareError("暂时无法获取位置，正在重试…");
+      },
+      { enableHighAccuracy: true, maximumAge: 10_000, timeout: 20_000 }
+    );
+  }
+
+  async function acknowledge(alertId: string) {
+    setAckId(alertId);
+    try {
+      await api.safety.ackAlert(alertId, "ack");
+      setAlerts((prev) => prev.filter((alert) => alert.id !== alertId));
+    } catch (err) {
+      toast.push({
+        kind: "danger",
+        title: "处理失败",
+        detail: err instanceof Error ? err.message : "请稍后再试"
+      });
+    } finally {
+      setAckId(null);
+    }
+  }
 
   async function createHomeGeofence() {
     setBusy(true);
@@ -88,11 +226,19 @@ export function SafetyHomePage() {
         lng: 118.88,
         source: "demo"
       });
-      toast.push({
-        kind: result.alerts.length ? "normal" : "ok",
-        title: result.alerts.length ? "已离开安全区域" : "位置已更新",
-        detail: result.alerts.length ? "已生成越界提醒，家属端可以看到。" : "当前仍在安全区域内。"
-      });
+      if (!result.alerts.length) {
+        toast.push({
+          kind: "ok",
+          title: "位置已更新",
+          detail: "当前仍在安全区域内。"
+        });
+      } else if (!connected) {
+        toast.push({
+          kind: "danger",
+          title: "已离开安全区域",
+          detail: "已生成越界提醒，家属端可以看到。"
+        });
+      }
       await load();
     } catch (err) {
       toast.push({
@@ -189,14 +335,40 @@ export function SafetyHomePage() {
             <span>{latest ? formatTime(latest.ts) : "等待更新"}</span>
           </div>
 
+          <div className={`ys-shareStatus ${shareError ? "ys-shareStatus--warn" : ""}`}>
+            <Icon name={sharing ? "activity" : "mapPin"} size="sm" />
+            <span>
+              {shareError
+                ? shareError
+                : sharing
+                  ? lastShareAt
+                    ? `正在共享位置 · 最近上报 ${formatTime(lastShareAt)}`
+                    : "正在获取定位…"
+                  : latest?.source === "browser"
+                    ? "上次位置由手机定位上报"
+                    : "未开启实时位置共享"}
+            </span>
+          </div>
+
           <div className="ys-inlineActions">
+            {sharing ? (
+              <button type="button" className="btn" onClick={stopSharing}>
+                <Icon name="stop" size="sm" />
+                停止共享位置
+              </button>
+            ) : (
+              <button type="button" className="btn btnPrimary" onClick={startSharing}>
+                <Icon name="mapPin" size="sm" />
+                开始共享位置
+              </button>
+            )}
             {homeFence ? (
               <button type="button" className="btn" disabled={busy} onClick={() => void simulateExit()}>
                 <Icon name="refresh" size="sm" />
                 {busy ? "更新中…" : "模拟走出围栏"}
               </button>
             ) : (
-              <button type="button" className="btn btnPrimary" disabled={busy} onClick={() => void createHomeGeofence()}>
+              <button type="button" className="btn" disabled={busy} onClick={() => void createHomeGeofence()}>
                 <Icon name="plus" size="sm" />
                 设置家附近 800m
               </button>
@@ -217,13 +389,22 @@ export function SafetyHomePage() {
               <p className="ys-mutedText">暂时没有新的提醒。</p>
             ) : (
               <div className="ys-alertList">
-                {alerts.slice(0, 3).map((alert) => (
+                {alerts.slice(0, 5).map((alert) => (
                   <div key={alert.id} className="ys-alertItem">
                     <span className="ys-alertDot" />
-                    <div>
+                    <div className="ys-alertBody">
                       <strong>{alertLabel(alert.type)}</strong>
                       <small>{formatTime(alert.createdAt)}</small>
+                      {alertDetail(alert) ? <p>{alertDetail(alert)}</p> : null}
                     </div>
+                    <button
+                      type="button"
+                      className="btn btn--sm"
+                      disabled={ackId === alert.id}
+                      onClick={() => void acknowledge(alert.id)}
+                    >
+                      {ackId === alert.id ? "处理中…" : "已处理"}
+                    </button>
                   </div>
                 ))}
               </div>

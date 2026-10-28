@@ -16,6 +16,7 @@ import { MedicationsPage } from "./pages/MedicationsPage.js";
 import { FamilyDashboardPage } from "./pages/FamilyDashboardPage.js";
 import { A11yProvider } from "./state/a11y.js";
 import { A11yDock } from "./components/A11yDock.js";
+import { RealtimeProvider } from "./state/realtime.js";
 
 export function App() {
   return (
@@ -23,42 +24,44 @@ export function App() {
       <A11yProvider>
         <AuthProvider>
           <ToastProvider>
-            <Routes>
-              <Route path="/" element={<RoleSelectPage />} />
+            <RealtimeProvider>
+              <Routes>
+                <Route path="/" element={<RoleSelectPage />} />
 
-              <Route
-                path="/elder"
-                element={
-                  <RequireRole role="elder">
-                    <ElderLayout />
-                  </RequireRole>
-                }
-              >
-                <Route index element={<ElderHomePage />} />
-                <Route path="chat" element={<AgentChatPage />} />
-                <Route path="story" element={<MemoryListPage />} />
-                <Route path="story/new" element={<MemoryInterviewPage />} />
-                <Route path="story/:id" element={<StoryChapterPage />} />
-                <Route path="meds" element={<MedicationsPage />} />
-                <Route path="safety" element={<SafetyHomePage />} />
-                <Route path="safety/scam" element={<ScamCheckPage />} />
-                <Route path="safety/roleplay" element={<RoleplayPage />} />
-              </Route>
+                <Route
+                  path="/elder"
+                  element={
+                    <RequireRole role="elder">
+                      <ElderLayout />
+                    </RequireRole>
+                  }
+                >
+                  <Route index element={<ElderHomePage />} />
+                  <Route path="chat" element={<AgentChatPage />} />
+                  <Route path="story" element={<MemoryListPage />} />
+                  <Route path="story/new" element={<MemoryInterviewPage />} />
+                  <Route path="story/:id" element={<StoryChapterPage />} />
+                  <Route path="meds" element={<MedicationsPage />} />
+                  <Route path="safety" element={<SafetyHomePage />} />
+                  <Route path="safety/scam" element={<ScamCheckPage />} />
+                  <Route path="safety/roleplay" element={<RoleplayPage />} />
+                </Route>
 
-              <Route
-                path="/family"
-                element={
-                  <RequireRole role="family">
-                    <FamilyLayout />
-                  </RequireRole>
-                }
-              >
-                <Route index element={<FamilyDashboardPage />} />
-              </Route>
+                <Route
+                  path="/family"
+                  element={
+                    <RequireRole role="family">
+                      <FamilyLayout />
+                    </RequireRole>
+                  }
+                >
+                  <Route index element={<FamilyDashboardPage />} />
+                </Route>
 
-              <Route path="*" element={<Navigate to="/" replace />} />
-            </Routes>
-            <A11yDock />
+                <Route path="*" element={<Navigate to="/" replace />} />
+              </Routes>
+              <A11yDock />
+            </RealtimeProvider>
           </ToastProvider>
         </AuthProvider>
       </A11yProvider>

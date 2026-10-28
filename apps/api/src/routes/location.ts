@@ -195,6 +195,11 @@ export const locationRoutes: FastifyPluginAsync = async (server) => {
       ts: Date.now()
     };
     server.db.locations.insert(point);
+    server.eventBus.publish({
+      type: "location.updated",
+      ts: Date.now(),
+      payload: { elderId, point }
+    });
 
     const geofences = server.db.geofences.listByElder(elderId);
     const inside = geofences.every((geofence) => isInsideGeofence(point, geofence.shape));
@@ -264,10 +269,16 @@ export const locationRoutes: FastifyPluginAsync = async (server) => {
     const elderId = resolveElderId(req);
     if (!elderId) return reply.code(403).send({ error: "forbidden" });
     const alerts = server.db.safetyAlerts.listByElder(elderId);
-    if (!alerts.some((alert) => alert.id === params.data.id)) {
+    const current = alerts.find((alert) => alert.id === params.data.id);
+    if (!current) {
       return reply.code(404).send({ error: "not_found" });
     }
     server.db.safetyAlerts.ack(params.data.id, body.data.status);
+    server.eventBus.publish({
+      type: "safety.alert.updated",
+      ts: Date.now(),
+      payload: { alert: { ...current, status: body.data.status } }
+    });
     return { ok: true };
   });
 

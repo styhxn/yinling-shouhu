@@ -8,6 +8,14 @@ export function eventElderId(event: AppEvent): string | null {
     const alert = (event.payload as { alert?: { elderId?: unknown } }).alert;
     return typeof alert?.elderId === "string" ? alert.elderId : null;
   }
+  if (event.type === "safety.alert.updated") {
+    const alert = (event.payload as { alert?: { elderId?: unknown } }).alert;
+    return typeof alert?.elderId === "string" ? alert.elderId : null;
+  }
+  if (event.type === "location.updated") {
+    const elderId = (event.payload as { elderId?: unknown }).elderId;
+    return typeof elderId === "string" ? elderId : null;
+  }
   if (event.type === "family.confirm.requested" || event.type === "family.confirm.responded") {
     const confirm = (event.payload as { confirm?: { elderId?: unknown } }).confirm;
     return typeof confirm?.elderId === "string" ? confirm.elderId : null;
@@ -52,7 +60,35 @@ export const wsRoutes: FastifyPluginAsync = async (server) => {
       }
     });
 
+    let alive = true;
+    const heartbeat = setInterval(() => {
+      if (!alive) {
+        socket.terminate();
+        return;
+      }
+      alive = false;
+      try {
+        socket.ping();
+      } catch {
+        undefined;
+      }
+    }, 30_000);
+    heartbeat.unref?.();
+
+    socket.on("pong", () => {
+      alive = true;
+    });
+    socket.on("message", (raw: { toString(): string }) => {
+      if (raw.toString() !== "ping") return;
+      try {
+        socket.send("pong");
+      } catch {
+        undefined;
+      }
+    });
+
     socket.on("close", () => {
+      clearInterval(heartbeat);
       unsubscribe();
     });
   });

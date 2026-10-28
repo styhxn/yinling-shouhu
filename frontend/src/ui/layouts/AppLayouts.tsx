@@ -2,6 +2,7 @@ import React from "react";
 import { Link, NavLink, Outlet, useNavigate } from "react-router-dom";
 import { Icon } from "../components/Icon.js";
 import { useAuth } from "../state/auth.js";
+import { RealtimeBadge } from "../state/realtime.js";
 
 function Brand({ home }: { home: string }) {
   return (
@@ -76,6 +77,7 @@ export function ElderLayout() {
           <Icon name="message" size="sm" />
           小助手
         </Link>
+        <RealtimeBadge />
         <Identity label="长者端" />
       </header>
       <main className="yl-main">
@@ -93,6 +95,7 @@ export function FamilyLayout() {
         <nav className="yl-nav">
           <NavItem to="/family" icon="users">家属概览</NavItem>
         </nav>
+        <RealtimeBadge />
         <Identity label="家属端" />
       </header>
       <main className="yl-main">

@@ -1,8 +1,9 @@
 import React from "react";
 import { Icon } from "../components/Icon.js";
 import { api } from "../../lib/api.js";
-import type { FamilyConfirm, FamilySummary, WeeklyReport } from "../../lib/types.js";
+import type { FamilyConfirm, FamilySummary, SafetyAlert, WeeklyReport } from "../../lib/types.js";
 import { useAuth } from "../state/auth.js";
+import { useRealtime } from "../state/realtime.js";
 import { useToast } from "../state/toast.js";
 
 const TYPE_LABEL: Record<string, string> = {
@@ -29,6 +30,26 @@ function formatTime(ts: number | null | undefined) {
   });
 }
 
+function alertLabel(type: string) {
+  if (type === "geofence.exit") return "离开安全区域";
+  if (type === "scam.high") return "高风险信息";
+  if (type === "cooling_off") return "转账冷静期";
+  return "安全提醒";
+}
+
+function alertDetail(alert: SafetyAlert) {
+  const payload = alert.payload ?? {};
+  if (alert.type === "geofence.exit") {
+    const name = typeof payload.geofenceName === "string" ? payload.geofenceName : "安全区域";
+    const distance =
+      typeof payload.distanceMeters === "number" ? `，距离约 ${payload.distanceMeters} 米` : "";
+    return `已离开${name}${distance}`;
+  }
+  if (alert.type === "scam.high") return "检测到高风险信息，请尽快电话确认";
+  if (alert.type === "cooling_off") return "转账处于冷静期，等待家属处理";
+  return "";
+}
+
 export function FamilyDashboardPage() {
   const { me } = useAuth();
   const toast = useToast();
@@ -39,14 +60,19 @@ export function FamilyDashboardPage() {
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
   const [busyId, setBusyId] = React.useState<string | null>(null);
+  const [alertBusyId, setAlertBusyId] = React.useState<string | null>(null);
+  const { lastEvent } = useRealtime();
+  const refreshTimerRef = React.useRef<number | null>(null);
 
-  async function load() {
+  async function load(silent = false) {
     if (!elderId) {
       setLoading(false);
       return;
     }
-    setLoading(true);
-    setError(null);
+    if (!silent) {
+      setLoading(true);
+      setError(null);
+    }
     try {
       const [summaryRes, reportRes, pendingRes] = await Promise.all([
         api.family.summary(elderId),
@@ -57,15 +83,40 @@ export function FamilyDashboardPage() {
       setReport(reportRes.report);
       setItems(pendingRes.items);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "加载失败");
+      if (!silent) setError(err instanceof Error ? err.message : "加载失败");
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   }
 
   React.useEffect(() => {
     void load();
   }, [elderId]);
+
+  React.useEffect(() => {
+    const event = lastEvent;
+    if (!event) return;
+    const relevant = new Set([
+      "safety.alert",
+      "safety.alert.updated",
+      "family.confirm.requested",
+      "family.confirm.responded",
+      "location.updated",
+      "emergency.triggered"
+    ]);
+    if (!relevant.has(event.type) || !elderId) return;
+    if (refreshTimerRef.current) window.clearTimeout(refreshTimerRef.current);
+    refreshTimerRef.current = window.setTimeout(() => {
+      refreshTimerRef.current = null;
+      void load(true);
+    }, 350);
+  }, [lastEvent, elderId]);
+
+  React.useEffect(() => {
+    return () => {
+      if (refreshTimerRef.current) window.clearTimeout(refreshTimerRef.current);
+    };
+  }, []);
 
   async function respond(item: FamilyConfirm, decision: "approved" | "denied") {
     setBusyId(item.id);
@@ -90,6 +141,33 @@ export function FamilyDashboardPage() {
       });
     } finally {
       setBusyId(null);
+    }
+  }
+
+  async function resolveAlert(alert: SafetyAlert) {
+    setAlertBusyId(alert.id);
+    try {
+      await api.safety.ackAlert(alert.id, "ack");
+      setSummary((prev) =>
+        prev
+          ? {
+              ...prev,
+              alerts: {
+                open: Math.max(0, prev.alerts.open - 1),
+                items: prev.alerts.items.filter((item) => item.id !== alert.id)
+              }
+            }
+          : prev
+      );
+      toast.push({ kind: "ok", title: "已标记为处理" });
+    } catch (err) {
+      toast.push({
+        kind: "danger",
+        title: "处理失败",
+        detail: err instanceof Error ? err.message : "请稍后再试"
+      });
+    } finally {
+      setAlertBusyId(null);
     }
   }
 
@@ -151,6 +229,35 @@ export function FamilyDashboardPage() {
               <small>段回忆</small>
             </div>
           </section>
+
+          {summary && summary.alerts.items.length > 0 ? (
+            <section className="ys-panel">
+              <div className="ys-sectionTitle">
+                <Icon name="alertTriangle" size="sm" />
+                安全提醒
+              </div>
+              <div className="ys-alertList">
+                {summary.alerts.items.map((alert) => (
+                  <div key={alert.id} className="ys-alertItem">
+                    <span className="ys-alertDot" />
+                    <div className="ys-alertBody">
+                      <strong>{alertLabel(alert.type)}</strong>
+                      <small>{formatTime(alert.createdAt)}</small>
+                      {alertDetail(alert) ? <p>{alertDetail(alert)}</p> : null}
+                    </div>
+                    <button
+                      type="button"
+                      className="btn btn--sm"
+                      disabled={alertBusyId === alert.id}
+                      onClick={() => void resolveAlert(alert)}
+                    >
+                      {alertBusyId === alert.id ? "处理中…" : "已处理"}
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </section>
+          ) : null}
 
           <section className="ys-report">
             <div className="ys-reportHead">

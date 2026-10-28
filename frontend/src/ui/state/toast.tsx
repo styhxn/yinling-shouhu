@@ -31,10 +31,11 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   return (
     <Ctx.Provider value={api}>
       {children}
-      <div className="toastWrap">
+      <div className="toastWrap" role="status" aria-live="polite">
         {items.map((t) => (
           <div
             key={t.id}
+            role={t.kind === "danger" ? "alert" : "status"}
             className={[
               "toast",
               t.kind === "danger" ? "toastDanger" : "",

@@ -1065,6 +1065,82 @@ body {
   margin-top: 14px;
 }
 
+.ys-shareStatus {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 9px 0 2px;
+  color: var(--ys-celadon-deep);
+  font-size: 12px;
+}
+
+.ys-shareStatus--warn {
+  color: var(--ys-seal);
+}
+
+.ys-alertBody {
+  flex: 1;
+  min-width: 0;
+}
+
+.ys-alertItem p {
+  margin: 3px 0 0;
+  color: var(--ys-muted);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.ys-alertItem .btn {
+  flex: 0 0 auto;
+}
+
+.ys-liveBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border: 1px solid #d9e5dd;
+  border-radius: 999px;
+  background: #f7faf8;
+  color: #3f5a50;
+  font-size: 11px;
+  letter-spacing: 0.03em;
+  cursor: default;
+}
+
+.ys-liveBadge--connecting,
+.ys-liveBadge--offline {
+  border-color: #ecd7d0;
+  background: #fdf7f5;
+  color: var(--ys-seal);
+  cursor: pointer;
+}
+
+.ys-liveDot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #4f8d6f;
+}
+
+.ys-liveBadge--connecting .ys-liveDot {
+  animation: ys-livePulse 1.2s ease-in-out infinite;
+}
+
+.ys-liveBadge--offline .ys-liveDot {
+  background: var(--ys-seal);
+}
+
+@keyframes ys-livePulse {
+  0%,
+  100% {
+    opacity: 0.35;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
 .ys-safetySide {
   display: flex;
   flex-direction: column;

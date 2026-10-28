@@ -118,6 +118,41 @@ describe("safety", () => {
   });
 });
 
+describe("realtime safety loop", () => {
+  it("publishes location updates, raises a geofence alert, and acknowledges it", async () => {
+    const events: Array<{ type: string; payload: any }> = [];
+    const unsubscribe = server.eventBus.subscribe((event) => {
+      events.push(event as { type: string; payload: any });
+    });
+    try {
+      const report = await server.inject({
+        method: "POST",
+        url: "/api/safety/location",
+        headers: { cookie: elderCookie },
+        payload: { lat: 32.12, lng: 118.88, accuracy: 18, source: "browser" }
+      });
+      expect(report.statusCode).toBe(200);
+      const body = report.json() as any;
+      expect(body.point.source).toBe("browser");
+      expect(body.alerts.length).toBeGreaterThan(0);
+      expect(events.some((event) => event.type === "location.updated")).toBe(true);
+      expect(events.some((event) => event.type === "safety.alert")).toBe(true);
+
+      const ack = await server.inject({
+        method: "PATCH",
+        url: `/api/safety/alerts/${body.alerts[0].id}`,
+        headers: { cookie: familyCookie },
+        payload: { status: "ack" }
+      });
+      expect(ack.statusCode).toBe(200);
+      const updated = events.find((event) => event.type === "safety.alert.updated");
+      expect(updated?.payload.alert.status).toBe("ack");
+    } finally {
+      unsubscribe();
+    }
+  });
+});
+
 describe("hybrid scam analysis", () => {
   const input = "我是不是遇到骗子了？他说要我把钱转到安全账户，还让我不要告诉家人。";
 

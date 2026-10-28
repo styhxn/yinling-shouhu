@@ -1,5 +1,24 @@
 export type Mode = "elder" | "adult" | "child";
 
+export type LocationSnapshot = {
+  elderId: string;
+  lat: number;
+  lng: number;
+  accuracy: number | null;
+  source: string;
+  ts: number;
+};
+
+export type SafetyAlertSnapshot = {
+  id: string;
+  elderId: string;
+  type: string;
+  level: string;
+  payload: unknown;
+  status: string;
+  createdAt: number;
+};
+
 export type AppEvent =
   | { type: "privacy.updated"; ts: number; payload: { settings: PrivacySettings } }
   | { type: "profile.updated"; ts: number; payload: { profile: Profile } }
@@ -10,7 +29,9 @@ export type AppEvent =
   | { type: "qa.answered"; ts: number; payload: { question: string; answer: string } }
   | { type: "vitality.alert"; ts: number; payload: { scores: number[] } }
   | { type: "companion.command"; ts: number; payload: { kind: "voice_message" | "reminder"; content: string; for: "elder" | "child" } }
-  | { type: "safety.alert"; ts: number; payload: { alert: unknown } }
+  | { type: "safety.alert"; ts: number; payload: { alert: SafetyAlertSnapshot } }
+  | { type: "safety.alert.updated"; ts: number; payload: { alert: SafetyAlertSnapshot } }
+  | { type: "location.updated"; ts: number; payload: { elderId: string; point: LocationSnapshot } }
   | { type: "family.confirm.requested"; ts: number; payload: { confirm: unknown } }
   | { type: "family.confirm.responded"; ts: number; payload: { confirm: unknown } };
 
