@@ -118,7 +118,7 @@ describe("memory", () => {
   });
 
   it("dequotes story lines the elder never said", async () => {
-    const memory = server.db.memories.create({
+    const memory = await server.db.memories.create({
       elderId: "e_li",
       title: "苏州河边的夏天",
       summary: "小时候住在苏州河边，夏天和邻居下河捉鱼。",

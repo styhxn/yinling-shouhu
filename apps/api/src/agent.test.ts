@@ -65,7 +65,7 @@ describe("agent", () => {
     expect(confirmations).toHaveLength(1);
     expect(confirmations[0]?.tool).toBe("start_cooling_off");
 
-    const pending = server.db.familyConfirms.listPending("e_li");
+    const pending = await server.db.familyConfirms.listPending("e_li");
     expect(pending).toHaveLength(1);
 
     const second = await server.inject({
@@ -88,7 +88,7 @@ describe("agent", () => {
 
 
   it("cites the elder's own memories when answering about the past", async () => {
-    const memory = server.db.memories.create({
+    const memory = await server.db.memories.create({
       elderId: "e_li",
       title: "河边捉鱼的夏天",
       summary: "小时候在苏州河边和邻居小伙伴捉鱼，回家晚了被母亲念叨。",

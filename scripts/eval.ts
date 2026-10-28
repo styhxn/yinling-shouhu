@@ -12,12 +12,14 @@ process.chdir(apiDir);
 const [
   { loadConfig },
   { createDb },
+  { createPostgresClient, createSqliteClient },
   { createModelRouter },
   { loadOrCreateMasterKey },
   { runEvaluation }
 ] = await Promise.all([
   import("../apps/api/src/config.js"),
   import("../apps/api/src/store/db.js"),
+  import("../apps/api/src/store/sql.js"),
   import("../apps/api/src/services/llm/router.js"),
   import("../apps/api/src/services/crypto.js"),
   import("../apps/api/src/services/eval.js")
@@ -42,7 +44,15 @@ const modules = moduleArg
       )
   : undefined;
 
-const db = createDb(config.dbPath, { masterKey, seed: config.demoMode });
+const sql =
+  config.db.driver === "postgres"
+    ? createPostgresClient({
+        connectionString: config.db.url,
+        max: config.db.poolMax,
+        ssl: config.db.ssl
+      })
+    : createSqliteClient(config.dbPath);
+const db = await createDb(sql, { masterKey, seed: config.demoMode });
 try {
   const report = await runEvaluation({
     db,
@@ -73,5 +83,5 @@ try {
   const minPass = Number(process.env.EVAL_MIN_PASS ?? 80);
   if (report.overall.passRate < minPass) process.exitCode = 1;
 } finally {
-  db.close();
+  await db.close();
 }

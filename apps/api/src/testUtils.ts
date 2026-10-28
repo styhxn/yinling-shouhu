@@ -17,6 +17,7 @@ export function testConfig(overrides: ConfigOverrides = {}): ConfigOverrides {
     logLevel: "silent",
     dataDir: dir,
     dbPath: ":memory:",
+    db: { driver: "sqlite", url: "", poolMax: 5, ssl: false },
     publicDir: path.join(dir, "public"),
     uploadsDir: path.join(dir, "public", "uploads"),
     demoMode: true,

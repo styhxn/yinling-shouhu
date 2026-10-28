@@ -86,14 +86,14 @@ describe("anti-fraud roleplay", () => {
         intensity: 3
       })
     );
-    const started = service.start("e_li", "fake_police");
+    const started = await service.start("e_li", "fake_police");
     const result = await service.turn(started.sessionId, "e_li", "我不太明白，你再说一遍。");
 
     expect(result.done).toBe(false);
     expect(result.reply).not.toContain("http");
     expect(result.reply).toContain("安全账户");
 
-    const session = server.db.roleplaySessions.get(started.sessionId);
+    const session = await server.db.roleplaySessions.get(started.sessionId);
     const scammer = session?.messages.filter((message) => message.role === "scammer").at(-1);
     expect(scammer?.text).not.toContain("http");
   });

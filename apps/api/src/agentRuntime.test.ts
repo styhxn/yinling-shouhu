@@ -65,7 +65,7 @@ describe("agent runtime", () => {
   });
 
   it("assesses a safety alert proactively and writes the assessment back", async () => {
-    const alert = server.db.safetyAlerts.create({
+    const alert = await server.db.safetyAlerts.create({
       elderId: "e_li",
       type: "geofence.exit",
       level: "critical",
@@ -78,13 +78,13 @@ describe("agent runtime", () => {
     expect(assessment?.needsConfirmation).toBe(true);
     expect(assessment?.traceId).toMatch(/^tr_/);
 
-    const updated = server.db.safetyAlerts.getById(alert.id);
+    const updated = await server.db.safetyAlerts.getById(alert.id);
     const stored = (updated?.payload as any)?.assessment;
     expect(stored.summary.length).toBeGreaterThan(0);
     expect(stored.likelyCause.length).toBeGreaterThan(0);
     expect(updated?.status).toBe("open");
 
-    const trace = server.db.agentTraces.getById(assessment!.traceId);
+    const trace = await server.db.agentTraces.getById(assessment!.traceId);
     expect(trace?.agent).toBe("guardian");
     expect(trace?.trigger).toBe("event");
     expect(trace?.decision?.riskLevel).toBe("high");
@@ -106,7 +106,7 @@ describe("agent runtime", () => {
   });
 
   it("scopes traces to the bound elder", async () => {
-    const alert = server.db.safetyAlerts.create({
+    const alert = await server.db.safetyAlerts.create({
       elderId: "e_li",
       type: "cooling_off",
       level: "critical",
@@ -120,13 +120,13 @@ describe("agent runtime", () => {
     });
     expect(res.statusCode).toBe(200);
 
-    server.db.elders.getById("e_li");
-    server.db.raw
+    await server.db.elders.getById("e_li");
+    await server.db.sql
       .prepare(
-        "INSERT OR IGNORE INTO elders (id, display_name, birth_year, gender, cognitive_note_enc, created_at) VALUES (?, ?, ?, ?, NULL, ?)"
+        "INSERT INTO elders (id, display_name, birth_year, gender, cognitive_note_enc, created_at) VALUES (?, ?, ?, ?, NULL, ?) ON CONFLICT (id) DO NOTHING"
       )
       .run("e_other", "张爷爷", 1945, "male", Date.now());
-    server.db.agentTraces.create({
+    await server.db.agentTraces.create({
       elderId: "e_other",
       userId: "u_other",
       agent: "guardian",
@@ -139,7 +139,7 @@ describe("agent runtime", () => {
       model: "mock",
       latencyMs: 1
     });
-    const other = server.db.agentTraces.listByElder("e_other", 1)[0]!;
+    const other = (await server.db.agentTraces.listByElder("e_other", 1))[0]!;
     const forbidden = await server.inject({
       method: "GET",
       url: `/api/agent/traces/${other.id}`,

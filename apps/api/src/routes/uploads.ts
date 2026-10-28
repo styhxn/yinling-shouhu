@@ -44,7 +44,7 @@ export const uploadRoutes: FastifyPluginAsync = async (server) => {
     const sha256 = crypto.createHash("sha256").update(normalized).digest("hex");
     const user = req.user!;
 
-    const upload = server.db.uploads.create({
+    const upload = await server.db.uploads.create({
       id,
       ownerUserId: user.userId,
       elderId: user.elderId ?? null,

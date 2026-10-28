@@ -1,33 +1,40 @@
-import type { DatabaseSync } from "node:sqlite";
 import { encryptJson } from "../services/crypto.js";
+import type { SqlClient } from "./sql.js";
 
 /** Idempotent demo data: 李奶奶、家属小李、两种药、一个位置点。 */
-export function seedDemo(db: DatabaseSync, masterKey: Buffer) {
+export async function seedDemo(db: SqlClient, masterKey: Buffer) {
   const now = Date.now();
   const elder = db.prepare(
-    "INSERT OR IGNORE INTO elders (id, display_name, birth_year, gender, cognitive_note_enc, created_at) VALUES (?, ?, ?, ?, ?, ?)"
+    `INSERT INTO elders (id, display_name, birth_year, gender, cognitive_note_enc, created_at)
+     VALUES (?, ?, ?, ?, ?, ?)
+     ON CONFLICT (id) DO NOTHING`
   );
-  elder.run("e_li", "李奶奶", 1948, "female", null, now);
+  await elder.run("e_li", "李奶奶", 1948, "female", null, now);
 
   const user = db.prepare(
-    "INSERT OR IGNORE INTO users (id, role, display_name, elder_id, created_at) VALUES (?, ?, ?, ?, ?)"
+    `INSERT INTO users (id, role, display_name, elder_id, created_at)
+     VALUES (?, ?, ?, ?, ?)
+     ON CONFLICT (id) DO NOTHING`
   );
-  user.run("u_elder", "elder", "李奶奶", "e_li", now);
-  user.run("u_family", "family", "小李", null, now);
-  user.run("u_inst", "institution", "社区养老中心", null, now);
-  user.run("u_admin", "admin", "管理员", null, now);
+  await user.run("u_elder", "elder", "李奶奶", "e_li", now);
+  await user.run("u_family", "family", "小李", null, now);
+  await user.run("u_inst", "institution", "社区养老中心", null, now);
+  await user.run("u_admin", "admin", "管理员", null, now);
 
   const link = db.prepare(
-    "INSERT OR IGNORE INTO family_links (id, family_user_id, elder_id, relation, status, created_at) VALUES (?, ?, ?, ?, ?, ?)"
+    `INSERT INTO family_links (id, family_user_id, elder_id, relation, status, created_at)
+     VALUES (?, ?, ?, ?, ?, ?)
+     ON CONFLICT (id) DO NOTHING`
   );
-  link.run("fl_1", "u_family", "e_li", "daughter", "active", now);
+  await link.run("fl_1", "u_family", "e_li", "daughter", "active", now);
 
   const med = db.prepare(
-    `INSERT OR IGNORE INTO medications
+    `INSERT INTO medications
       (id, elder_id, name, generic_name, spec, dosage, schedule_json, photo_upload_id, notes_enc, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+     ON CONFLICT (id) DO NOTHING`
   );
-  med.run(
+  await med.run(
     "med_1",
     "e_li",
     "氨氯地平",
@@ -40,7 +47,7 @@ export function seedDemo(db: DatabaseSync, masterKey: Buffer) {
     now,
     now
   );
-  med.run(
+  await med.run(
     "med_2",
     "e_li",
     "二甲双胍",
@@ -55,10 +62,11 @@ export function seedDemo(db: DatabaseSync, masterKey: Buffer) {
   );
 
   const loc = db.prepare(
-    `INSERT OR IGNORE INTO location_points (id, elder_id, lat_enc, lng_enc, accuracy, source, ts)
-     VALUES (?, ?, ?, ?, ?, ?, ?)`
+    `INSERT INTO location_points (id, elder_id, lat_enc, lng_enc, accuracy, source, ts)
+     VALUES (?, ?, ?, ?, ?, ?, ?)
+     ON CONFLICT (id) DO NOTHING`
   );
-  loc.run(
+  await loc.run(
     "loc_seed",
     "e_li",
     encryptJson(masterKey, 32.041),
@@ -69,11 +77,12 @@ export function seedDemo(db: DatabaseSync, masterKey: Buffer) {
   );
 
   const geofence = db.prepare(
-    `INSERT OR IGNORE INTO geofences
+    `INSERT INTO geofences
       (id, elder_id, name, shape_json, schedule_json, notify_on_json, active, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?)`
+     VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?)
+     ON CONFLICT (id) DO NOTHING`
   );
-  geofence.run(
+  await geofence.run(
     "gf_home",
     "e_li",
     "家附近",
@@ -85,10 +94,11 @@ export function seedDemo(db: DatabaseSync, masterKey: Buffer) {
   );
 
   const memory = db.prepare(
-    `INSERT OR IGNORE INTO memories
+    `INSERT INTO memories
       (id, elder_id, title, time_range, place, people_json, tags_json, photo_ids_json,
        transcript_enc, summary, visibility, consent, status, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'family', 1, 'active', ?, ?)`
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'family', 1, 'active', ?, ?)
+     ON CONFLICT (id) DO NOTHING`
   );
   const demoMemories = [
     {
@@ -129,7 +139,7 @@ export function seedDemo(db: DatabaseSync, masterKey: Buffer) {
     }
   ];
   for (const item of demoMemories) {
-    memory.run(
+    await memory.run(
       item.id,
       "e_li",
       item.title,

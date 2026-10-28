@@ -22,7 +22,7 @@ export const authRoutes: FastifyPluginAsync = async (server) => {
       return reply.code(400).send({ error: "invalid_body", message: "角色不正确" });
     }
 
-    const user = server.db.users.findDemo(parsed.data.role);
+    const user = await server.db.users.findDemo(parsed.data.role);
     if (!user) {
       return reply.code(404).send({ error: "not_found", message: "演示账号不存在" });
     }
@@ -49,16 +49,16 @@ export const authRoutes: FastifyPluginAsync = async (server) => {
       })
     );
 
-    const elder = user.elderId ? server.db.elders.getById(user.elderId) : null;
+    const elder = user.elderId ? await server.db.elders.getById(user.elderId) : null;
     const familyLinks =
       user.role === "family"
-        ? server.db.users.listFamilyLinks(user.id).map((link) => ({
+        ? (await server.db.users.listFamilyLinks(user.id)).map((link) => ({
             elderId: link.elderId,
             relation: link.relation
           }))
         : [];
 
-    server.db.auditLogs.insert({
+    await server.db.auditLogs.insert({
       userId: user.id,
       action: "auth.demo_login",
       ip: req.ip
@@ -82,7 +82,7 @@ export const authRoutes: FastifyPluginAsync = async (server) => {
       clearSessionCookie(server.config.cookieName, server.config.cookieSecure)
     );
     if (req.user) {
-      server.db.auditLogs.insert({ userId: req.user.userId, action: "auth.logout", ip: req.ip });
+      await server.db.auditLogs.insert({ userId: req.user.userId, action: "auth.logout", ip: req.ip });
     }
     return { ok: true };
   });
@@ -90,13 +90,13 @@ export const authRoutes: FastifyPluginAsync = async (server) => {
   server.get("/api/me", { preHandler: requireAuth }, async (req, reply) => {
     const current = req.user;
     if (!current) return reply.code(401).send({ error: "unauthorized" });
-    const user = server.db.users.getById(current.userId);
+    const user = await server.db.users.getById(current.userId);
     if (!user) return reply.code(401).send({ error: "unauthorized" });
 
-    const elder = user.elderId ? server.db.elders.getById(user.elderId) : null;
+    const elder = user.elderId ? await server.db.elders.getById(user.elderId) : null;
     const familyLinks =
       user.role === "family"
-        ? server.db.users.listFamilyLinks(user.id).map((link) => ({
+        ? (await server.db.users.listFamilyLinks(user.id)).map((link) => ({
             elderId: link.elderId,
             relation: link.relation
           }))

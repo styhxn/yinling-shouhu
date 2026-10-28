@@ -7,21 +7,21 @@ function startOfToday() {
 }
 
 export function createFamilyService(db: AppDb) {
-  function summary(elderId: string) {
-    const elder = db.elders.getById(elderId);
+  async function summary(elderId: string) {
+    const elder = await db.elders.getById(elderId);
     if (!elder) throw new Error("not_found");
 
-    const location = db.locations.latest(elderId);
-    const medications = db.medications.listByElder(elderId);
-    const logs = db.medicationLogs.listByElder(elderId, startOfToday(), Date.now());
+    const location = await db.locations.latest(elderId);
+    const medications = await db.medications.listByElder(elderId);
+    const logs = await db.medicationLogs.listByElder(elderId, startOfToday(), Date.now());
     const dueToday = medications.reduce((count, med) => count + med.schedule.length, 0);
     const taken = logs.filter((log) => log.status === "taken").length;
     const logged = logs.length;
     const adherencePct =
       dueToday > 0 && logged > 0 ? Math.round((taken / dueToday) * 100) : null;
-    const alerts = db.safetyAlerts.listByElder(elderId, "open");
-    const pending = db.familyConfirms.listPending(elderId);
-    const memoryCount = db.memories.countByElder(elderId);
+    const alerts = await db.safetyAlerts.listByElder(elderId, "open");
+    const pending = await db.familyConfirms.listPending(elderId);
+    const memoryCount = await db.memories.countByElder(elderId);
 
     return {
       elder: {
@@ -54,19 +54,19 @@ export function createFamilyService(db: AppDb) {
     };
   }
 
-  function weeklyReport(elderId: string) {
-    const elder = db.elders.getById(elderId);
+  async function weeklyReport(elderId: string) {
+    const elder = await db.elders.getById(elderId);
     if (!elder) throw new Error("not_found");
 
     const to = Date.now();
     const from = to - 7 * 24 * 60 * 60 * 1000;
-    const medications = db.medications.listByElder(elderId);
-    const logs = db.medicationLogs.listByElder(elderId, from, to);
-    const alerts = db.safetyAlerts
-      .listByElder(elderId)
-      .filter((alert) => alert.createdAt >= from);
-    const memoryCount = db.memories.countByElderSince(elderId, from);
-    const pending = db.familyConfirms.listPending(elderId);
+    const medications = await db.medications.listByElder(elderId);
+    const logs = await db.medicationLogs.listByElder(elderId, from, to);
+    const alerts = (await db.safetyAlerts.listByElder(elderId)).filter(
+      (alert) => alert.createdAt >= from
+    );
+    const memoryCount = await db.memories.countByElderSince(elderId, from);
+    const pending = await db.familyConfirms.listPending(elderId);
 
     const scheduled = medications.reduce((count, med) => count + med.schedule.length, 0) * 7;
     const taken = logs.filter((log) => log.status === "taken").length;

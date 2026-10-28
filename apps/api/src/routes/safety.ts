@@ -1,7 +1,8 @@
-import type { FastifyPluginAsync, FastifyRequest } from "fastify";
+import type { FastifyPluginAsync } from "fastify";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { z } from "zod";
+import { resolveElderId } from "../services/auth/elder.js";
 import { canAccessElder, requireAuth, requireRole } from "../services/auth/rbac.js";
 import { analyzeScamHybrid } from "../services/safety/scamAI.js";
 import { analyzeScamImage } from "../services/safety/scamImage.js";
@@ -30,18 +31,6 @@ const ConfirmRespondSchema = z.object({
   note: z.string().max(500).optional()
 });
 
-function resolveElderId(req: FastifyRequest, requested?: string): string | null {
-  const user = req.user;
-  if (!user) return null;
-  if (user.role === "elder") return user.elderId ?? null;
-  if (user.role === "family") {
-    const candidate =
-      requested ?? req.server.db.users.listFamilyLinks(user.userId)[0]?.elderId ?? null;
-    if (!candidate) return null;
-    return canAccessElder(req, candidate) ? candidate : null;
-  }
-  return null;
-}
 
 function dedupeSources(sources: { title: string; url: string }[]) {
   const seen = new Set<string>();
@@ -59,18 +48,18 @@ export const safetyRoutes: FastifyPluginAsync = async (server) => {
     if (!parsed.success) {
       return reply.code(400).send({ error: "invalid_body", message: "请提供文字、链接或截图" });
     }
-    const elderId = resolveElderId(req);
+    const elderId = await resolveElderId(req);
     if (!elderId) {
       return reply.code(403).send({ error: "forbidden", message: "请先绑定老人" });
     }
 
     if (parsed.data.inputType === "image") {
-      const upload = server.db.uploads.getById(parsed.data.imageId ?? "");
+      const upload = await server.db.uploads.getById(parsed.data.imageId ?? "");
       if (!upload) return reply.code(404).send({ error: "not_found", message: "图片不存在" });
       const user = req.user!;
       const allowed =
         upload.ownerUserId === user.userId ||
-        (upload.elderId ? canAccessElder(req, upload.elderId) : false);
+        (upload.elderId ? await canAccessElder(req, upload.elderId) : false);
       if (!allowed) return reply.code(403).send({ error: "forbidden" });
 
       let buffer: Buffer;
@@ -92,7 +81,7 @@ export const safetyRoutes: FastifyPluginAsync = async (server) => {
         ...result,
         sources: dedupeSources([...result.sources, ...hits.map((hit) => hit.source)])
       };
-      server.db.scamChecks.insert({
+      await server.db.scamChecks.insert({
         elderId,
         inputType: "image",
         inputText: result.extractedText ?? null,
@@ -127,7 +116,7 @@ export const safetyRoutes: FastifyPluginAsync = async (server) => {
       ...result,
       sources: dedupeSources([...result.sources, ...hits.map((hit) => hit.source)])
     };
-    server.db.scamChecks.insert({
+    await server.db.scamChecks.insert({
       elderId,
       inputType: parsed.data.inputType,
       inputText: parsed.data.text ?? null,
@@ -158,7 +147,7 @@ export const safetyRoutes: FastifyPluginAsync = async (server) => {
       if (!user.elderId) {
         return reply.code(403).send({ error: "forbidden", message: "当前账号未绑定老人" });
       }
-      const result = server.coolingOff.start({
+      const result = await server.coolingOff.start({
         elderId: user.elderId,
         userId: user.userId,
         ...(parsed.data.amount ? { amount: parsed.data.amount } : {}),
@@ -181,7 +170,7 @@ export const safetyRoutes: FastifyPluginAsync = async (server) => {
       const user = req.user!;
       if (!user.elderId) return reply.code(403).send({ error: "forbidden" });
       try {
-        const coolingOff = server.coolingOff.respond({
+        const coolingOff = await server.coolingOff.respond({
           id: params.data.id,
           elderId: user.elderId,
           action: body.data.action
@@ -204,9 +193,9 @@ export const safetyRoutes: FastifyPluginAsync = async (server) => {
     async (req, reply) => {
       const query = PendingQuerySchema.safeParse(req.query);
       if (!query.success) return reply.code(400).send({ error: "invalid_body" });
-      const elderId = resolveElderId(req, query.data.elderId);
+      const elderId = await resolveElderId(req, query.data.elderId);
       if (!elderId) return reply.code(403).send({ error: "forbidden" });
-      return { items: server.db.familyConfirms.listPending(elderId) };
+      return { items: await server.db.familyConfirms.listPending(elderId) };
     }
   );
 
@@ -219,9 +208,9 @@ export const safetyRoutes: FastifyPluginAsync = async (server) => {
       if (!params.success || !body.success) {
         return reply.code(400).send({ error: "invalid_body" });
       }
-      const confirm = server.db.familyConfirms.get(params.data.id);
+      const confirm = await server.db.familyConfirms.get(params.data.id);
       if (!confirm) return reply.code(404).send({ error: "not_found" });
-      if (!canAccessElder(req, confirm.elderId)) {
+      if (!(await canAccessElder(req, confirm.elderId))) {
         return reply.code(403).send({ error: "forbidden" });
       }
       if (confirm.status !== "pending") {
@@ -229,13 +218,13 @@ export const safetyRoutes: FastifyPluginAsync = async (server) => {
       }
 
       const user = req.user!;
-      server.db.familyConfirms.respond(
+      await server.db.familyConfirms.respond(
         confirm.id,
         body.data.decision,
         user.userId,
         body.data.note
       );
-      server.db.auditLogs.insert({
+      await server.db.auditLogs.insert({
         userId: user.userId,
         action: "family.confirm.respond",
         targetType: "family_confirm",

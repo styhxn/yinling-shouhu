@@ -61,8 +61,8 @@ export function createBriefService(deps: {
   runtime: AgentRuntime;
   memoryProfile: MemoryProfileService;
 }) {
-  function nameOf(elderId: string) {
-    return deps.db.elders.getById(elderId)?.displayName ?? "您";
+  async function nameOf(elderId: string) {
+    return (await deps.db.elders.getById(elderId))?.displayName ?? "您";
   }
 
   async function generate(input: {
@@ -73,7 +73,7 @@ export function createBriefService(deps: {
   }): Promise<{ brief: BriefView; cached: boolean }> {
     const date = todayKey();
     if (!input.refresh) {
-      const existing = deps.db.agentBriefs.getByDate(input.elderId, date);
+      const existing = await deps.db.agentBriefs.getByDate(input.elderId, date);
       if (existing) {
         return {
           brief: viewFromContent(
@@ -101,7 +101,7 @@ export function createBriefService(deps: {
     });
 
     const content: AgentBriefContent = {
-      greeting: greetingFor(nameOf(input.elderId)),
+      greeting: greetingFor(await nameOf(input.elderId)),
       summary: result.decision.summary,
       items: sortBriefItems(result.decision.briefItems ?? []),
       encouragement: "慢慢来，今天也会是稳当的一天。",
@@ -111,7 +111,7 @@ export function createBriefService(deps: {
       model: result.decision.model,
       traceId: result.traceId
     };
-    const saved = deps.db.agentBriefs.upsert({
+    const saved = await deps.db.agentBriefs.upsert({
       elderId: input.elderId,
       briefDate: date,
       content
@@ -122,9 +122,11 @@ export function createBriefService(deps: {
     };
   }
 
-  function getCached(elderId: string): { brief: BriefView; cached: boolean } | null {
+  async function getCached(
+    elderId: string
+  ): Promise<{ brief: BriefView; cached: boolean } | null> {
     const date = todayKey();
-    const existing = deps.db.agentBriefs.getByDate(elderId, date);
+    const existing = await deps.db.agentBriefs.getByDate(elderId, date);
     if (!existing) return null;
     return {
       brief: viewFromContent(

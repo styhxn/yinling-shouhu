@@ -21,16 +21,18 @@ export function createMaintenance(db: AppDb, config: AppConfig) {
     return `${d.getFullYear()}-${month}-${day}`;
   }
 
-  function prune(now = Date.now()): MaintenanceResult {
-    return {
-      locations: db.locations.deleteBefore(now - config.retention.locationDays * DAY_MS),
-      toolLogs: db.toolLogs.deleteBefore(now - config.retention.toolLogDays * DAY_MS),
-      auditLogs: db.auditLogs.deleteBefore(now - config.retention.auditDays * DAY_MS),
-      alerts: db.safetyAlerts.deleteHandledBefore(now - config.retention.alertDays * DAY_MS),
-      posters: db.missingPosters.deleteExpiredBefore(now - config.retention.posterDays * DAY_MS),
-      agentTraces: db.agentTraces.deleteBefore(now - config.retention.toolLogDays * DAY_MS),
-      agentBriefs: db.agentBriefs.deleteBefore(dateKey(now - 90 * DAY_MS))
-    };
+  async function prune(now = Date.now()): Promise<MaintenanceResult> {
+    const [locations, toolLogs, auditLogs, alerts, posters, agentTraces, agentBriefs] =
+      await Promise.all([
+        db.locations.deleteBefore(now - config.retention.locationDays * DAY_MS),
+        db.toolLogs.deleteBefore(now - config.retention.toolLogDays * DAY_MS),
+        db.auditLogs.deleteBefore(now - config.retention.auditDays * DAY_MS),
+        db.safetyAlerts.deleteHandledBefore(now - config.retention.alertDays * DAY_MS),
+        db.missingPosters.deleteExpiredBefore(now - config.retention.posterDays * DAY_MS),
+        db.agentTraces.deleteBefore(now - config.retention.toolLogDays * DAY_MS),
+        db.agentBriefs.deleteBefore(dateKey(now - 90 * DAY_MS))
+      ]);
+    return { locations, toolLogs, auditLogs, alerts, posters, agentTraces, agentBriefs };
   }
 
   return { prune };

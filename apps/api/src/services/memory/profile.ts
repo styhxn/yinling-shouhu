@@ -103,10 +103,10 @@ function rulesProfile(memories: DbMemory[], model: string): MemoryProfile {
 
 export function createMemoryProfileService(db: AppDb, modelRouter: ModelRouter) {
   async function refresh(elderId: string): Promise<MemoryProfile> {
-    const memories = db.memories.listByElder(elderId);
+    const memories = await db.memories.listByElder(elderId);
     if (!memories.length) {
       const empty = rulesProfile([], modelRouter.mode);
-      db.memoryProfiles.upsert({ elderId, profile: empty, sourceCount: 0 });
+      await db.memoryProfiles.upsert({ elderId, profile: empty, sourceCount: 0 });
       return empty;
     }
 
@@ -147,21 +147,21 @@ export function createMemoryProfileService(db: AppDb, modelRouter: ModelRouter) 
       // Keep the deterministic profile when the model is unavailable.
     }
 
-    db.memoryProfiles.upsert({ elderId, profile, sourceCount: memories.length });
+    await db.memoryProfiles.upsert({ elderId, profile, sourceCount: memories.length });
     return profile;
   }
 
   async function get(elderId: string, options: { refresh?: boolean } = {}): Promise<MemoryProfile> {
-    const sourceCount = db.memories.countByElder(elderId);
-    const existing = db.memoryProfiles.getByElder(elderId);
+    const sourceCount = await db.memories.countByElder(elderId);
+    const existing = await db.memoryProfiles.getByElder(elderId);
     if (!options.refresh && existing && existing.sourceCount === sourceCount) {
       return existing.profile;
     }
     return refresh(elderId);
   }
 
-  function getCached(elderId: string): MemoryProfile | null {
-    return db.memoryProfiles.getByElder(elderId)?.profile ?? null;
+  async function getCached(elderId: string): Promise<MemoryProfile | null> {
+    return (await db.memoryProfiles.getByElder(elderId))?.profile ?? null;
   }
 
   return { refresh, get, getCached };

@@ -194,18 +194,18 @@ function traceDecision(input: {
 }
 
 export function createAgentRunner(deps: AgentRunnerDeps): AgentRunner {
-  function resolveElderId(user: SessionUser): string | undefined {
+  async function resolveElderId(user: SessionUser): Promise<string | undefined> {
     if (user.elderId) return user.elderId;
     if (user.role === "family") {
-      return deps.db.users.listFamilyLinks(user.userId)[0]?.elderId;
+      return (await deps.db.users.listFamilyLinks(user.userId))[0]?.elderId;
     }
     return undefined;
   }
 
-  function buildSystemPrompt(user: SessionUser): string {
-    const name = deps.db.users.getById(user.userId)?.displayName ?? "用户";
-    const elderId = resolveElderId(user);
-    const profile = elderId ? deps.memoryProfile.getCached(elderId) : null;
+  async function buildSystemPrompt(user: SessionUser): Promise<string> {
+    const name = (await deps.db.users.getById(user.userId))?.displayName ?? "用户";
+    const elderId = await resolveElderId(user);
+    const profile = elderId ? await deps.memoryProfile.getCached(elderId) : null;
     const profileLine =
       profile?.summary && !profile.summary.startsWith("还没有")
         ? `\n已知记忆画像（只用于个性化陪伴，不要逐条复述）：${profile.summary}` +
@@ -214,15 +214,15 @@ export function createAgentRunner(deps: AgentRunnerDeps): AgentRunner {
     return `${AGENT_SYSTEM_PROMPT}\n当前用户：${name}（${user.role}）。${profileLine}`;
   }
 
-  function persistTrace(input: {
+  async function persistTrace(input: {
     ctx: ToolContext;
     goal: string;
     status: "ok" | "needs_confirmation" | "error";
     decision: AgentDecision;
     recorder: TraceRecorder;
-  }): string {
+  }): Promise<string> {
     const elderId = input.ctx.elderId ?? input.ctx.user.elderId ?? input.ctx.user.userId;
-    const trace = deps.db.agentTraces.create({
+    const trace = await deps.db.agentTraces.create({
       elderId,
       userId: input.ctx.user.userId,
       agent: "companion",
@@ -242,8 +242,8 @@ export function createAgentRunner(deps: AgentRunnerDeps): AgentRunner {
     return trace.id;
   }
 
-  function saveSession(session: DbSession, messages: ChatMessage[], summary?: string) {
-    deps.db.sessions.upsert({
+  async function saveSession(session: DbSession, messages: ChatMessage[], summary?: string) {
+    await deps.db.sessions.upsert({
       id: session.id,
       userId: session.userId,
       elderId: session.elderId,
@@ -261,7 +261,7 @@ export function createAgentRunner(deps: AgentRunnerDeps): AgentRunner {
     try {
       const result = await deps.toolRegistry.execute(call.name, call.args, ctx);
       const latencyMs = Date.now() - started;
-      deps.db.toolLogs.insert({
+      await deps.db.toolLogs.insert({
         sessionId: ctx.sessionId,
         userId: ctx.user.userId,
         tool: call.name,
@@ -276,7 +276,7 @@ export function createAgentRunner(deps: AgentRunnerDeps): AgentRunner {
     } catch (err) {
       const latencyMs = Date.now() - started;
       const message = errorMessage(err);
-      deps.db.toolLogs.insert({
+      await deps.db.toolLogs.insert({
         sessionId: ctx.sessionId,
         userId: ctx.user.userId,
         tool: call.name,
@@ -316,7 +316,7 @@ export function createAgentRunner(deps: AgentRunnerDeps): AgentRunner {
     for (let step = 0; step < 4; step += 1) {
       const toolSchemas = deps.toolRegistry.schemas(ctx.user.role);
       const modelMessages: ChatMessage[] = [
-        { role: "system", content: buildSystemPrompt(ctx.user) },
+        { role: "system", content: await buildSystemPrompt(ctx.user) },
         ...messages
       ];
 
@@ -345,7 +345,7 @@ export function createAgentRunner(deps: AgentRunnerDeps): AgentRunner {
           detail: message,
           ok: false
         });
-        persistTrace({
+        await persistTrace({
           ctx,
           goal: input.goal,
           status: "error",
@@ -364,14 +364,14 @@ export function createAgentRunner(deps: AgentRunnerDeps): AgentRunner {
         const answer = text.trim() || "我在呢，您可以慢慢说。";
         for (const piece of chunkText(answer)) yield { type: "token", text: piece };
         messages.push({ role: "assistant", content: answer });
-        saveSession(session, messages);
+        await saveSession(session, messages);
         pushStep(recorder, {
           type: "decision",
           label: "生成回答",
           detail: answer.slice(0, 300),
           ok: true
         });
-        const traceId = persistTrace({
+        const traceId = await persistTrace({
           ctx,
           goal: input.goal,
           status: "ok",
@@ -455,21 +455,21 @@ export function createAgentRunner(deps: AgentRunnerDeps): AgentRunner {
               continue;
             }
           }
-          const confirmation = deps.db.confirmations.create({
+          const confirmation = await deps.db.confirmations.create({
             sessionId: session.id,
             userId: ctx.user.userId,
             tool: call.name,
             args: preparedArgs,
             ttlMs: call.name === "start_cooling_off" ? 60_000 : 5 * 60_000
           });
-          saveSession(session, messages);
+          await saveSession(session, messages);
           pushStep(recorder, {
             type: "decision",
             label: "等待用户确认",
             detail: preparedSummary,
             ok: true
           });
-          persistTrace({
+          await persistTrace({
             ctx,
             goal: input.goal,
             status: "needs_confirmation",
@@ -527,14 +527,14 @@ export function createAgentRunner(deps: AgentRunnerDeps): AgentRunner {
     const fallback = "我先帮您整理到这里。建议联系家人，或者再问我一次。";
     for (const piece of chunkText(fallback)) yield { type: "token", text: piece };
     messages.push({ role: "assistant", content: fallback });
-    saveSession(session, messages);
+    await saveSession(session, messages);
     pushStep(recorder, {
       type: "decision",
       label: "达到工具步数上限",
       detail: fallback,
       ok: true
     });
-    const traceId = persistTrace({
+    const traceId = await persistTrace({
       ctx,
       goal: input.goal,
       status: "ok",
@@ -550,10 +550,10 @@ export function createAgentRunner(deps: AgentRunnerDeps): AgentRunner {
     ctx: ToolContext,
     recorder: TraceRecorder
   ): AsyncGenerator<AgentEvent> {
-    const confirmation = deps.db.confirmations.get(input.confirmationId!);
+    const confirmation = await deps.db.confirmations.get(input.confirmationId!);
     const goal = confirmation ? `确认并继续：${confirmation.tool}` : "确认高风险操作";
     if (!confirmation) {
-      persistTrace({
+      await persistTrace({
         ctx,
         goal,
         status: "error",
@@ -564,7 +564,7 @@ export function createAgentRunner(deps: AgentRunnerDeps): AgentRunner {
       return;
     }
     if (confirmation.sessionId !== session.id || confirmation.userId !== input.user.userId) {
-      persistTrace({
+      await persistTrace({
         ctx,
         goal,
         status: "error",
@@ -575,7 +575,7 @@ export function createAgentRunner(deps: AgentRunnerDeps): AgentRunner {
       return;
     }
     if (confirmation.status !== "pending") {
-      persistTrace({
+      await persistTrace({
         ctx,
         goal,
         status: "error",
@@ -586,8 +586,8 @@ export function createAgentRunner(deps: AgentRunnerDeps): AgentRunner {
       return;
     }
     if (confirmation.expiresAt < Date.now()) {
-      deps.db.confirmations.setStatus(confirmation.id, "expired");
-      persistTrace({
+      await deps.db.confirmations.setStatus(confirmation.id, "expired");
+      await persistTrace({
         ctx,
         goal,
         status: "error",
@@ -601,17 +601,17 @@ export function createAgentRunner(deps: AgentRunnerDeps): AgentRunner {
     const messages = [...(session.messages as ChatMessage[])];
 
     if (input.confirmationDecision !== "approve") {
-      deps.db.confirmations.setStatus(confirmation.id, "cancelled");
+      await deps.db.confirmations.setStatus(confirmation.id, "cancelled");
       const answer = "好的，已经取消。您先不要转账，有需要可以再叫我。";
       messages.push({ role: "assistant", content: answer });
-      saveSession(session, messages);
+      await saveSession(session, messages);
       pushStep(recorder, {
         type: "decision",
         label: "用户取消高风险操作",
         detail: answer,
         ok: true
       });
-      const traceId = persistTrace({
+      const traceId = await persistTrace({
         ctx,
         goal,
         status: "ok",
@@ -629,10 +629,10 @@ export function createAgentRunner(deps: AgentRunnerDeps): AgentRunner {
       return;
     }
 
-    deps.db.confirmations.setStatus(confirmation.id, "approved");
+    await deps.db.confirmations.setStatus(confirmation.id, "approved");
     const tool = deps.toolRegistry.get(confirmation.tool);
     if (!tool) {
-      persistTrace({
+      await persistTrace({
         ctx,
         goal,
         status: "error",
@@ -692,7 +692,7 @@ export function createAgentRunner(deps: AgentRunnerDeps): AgentRunner {
   }
 
   async function* run(input: AgentRunInput): AsyncGenerator<AgentEvent> {
-    const elderId = resolveElderId(input.user);
+    const elderId = await resolveElderId(input.user);
     const recorder = newRecorder();
     const ctx: ToolContext = {
       user: input.user,
@@ -702,13 +702,13 @@ export function createAgentRunner(deps: AgentRunnerDeps): AgentRunner {
       ...(input.signal ? { signal: input.signal } : {})
     };
 
-    let session = input.sessionId ? deps.db.sessions.get(input.sessionId) : null;
+    let session = input.sessionId ? await deps.db.sessions.get(input.sessionId) : null;
     if (session && session.userId !== input.user.userId) {
       yield { type: "error", code: "forbidden", message: "会话不属于当前用户" };
       return;
     }
     if (!session) {
-      session = deps.db.sessions.create(input.user.userId, elderId ?? null);
+      session = await deps.db.sessions.create(input.user.userId, elderId ?? null);
     }
     ctx.sessionId = session.id;
     yield { type: "meta", sessionId: session.id };
@@ -725,7 +725,7 @@ export function createAgentRunner(deps: AgentRunnerDeps): AgentRunner {
         detail: "请说点什么",
         ok: false
       });
-      persistTrace({
+      await persistTrace({
         ctx,
         goal: "用户对话",
         status: "error",

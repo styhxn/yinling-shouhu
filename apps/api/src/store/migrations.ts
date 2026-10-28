@@ -1,13 +1,10 @@
-import type { DatabaseSync } from "node:sqlite";
+import type { SqlClient } from "./sql.js";
 
 /**
- * P0 schema. Keep this idempotent so `createServer()` can run against an
- * existing data/app.db without a separate migration step.
+ * Shared schema. Keep this idempotent so both SQLite and PostgreSQL can run
+ * against an existing database without a separate migration step.
  */
-export function migrate(db: DatabaseSync) {
-  db.exec(`
-    PRAGMA foreign_keys = ON;
-
+export const SCHEMA_SQL = `
     CREATE TABLE IF NOT EXISTS users (
       id TEXT PRIMARY KEY,
       role TEXT NOT NULL,
@@ -313,6 +310,21 @@ export function migrate(db: DatabaseSync) {
     );
     CREATE INDEX IF NOT EXISTS idx_kb_chunks_doc ON kb_chunks(doc_id);
 
+    CREATE TABLE IF NOT EXISTS embeddings (
+      id TEXT PRIMARY KEY,
+      owner_type TEXT NOT NULL,
+      owner_id TEXT NOT NULL,
+      elder_id TEXT,
+      model TEXT NOT NULL,
+      dim INTEGER NOT NULL,
+      content TEXT NOT NULL,
+      metadata_json TEXT,
+      embedding_json TEXT NOT NULL,
+      updated_at INTEGER NOT NULL,
+      UNIQUE(owner_type, owner_id, model)
+    );
+    CREATE INDEX IF NOT EXISTS idx_embeddings_owner ON embeddings(owner_type, owner_id);
+
     CREATE TABLE IF NOT EXISTS eval_cases (
       id TEXT PRIMARY KEY,
       module TEXT NOT NULL,
@@ -389,27 +401,69 @@ export function migrate(db: DatabaseSync) {
     CREATE INDEX IF NOT EXISTS idx_audit_logs_ts ON audit_logs(ts DESC);
     CREATE INDEX IF NOT EXISTS idx_missing_posters_expires ON missing_posters(expires_at);
     CREATE INDEX IF NOT EXISTS idx_users_role ON users(role);
+`;
 
-    PRAGMA user_version = 1;
-  `);
+export function postgresSchema() {
+  return SCHEMA_SQL.replace(/\bINTEGER\b/g, "BIGINT").replace(/\bREAL\b/g, "DOUBLE PRECISION");
+}
 
-  // Additive migration for databases created before photo_ids_json existed.
-  const memoryColumns = db.prepare("PRAGMA table_info(memories)").all() as Array<{ name?: string }>;
+async function sqliteMigrate(db: SqlClient) {
+  await db.exec("PRAGMA foreign_keys = ON;");
+  await db.exec(SCHEMA_SQL);
+  await db.exec("PRAGMA user_version = 1;");
+
+  const memoryColumns = await db
+    .prepare("PRAGMA table_info(memories)")
+    .all<{ name?: string }>();
   if (!memoryColumns.some((column) => column.name === "photo_ids_json")) {
-    db.exec("ALTER TABLE memories ADD COLUMN photo_ids_json TEXT");
+    await db.exec("ALTER TABLE memories ADD COLUMN photo_ids_json TEXT");
   }
 
-  const medicationLogColumns = db
+  const medicationLogColumns = await db
     .prepare("PRAGMA table_info(medication_logs)")
-    .all() as Array<{ name?: string }>;
+    .all<{ name?: string }>();
   if (!medicationLogColumns.some((column) => column.name === "scheduled_time")) {
-    db.exec("ALTER TABLE medication_logs ADD COLUMN scheduled_time TEXT");
+    await db.exec("ALTER TABLE medication_logs ADD COLUMN scheduled_time TEXT");
   }
 
-  const storyChapterColumns = db
+  const storyChapterColumns = await db
     .prepare("PRAGMA table_info(story_chapters)")
-    .all() as Array<{ name?: string }>;
+    .all<{ name?: string }>();
   if (!storyChapterColumns.some((column) => column.name === "fidelity_json")) {
-    db.exec("ALTER TABLE story_chapters ADD COLUMN fidelity_json TEXT");
+    await db.exec("ALTER TABLE story_chapters ADD COLUMN fidelity_json TEXT");
+  }
+}
+
+async function postgresMigrate(db: SqlClient) {
+  if (db.supportsVector) {
+    try {
+      await db.exec("CREATE EXTENSION IF NOT EXISTS vector;");
+    } catch {
+      // Managed PostgreSQL may not allow CREATE EXTENSION; keep running with
+      // the in-memory fallback instead of failing startup.
+      db.supportsVector = false;
+    }
+  }
+  await db.exec(postgresSchema());
+  if (db.supportsVector) {
+    try {
+      await db.exec("ALTER TABLE embeddings ADD COLUMN IF NOT EXISTS embedding vector;");
+    } catch {
+      db.supportsVector = false;
+    }
+  }
+  await db.exec(
+    "CREATE TABLE IF NOT EXISTS schema_migrations (version INTEGER PRIMARY KEY, applied_at BIGINT NOT NULL);"
+  );
+  await db.exec(
+    "INSERT INTO schema_migrations (version, applied_at) VALUES (1, (EXTRACT(EPOCH FROM NOW()) * 1000)::BIGINT) ON CONFLICT (version) DO NOTHING;"
+  );
+}
+
+export async function migrate(db: SqlClient) {
+  if (db.driver === "postgres") {
+    await postgresMigrate(db);
+  } else {
+    await sqliteMigrate(db);
   }
 }

@@ -2,6 +2,7 @@ import crypto from "node:crypto";
 import { z } from "zod";
 import type { AppDb } from "../store/db.js";
 import { createDb } from "../store/db.js";
+import { createSqliteClient } from "../store/sql.js";
 import { createAgentRuntime } from "./agent/runtime.js";
 import type { ToolDef, ToolRegistry } from "./agent/tools.js";
 import type { ModelRouter } from "./llm/types.js";
@@ -308,9 +309,9 @@ function percent(part: number, total: number) {
   return total > 0 ? Math.round((part / total) * 100) : 0;
 }
 
-export function seedEvalCases(db: AppDb) {
+export async function seedEvalCases(db: AppDb) {
   for (const item of SCAM_CASES) {
-    db.evalCases.upsert({
+    await db.evalCases.upsert({
       id: item.id,
       module: "scam",
       question: item.text,
@@ -318,7 +319,7 @@ export function seedEvalCases(db: AppDb) {
     });
   }
   for (const item of STORY_CASES) {
-    db.evalCases.upsert({
+    await db.evalCases.upsert({
       id: item.id,
       module: "story",
       question: JSON.stringify(item.input),
@@ -326,7 +327,7 @@ export function seedEvalCases(db: AppDb) {
     });
   }
   for (const item of AGENT_CASES) {
-    db.evalCases.upsert({
+    await db.evalCases.upsert({
       id: item.id,
       module: "agent",
       question: JSON.stringify({ goal: item.goal, context: item.context }),
@@ -337,7 +338,7 @@ export function seedEvalCases(db: AppDb) {
 
 async function runScamCases(db: AppDb, modelRouter: ModelRouter): Promise<EvalModuleReport> {
   const startedAt = Date.now();
-  const cases = db.evalCases.list("scam");
+  const cases = await db.evalCases.list("scam");
   const failures: EvalFailure[] = [];
   let passed = 0;
   let riskMatched = 0;
@@ -436,7 +437,7 @@ async function runScamCases(db: AppDb, modelRouter: ModelRouter): Promise<EvalMo
 
 async function runStoryCases(db: AppDb, modelRouter: ModelRouter): Promise<EvalModuleReport> {
   const startedAt = Date.now();
-  const cases = db.evalCases.list("story");
+  const cases = await db.evalCases.list("story");
   const failures: EvalFailure[] = [];
   let passed = 0;
   let groundingSum = 0;
@@ -455,12 +456,12 @@ async function runStoryCases(db: AppDb, modelRouter: ModelRouter): Promise<EvalM
       continue;
     }
 
-    const temp = createDb(":memory:", {
+    const temp = await createDb(createSqliteClient(":memory:"), {
       masterKey: crypto.randomBytes(32),
       seed: false
     });
     try {
-      const memory = temp.memories.create({
+      const memory = await temp.memories.create({
         elderId: "eval_elder",
         title: input.title,
         summary: input.summary,
@@ -522,7 +523,7 @@ async function runStoryCases(db: AppDb, modelRouter: ModelRouter): Promise<EvalM
         reasons: [err instanceof Error ? err.message : "failed"]
       });
     } finally {
-      temp.close();
+      await temp.close();
     }
   }
 
@@ -548,9 +549,9 @@ async function runStoryCases(db: AppDb, modelRouter: ModelRouter): Promise<EvalM
 
 async function runAgentCases(db: AppDb, modelRouter: ModelRouter): Promise<EvalModuleReport> {
   const startedAt = Date.now();
-  const cases = db.evalCases.list("agent");
+  const cases = await db.evalCases.list("agent");
   const failures: EvalFailure[] = [];
-  const temp = createDb(":memory:", { masterKey: crypto.randomBytes(32), seed: false });
+  const temp = await createDb(createSqliteClient(":memory:"), { masterKey: crypto.randomBytes(32), seed: false });
   const runtime = createAgentRuntime({
     db: temp,
     modelRouter,
@@ -590,7 +591,7 @@ async function runAgentCases(db: AppDb, modelRouter: ModelRouter): Promise<EvalM
           context: input.context,
           maxTools: 4
         });
-        const trace = temp.agentTraces.getById(result.traceId);
+        const trace = await temp.agentTraces.getById(result.traceId);
         const calledTools =
           trace?.steps.filter((step) => step.type === "tool_call").map((step) => step.tool ?? "") ?? [];
         toolCalls += calledTools.length;
@@ -654,7 +655,7 @@ async function runAgentCases(db: AppDb, modelRouter: ModelRouter): Promise<EvalM
       }
     }
   } finally {
-    temp.close();
+    await temp.close();
   }
 
   return {
@@ -682,12 +683,12 @@ export async function runEvaluation(input: {
   modelRouter: ModelRouter;
   modules?: EvalModule[];
 }): Promise<EvalReport> {
-  seedEvalCases(input.db);
+  await seedEvalCases(input.db);
   const modules =
     input.modules && input.modules.length > 0
       ? input.modules
       : (["scam", "story", "agent"] as const);
-  const runId = input.db.evalRuns.start();
+  const runId = await input.db.evalRuns.start();
   const startedAt = Date.now();
 
   try {
@@ -707,10 +708,10 @@ export async function runEvaluation(input: {
       overall: { total, passed, passRate: percent(passed, total) },
       modules: reports
     };
-    input.db.evalRuns.finish(runId, report);
+    await input.db.evalRuns.finish(runId, report);
     return report;
   } catch (err) {
-    input.db.evalRuns.finish(runId, {
+    await input.db.evalRuns.finish(runId, {
       error: err instanceof Error ? err.message : "eval_failed"
     });
     throw err;

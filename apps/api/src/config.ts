@@ -19,6 +19,12 @@ export type AppConfig = {
   appBaseUrl: string;
   dataDir: string;
   dbPath: string;
+  db: {
+    driver: "sqlite" | "postgres";
+    url: string;
+    poolMax: number;
+    ssl: boolean;
+  };
   publicDir: string;
   webDistDir: string;
   uploadsDir: string;
@@ -56,8 +62,9 @@ export type AppConfig = {
   };
 };
 
-export type ConfigOverrides = Partial<Omit<AppConfig, "llm">> & {
+export type ConfigOverrides = Partial<Omit<AppConfig, "llm" | "db">> & {
   llm?: Partial<AppConfig["llm"]>;
+  db?: Partial<AppConfig["db"]>;
 };
 
 function env(name: string) {
@@ -171,6 +178,22 @@ export function loadConfig(overrides: ConfigOverrides = {}): AppConfig {
   const corsOrigins =
     overrides.corsOrigins ??
     Array.from(new Set(configuredOrigins.length ? configuredOrigins : defaultOrigins));
+  const rawDriver = env("DB_DRIVER").toLowerCase();
+  const databaseUrl = env("DATABASE_URL");
+  const dbDriver =
+    overrides.db?.driver ??
+    (rawDriver === "postgres" || rawDriver === "postgresql" || rawDriver === "pg"
+      ? "postgres"
+      : rawDriver === "sqlite"
+        ? "sqlite"
+        : databaseUrl
+          ? "postgres"
+          : "sqlite");
+  const dbUrl = overrides.db?.url ?? databaseUrl;
+  if (dbDriver === "postgres" && !dbUrl) {
+    throw new Error("DATABASE_URL is required when DB_DRIVER=postgres");
+  }
+
   const rawCookieSecure = env("COOKIE_SECURE");
   const cookieSecure =
     overrides.cookieSecure ??
@@ -184,6 +207,12 @@ export function loadConfig(overrides: ConfigOverrides = {}): AppConfig {
     appBaseUrl,
     dataDir,
     dbPath: overrides.dbPath ?? (env("DB_PATH") || path.join(dataDir, "app.db")),
+    db: {
+      driver: dbDriver,
+      url: dbUrl,
+      poolMax: overrides.db?.poolMax ?? num("DB_POOL_MAX", 10),
+      ssl: overrides.db?.ssl ?? bool("DB_SSL", false)
+    },
     publicDir,
     webDistDir,
     uploadsDir: overrides.uploadsDir ?? path.join(publicDir, "uploads"),

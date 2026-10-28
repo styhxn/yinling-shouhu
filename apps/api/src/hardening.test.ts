@@ -71,7 +71,7 @@ describe("hardening", () => {
   it("prunes location history older than the retention window", async () => {
     const server = await createServer({ config: testConfig() });
     const oldTs = Date.now() - 200 * 24 * 60 * 60 * 1000;
-    server.db.locations.insert({
+    await server.db.locations.insert({
       elderId: "e_li",
       lat: 31.1,
       lng: 120.1,
@@ -80,9 +80,9 @@ describe("hardening", () => {
       ts: oldTs
     });
 
-    const result = createMaintenance(server.db, server.config).prune();
+    const result = await createMaintenance(server.db, server.config).prune();
     expect(result.locations).toBeGreaterThanOrEqual(1);
-    expect(server.db.locations.history("e_li", oldTs - 1, oldTs + 1)).toHaveLength(0);
+    expect(await server.db.locations.history("e_li", oldTs - 1, oldTs + 1)).toHaveLength(0);
     await server.close();
   });
 });

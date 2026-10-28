@@ -35,7 +35,7 @@ describe("evaluation harness", () => {
     expect(agent?.metrics.traceCompletenessPct).toBe(100);
     expect(agent?.metrics.escalationAccuracyPct).toBe(100);
 
-    const latest = server.db.evalRuns.latest();
+    const latest = await server.db.evalRuns.latest();
     expect(latest?.id).toBe(report.runId);
     expect(latest?.finishedAt).toBeTruthy();
   });

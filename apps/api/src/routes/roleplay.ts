@@ -18,10 +18,10 @@ export const roleplayRoutes: FastifyPluginAsync = async (server) => {
   server.post("/start", { preHandler: requireAuth }, async (req, reply) => {
     const parsed = StartSchema.safeParse(req.body);
     if (!parsed.success) return reply.code(400).send({ error: "invalid_body" });
-    const elderId = resolveElderId(req);
+    const elderId = await resolveElderId(req);
     if (!elderId) return reply.code(403).send({ error: "forbidden" });
     try {
-      return { ok: true, ...roleplay.start(elderId, parsed.data.scenarioId) };
+      return { ok: true, ...(await roleplay.start(elderId, parsed.data.scenarioId)) };
     } catch {
       return reply.code(404).send({ error: "not_found" });
     }
@@ -31,7 +31,7 @@ export const roleplayRoutes: FastifyPluginAsync = async (server) => {
     const params = IdParamsSchema.safeParse(req.params);
     const body = TurnSchema.safeParse(req.body);
     if (!params.success || !body.success) return reply.code(400).send({ error: "invalid_body" });
-    const elderId = resolveElderId(req);
+    const elderId = await resolveElderId(req);
     if (!elderId) return reply.code(403).send({ error: "forbidden" });
     try {
       return { ok: true, ...(await roleplay.turn(params.data.id, elderId, body.data.text.trim())) };
@@ -46,10 +46,10 @@ export const roleplayRoutes: FastifyPluginAsync = async (server) => {
   server.post("/:id/end", { preHandler: requireAuth }, async (req, reply) => {
     const params = IdParamsSchema.safeParse(req.params);
     if (!params.success) return reply.code(400).send({ error: "invalid_body" });
-    const elderId = resolveElderId(req);
+    const elderId = await resolveElderId(req);
     if (!elderId) return reply.code(403).send({ error: "forbidden" });
     try {
-      return { ok: true, ...roleplay.end(params.data.id, elderId) };
+      return { ok: true, ...(await roleplay.end(params.data.id, elderId)) };
     } catch {
       return reply.code(404).send({ error: "not_found" });
     }

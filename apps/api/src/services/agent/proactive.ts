@@ -78,7 +78,7 @@ export function createProactiveAgent(deps: {
 
   async function assess(alert: DbSafetyAlert): Promise<AlertAssessment | null> {
     if (processed.has(alert.id)) return null;
-    const current = deps.db.safetyAlerts.getById(alert.id);
+    const current = await deps.db.safetyAlerts.getById(alert.id);
     if (!current) return null;
     const payload =
       current.payload && typeof current.payload === "object" && !Array.isArray(current.payload)
@@ -103,7 +103,7 @@ export function createProactiveAgent(deps: {
       maxTools: 3
     });
     const assessment = assessmentFromDecision(result.decision, result.traceId);
-    const updated = deps.db.safetyAlerts.updatePayload(current.id, {
+    const updated = await deps.db.safetyAlerts.updatePayload(current.id, {
       ...payload,
       assessment
     });
@@ -136,10 +136,10 @@ export function createProactiveAgent(deps: {
       assessInBackground(alert);
     });
 
-    const backfill = setTimeout(() => {
+    const backfill = setTimeout(async () => {
       if (stopped) return;
       try {
-        for (const alert of deps.db.safetyAlerts.listOpen(10)) {
+        for (const alert of await deps.db.safetyAlerts.listOpen(10)) {
           const payload =
             alert.payload && typeof alert.payload === "object" && !Array.isArray(alert.payload)
               ? (alert.payload as Record<string, unknown>)

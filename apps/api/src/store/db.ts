@@ -1,16 +1,8 @@
 import { randomUUID } from "node:crypto";
-import { createRequire } from "node:module";
-import type { DatabaseSync as DatabaseSyncType } from "node:sqlite";
 import { decryptJson, encryptJson } from "../services/crypto.js";
 import { migrate } from "./migrations.js";
 import { seedDemo } from "./seed.js";
-
-// Vite/Vitest rewrites `node:` imports in some setups; require the built-in
-// directly so tests and production use the same SQLite implementation.
-const nodeRequire = createRequire(import.meta.url);
-const { DatabaseSync } = nodeRequire("node:sqlite") as {
-  DatabaseSync: new (path: string, options?: { enableForeignKeyConstraints?: boolean }) => DatabaseSyncType;
-};
+import type { SqlClient } from "./sql.js";
 
 export type Role = "elder" | "family" | "institution" | "admin";
 
@@ -423,14 +415,9 @@ function parseJson<T>(value: unknown, fallback: T): T {
   }
 }
 
-export function createDb(dbPath: string, options: CreateDbOptions) {
-  const raw = new DatabaseSync(dbPath, { enableForeignKeyConstraints: true });
-  raw.exec("PRAGMA busy_timeout = 5000");
-  if (dbPath !== ":memory:") {
-    raw.exec("PRAGMA journal_mode = WAL");
-  }
-  migrate(raw);
-  if (options.seed) seedDemo(raw, options.masterKey);
+export async function createDb(sql: SqlClient, options: CreateDbOptions) {
+  await migrate(sql);
+  if (options.seed) await seedDemo(sql, options.masterKey);
 
   const enc = (value: unknown) => encryptJson(options.masterKey, value);
   const dec = <T>(blob: unknown): T | null => {
@@ -443,19 +430,17 @@ export function createDb(dbPath: string, options: CreateDbOptions) {
   };
 
   const users = {
-    getById(id: string): DbUser | null {
-      const row = raw.prepare("SELECT * FROM users WHERE id = ?").get(id) as any;
+    async getById(id: string): Promise<DbUser | null> {
+      const row = await sql.prepare("SELECT * FROM users WHERE id = ?").get(id) as any;
       return row ? asUser(row) : null;
     },
-    findDemo(role: Role): DbUser | null {
-      const row = raw
-        .prepare("SELECT * FROM users WHERE role = ? ORDER BY created_at ASC LIMIT 1")
+    async findDemo(role: Role): Promise<DbUser | null> {
+      const row = await sql.prepare("SELECT * FROM users WHERE role = ? ORDER BY created_at ASC LIMIT 1")
         .get(role) as any;
       return row ? asUser(row) : null;
     },
-    listFamilyLinks(userId: string): DbFamilyLink[] {
-      const rows = raw
-        .prepare("SELECT * FROM family_links WHERE family_user_id = ? AND status = 'active'")
+    async listFamilyLinks(userId: string): Promise<DbFamilyLink[]> {
+      const rows = await sql.prepare("SELECT * FROM family_links WHERE family_user_id = ? AND status = 'active'")
         .all(userId) as any[];
       return rows.map((r) => ({
         id: String(r.id),
@@ -468,8 +453,8 @@ export function createDb(dbPath: string, options: CreateDbOptions) {
   };
 
   const elders = {
-    getById(id: string): DbElder | null {
-      const row = raw.prepare("SELECT * FROM elders WHERE id = ?").get(id) as any;
+    async getById(id: string): Promise<DbElder | null> {
+      const row = await sql.prepare("SELECT * FROM elders WHERE id = ?").get(id) as any;
       if (!row) return null;
       return {
         id: String(row.id),
@@ -481,8 +466,8 @@ export function createDb(dbPath: string, options: CreateDbOptions) {
   };
 
   const sessions = {
-    get(id: string): DbSession | null {
-      const row = raw.prepare("SELECT * FROM sessions WHERE id = ?").get(id) as any;
+    async get(id: string): Promise<DbSession | null> {
+      const row = await sql.prepare("SELECT * FROM sessions WHERE id = ?").get(id) as any;
       if (!row) return null;
       return {
         id: String(row.id),
@@ -494,16 +479,15 @@ export function createDb(dbPath: string, options: CreateDbOptions) {
         updatedAt: Number(row.updated_at)
       };
     },
-    upsert(input: {
+    async upsert(input: {
       id: string;
       userId: string;
       elderId: string | null;
       messages: unknown[];
       summary?: string | null;
-    }): void {
+    }): Promise<void> {
       const now = Date.now();
-      raw
-        .prepare(
+      await sql.prepare(
           `INSERT INTO sessions (id, user_id, elder_id, messages_json, summary, created_at, updated_at)
            VALUES (?, ?, ?, ?, ?, ?, ?)
            ON CONFLICT(id) DO UPDATE SET
@@ -521,11 +505,10 @@ export function createDb(dbPath: string, options: CreateDbOptions) {
           now
         );
     },
-    create(userId: string, elderId: string | null): DbSession {
+    async create(userId: string, elderId: string | null): Promise<DbSession> {
       const id = `s_${randomUUID()}`;
       const now = Date.now();
-      raw
-        .prepare(
+      await sql.prepare(
           "INSERT INTO sessions (id, user_id, elder_id, messages_json, summary, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)"
         )
         .run(id, userId, elderId, "[]", null, now, now);
@@ -534,18 +517,17 @@ export function createDb(dbPath: string, options: CreateDbOptions) {
   };
 
   const confirmations = {
-    create(input: {
+    async create(input: {
       sessionId: string;
       userId: string;
       tool: string;
       args: unknown;
       ttlMs?: number;
-    }): DbConfirmation {
+    }): Promise<DbConfirmation> {
       const id = `cf_${randomUUID()}`;
       const now = Date.now();
       const expiresAt = now + (input.ttlMs ?? 5 * 60 * 1000);
-      raw
-        .prepare(
+      await sql.prepare(
           `INSERT INTO agent_confirmations
             (id, session_id, user_id, tool, args_json, status, expires_at, created_at)
            VALUES (?, ?, ?, ?, ?, 'pending', ?, ?)`
@@ -562,8 +544,8 @@ export function createDb(dbPath: string, options: CreateDbOptions) {
         createdAt: now
       };
     },
-    get(id: string): DbConfirmation | null {
-      const row = raw.prepare("SELECT * FROM agent_confirmations WHERE id = ?").get(id) as any;
+    async get(id: string): Promise<DbConfirmation | null> {
+      const row = await sql.prepare("SELECT * FROM agent_confirmations WHERE id = ?").get(id) as any;
       if (!row) return null;
       return {
         id: String(row.id),
@@ -576,15 +558,14 @@ export function createDb(dbPath: string, options: CreateDbOptions) {
         createdAt: Number(row.created_at)
       };
     },
-    setStatus(id: string, status: DbConfirmation["status"]): void {
-      raw
-        .prepare("UPDATE agent_confirmations SET status = ?, responded_at = ? WHERE id = ?")
+    async setStatus(id: string, status: DbConfirmation["status"]): Promise<void> {
+      await sql.prepare("UPDATE agent_confirmations SET status = ?, responded_at = ? WHERE id = ?")
         .run(status, Date.now(), id);
     }
   };
 
   const coolingOffs = {
-    create(input: {
+    async create(input: {
       elderId: string;
       riskLevel: string;
       questions: string[];
@@ -592,12 +573,11 @@ export function createDb(dbPath: string, options: CreateDbOptions) {
       counterparty?: string;
       amount?: number;
       familyConfirmId?: string;
-    }): DbCoolingOff {
+    }): Promise<DbCoolingOff> {
       const id = `co_${randomUUID()}`;
       const now = Date.now();
       const expiresAt = now + 60_000;
-      raw
-        .prepare(
+      await sql.prepare(
           `INSERT INTO cooling_offs
             (id, elder_id, status, reason_enc, counterparty_enc, amount, risk_level, questions_json, family_confirm_id, started_at, expires_at)
            VALUES (?, ?, 'pending', ?, ?, ?, ?, ?, ?, ?, ?)`
@@ -625,8 +605,8 @@ export function createDb(dbPath: string, options: CreateDbOptions) {
         expiresAt
       };
     },
-    get(id: string): DbCoolingOff | null {
-      const row = raw.prepare("SELECT * FROM cooling_offs WHERE id = ?").get(id) as any;
+    async get(id: string): Promise<DbCoolingOff | null> {
+      const row = await sql.prepare("SELECT * FROM cooling_offs WHERE id = ?").get(id) as any;
       if (!row) return null;
       return {
         id: String(row.id),
@@ -639,19 +619,17 @@ export function createDb(dbPath: string, options: CreateDbOptions) {
         expiresAt: Number(row.expires_at)
       };
     },
-    setStatus(id: string, status: string, outcome?: string): void {
-      raw
-        .prepare("UPDATE cooling_offs SET status = ?, outcome = ? WHERE id = ?")
+    async setStatus(id: string, status: string, outcome?: string): Promise<void> {
+      await sql.prepare("UPDATE cooling_offs SET status = ?, outcome = ? WHERE id = ?")
         .run(status, outcome ?? null, id);
     }
   };
 
   const familyConfirms = {
-    create(input: { elderId: string; type: string; payload: unknown }): DbFamilyConfirm {
+    async create(input: { elderId: string; type: string; payload: unknown }): Promise<DbFamilyConfirm> {
       const id = `fc_${randomUUID()}`;
       const now = Date.now();
-      raw
-        .prepare(
+      await sql.prepare(
           `INSERT INTO family_confirms (id, elder_id, type, payload_json, status, created_at)
            VALUES (?, ?, ?, ?, 'pending', ?)`
         )
@@ -665,8 +643,8 @@ export function createDb(dbPath: string, options: CreateDbOptions) {
         createdAt: now
       };
     },
-    get(id: string): DbFamilyConfirm | null {
-      const row = raw.prepare("SELECT * FROM family_confirms WHERE id = ?").get(id) as any;
+    async get(id: string): Promise<DbFamilyConfirm | null> {
+      const row = await sql.prepare("SELECT * FROM family_confirms WHERE id = ?").get(id) as any;
       if (!row) return null;
       return {
         id: String(row.id),
@@ -677,9 +655,8 @@ export function createDb(dbPath: string, options: CreateDbOptions) {
         createdAt: Number(row.created_at)
       };
     },
-    listPending(elderId: string): DbFamilyConfirm[] {
-      const rows = raw
-        .prepare(
+    async listPending(elderId: string): Promise<DbFamilyConfirm[]> {
+      const rows = await sql.prepare(
           "SELECT * FROM family_confirms WHERE elder_id = ? AND status = 'pending' ORDER BY created_at DESC"
         )
         .all(elderId) as any[];
@@ -692,9 +669,8 @@ export function createDb(dbPath: string, options: CreateDbOptions) {
         createdAt: Number(r.created_at)
       }));
     },
-    respond(id: string, decision: "approved" | "denied", respondedBy: string, note?: string): void {
-      raw
-        .prepare(
+    async respond(id: string, decision: "approved" | "denied", respondedBy: string, note?: string): Promise<void> {
+      await sql.prepare(
           "UPDATE family_confirms SET status = ?, responded_at = ?, responded_by = ?, note_enc = ? WHERE id = ?"
         )
         .run(decision, Date.now(), respondedBy, note ? enc(note) : null, id);
@@ -702,17 +678,16 @@ export function createDb(dbPath: string, options: CreateDbOptions) {
   };
 
   const medications = {
-    listByElder(elderId: string): DbMedication[] {
-      const rows = raw
-        .prepare("SELECT * FROM medications WHERE elder_id = ? ORDER BY created_at ASC")
+    async listByElder(elderId: string): Promise<DbMedication[]> {
+      const rows = await sql.prepare("SELECT * FROM medications WHERE elder_id = ? ORDER BY created_at ASC")
         .all(elderId) as any[];
       return rows.map(mapMedication);
     },
-    getById(id: string): DbMedication | null {
-      const row = raw.prepare("SELECT * FROM medications WHERE id = ?").get(id) as any;
+    async getById(id: string): Promise<DbMedication | null> {
+      const row = await sql.prepare("SELECT * FROM medications WHERE id = ?").get(id) as any;
       return row ? mapMedication(row) : null;
     },
-    create(input: {
+    async create(input: {
       elderId: string;
       name: string;
       genericName?: string | null;
@@ -720,11 +695,10 @@ export function createDb(dbPath: string, options: CreateDbOptions) {
       dosage?: string | null;
       schedule: { time: string }[];
       notes?: string | null;
-    }): DbMedication {
+    }): Promise<DbMedication> {
       const id = `med_${randomUUID()}`;
       const now = Date.now();
-      raw
-        .prepare(
+      await sql.prepare(
           `INSERT INTO medications
             (id, elder_id, name, generic_name, spec, dosage, schedule_json, photo_upload_id, notes_enc, created_at, updated_at)
            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
@@ -742,9 +716,9 @@ export function createDb(dbPath: string, options: CreateDbOptions) {
           now,
           now
         );
-      return medications.getById(id)!;
+      return (await medications.getById(id))!;
     },
-    update(
+    async update(
       id: string,
       patch: Partial<{
         name: string;
@@ -754,15 +728,14 @@ export function createDb(dbPath: string, options: CreateDbOptions) {
         schedule: { time: string }[];
         notes: string | null;
       }>
-    ): DbMedication | null {
-      const current = medications.getById(id);
+    ): Promise<DbMedication | null> {
+      const current = await medications.getById(id);
       if (!current) return null;
       const next = {
         ...current,
         ...Object.fromEntries(Object.entries(patch).filter(([, value]) => value !== undefined))
       } as DbMedication;
-      raw
-        .prepare(
+      await sql.prepare(
           `UPDATE medications SET name = ?, generic_name = ?, spec = ?, dosage = ?, schedule_json = ?, notes_enc = ?, updated_at = ? WHERE id = ?`
         )
         .run(
@@ -775,18 +748,17 @@ export function createDb(dbPath: string, options: CreateDbOptions) {
           Date.now(),
           id
         );
-      return medications.getById(id);
+      return await medications.getById(id);
     },
-    remove(id: string): void {
-      raw.prepare("DELETE FROM medications WHERE id = ?").run(id);
+    async remove(id: string): Promise<void> {
+      await sql.prepare("DELETE FROM medications WHERE id = ?").run(id);
     }
   };
 
   const locations = {
-    insert(input: Omit<DbLocation, "ts"> & { ts?: number }): void {
+    async insert(input: Omit<DbLocation, "ts"> & { ts?: number }): Promise<void> {
       const id = `loc_${randomUUID()}`;
-      raw
-        .prepare(
+      await sql.prepare(
           `INSERT INTO location_points (id, elder_id, lat_enc, lng_enc, accuracy, source, ts)
            VALUES (?, ?, ?, ?, ?, ?, ?)`
         )
@@ -800,9 +772,8 @@ export function createDb(dbPath: string, options: CreateDbOptions) {
           input.ts ?? Date.now()
         );
     },
-    latest(elderId: string): DbLocation | null {
-      const row = raw
-        .prepare(
+    async latest(elderId: string): Promise<DbLocation | null> {
+      const row = await sql.prepare(
           "SELECT * FROM location_points WHERE elder_id = ? ORDER BY ts DESC LIMIT 1"
         )
         .get(elderId) as any;
@@ -819,9 +790,8 @@ export function createDb(dbPath: string, options: CreateDbOptions) {
         ts: Number(row.ts)
       };
     },
-    history(elderId: string, from: number, to: number): DbLocation[] {
-      const rows = raw
-        .prepare(
+    async history(elderId: string, from: number, to: number): Promise<DbLocation[]> {
+      const rows = await sql.prepare(
           "SELECT * FROM location_points WHERE elder_id = ? AND ts >= ? AND ts <= ? ORDER BY ts ASC"
         )
         .all(elderId, from, to) as any[];
@@ -841,16 +811,15 @@ export function createDb(dbPath: string, options: CreateDbOptions) {
         })
         .filter((point): point is DbLocation => point !== null);
     },
-    deleteBefore(ts: number): number {
-      const result = raw.prepare("DELETE FROM location_points WHERE ts < ?").run(ts);
+    async deleteBefore(ts: number): Promise<number> {
+      const result = await sql.prepare("DELETE FROM location_points WHERE ts < ?").run(ts);
       return Number(result.changes ?? 0);
     }
   };
 
   const toolLogs = {
-    insert(input: DbToolLog): void {
-      raw
-        .prepare(
+    async insert(input: DbToolLog): Promise<void> {
+      await sql.prepare(
           `INSERT INTO tool_logs
             (id, session_id, user_id, tool, args_redacted_json, result_summary, ok, latency_ms, model, risk_level, ts)
            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
@@ -869,23 +838,22 @@ export function createDb(dbPath: string, options: CreateDbOptions) {
           Date.now()
         );
     },
-    deleteBefore(ts: number): number {
-      const result = raw.prepare("DELETE FROM tool_logs WHERE ts < ?").run(ts);
+    async deleteBefore(ts: number): Promise<number> {
+      const result = await sql.prepare("DELETE FROM tool_logs WHERE ts < ?").run(ts);
       return Number(result.changes ?? 0);
     }
   };
 
   const auditLogs = {
-    insert(input: {
+    async insert(input: {
       userId?: string;
       action: string;
       targetType?: string;
       targetId?: string;
       meta?: unknown;
       ip?: string;
-    }): void {
-      raw
-        .prepare(
+    }): Promise<void> {
+      await sql.prepare(
           `INSERT INTO audit_logs (id, user_id, action, target_type, target_id, meta_json, ip, ts)
            VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
         )
@@ -900,16 +868,15 @@ export function createDb(dbPath: string, options: CreateDbOptions) {
           Date.now()
         );
     },
-    deleteBefore(ts: number): number {
-      const result = raw.prepare("DELETE FROM audit_logs WHERE ts < ?").run(ts);
+    async deleteBefore(ts: number): Promise<number> {
+      const result = await sql.prepare("DELETE FROM audit_logs WHERE ts < ?").run(ts);
       return Number(result.changes ?? 0);
     }
   };
 
   const scamChecks = {
-    insert(input: DbScamCheck): void {
-      raw
-        .prepare(
+    async insert(input: DbScamCheck): Promise<void> {
+      await sql.prepare(
           `INSERT INTO scam_checks
             (id, elder_id, input_type, input_text_enc, image_upload_id, url, risk_level, scam_type, confidence, result_json, model, created_at)
            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
@@ -1071,7 +1038,7 @@ export function createDb(dbPath: string, options: CreateDbOptions) {
   }
 
   const uploads = {
-    create(input: {
+    async create(input: {
       id?: string;
       ownerUserId: string;
       elderId: string | null;
@@ -1082,11 +1049,10 @@ export function createDb(dbPath: string, options: CreateDbOptions) {
       width: number | null;
       height: number | null;
       sha256?: string;
-    }): DbUpload {
+    }): Promise<DbUpload> {
       const id = input.id ?? `up_${randomUUID()}`;
       const now = Date.now();
-      raw
-        .prepare(
+      await sql.prepare(
           `INSERT INTO uploads
             (id, owner_user_id, elder_id, kind, path, mime, size, width, height, sha256, created_at)
            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
@@ -1117,14 +1083,14 @@ export function createDb(dbPath: string, options: CreateDbOptions) {
         createdAt: now
       };
     },
-    getById(id: string): DbUpload | null {
-      const row = raw.prepare("SELECT * FROM uploads WHERE id = ?").get(id) as any;
+    async getById(id: string): Promise<DbUpload | null> {
+      const row = await sql.prepare("SELECT * FROM uploads WHERE id = ?").get(id) as any;
       return row ? mapUpload(row) : null;
     }
   };
 
   const memories = {
-    create(input: {
+    async create(input: {
       elderId: string;
       title: string;
       timeRange?: string | null;
@@ -1136,11 +1102,10 @@ export function createDb(dbPath: string, options: CreateDbOptions) {
       summary?: string | null;
       visibility?: string;
       consent?: boolean;
-    }): DbMemory {
+    }): Promise<DbMemory> {
       const id = `m_${randomUUID()}`;
       const now = Date.now();
-      raw
-        .prepare(
+      await sql.prepare(
           `INSERT INTO memories
             (id, elder_id, title, time_range, place, people_json, tags_json, photo_ids_json,
              transcript_enc, summary, visibility, consent, status, created_at, updated_at)
@@ -1162,35 +1127,32 @@ export function createDb(dbPath: string, options: CreateDbOptions) {
           now,
           now
         );
-      return memories.getById(id)!;
+      return (await memories.getById(id))!;
     },
-    listByElder(elderId: string): DbMemory[] {
-      const rows = raw
-        .prepare(
+    async listByElder(elderId: string): Promise<DbMemory[]> {
+      const rows = await sql.prepare(
           "SELECT * FROM memories WHERE elder_id = ? AND status = 'active' ORDER BY created_at DESC"
         )
         .all(elderId) as any[];
       return rows.map(mapMemory);
     },
-    countByElder(elderId: string): number {
-      const row = raw
-        .prepare("SELECT COUNT(*) AS n FROM memories WHERE elder_id = ? AND status = 'active'")
+    async countByElder(elderId: string): Promise<number> {
+      const row = await sql.prepare("SELECT COUNT(*) AS n FROM memories WHERE elder_id = ? AND status = 'active'")
         .get(elderId) as any;
       return Number(row?.n ?? 0);
     },
-    countByElderSince(elderId: string, sinceTs: number): number {
-      const row = raw
-        .prepare(
+    async countByElderSince(elderId: string, sinceTs: number): Promise<number> {
+      const row = await sql.prepare(
           "SELECT COUNT(*) AS n FROM memories WHERE elder_id = ? AND status = 'active' AND created_at >= ?"
         )
         .get(elderId, sinceTs) as any;
       return Number(row?.n ?? 0);
     },
-    getById(id: string): DbMemory | null {
-      const row = raw.prepare("SELECT * FROM memories WHERE id = ?").get(id) as any;
+    async getById(id: string): Promise<DbMemory | null> {
+      const row = await sql.prepare("SELECT * FROM memories WHERE id = ?").get(id) as any;
       return row ? mapMemory(row) : null;
     },
-    update(
+    async update(
       id: string,
       patch: Partial<
         Pick<
@@ -1207,16 +1169,15 @@ export function createDb(dbPath: string, options: CreateDbOptions) {
           | "consent"
         >
       >
-    ): DbMemory | null {
-      const current = memories.getById(id);
+    ): Promise<DbMemory | null> {
+      const current = await memories.getById(id);
       if (!current) return null;
       const next = {
         ...current,
         ...Object.fromEntries(Object.entries(patch).filter(([, value]) => value !== undefined)),
         updatedAt: Date.now()
       } as DbMemory;
-      raw
-        .prepare(
+      await sql.prepare(
           `UPDATE memories SET title = ?, time_range = ?, place = ?, people_json = ?, tags_json = ?,
              photo_ids_json = ?, transcript_enc = ?, summary = ?, visibility = ?, consent = ?, updated_at = ?
            WHERE id = ?`
@@ -1235,45 +1196,41 @@ export function createDb(dbPath: string, options: CreateDbOptions) {
           next.updatedAt,
           id
         );
-      return memories.getById(id);
+      return await memories.getById(id);
     },
-    softDelete(id: string): void {
-      raw
-        .prepare("UPDATE memories SET status = 'deleted', deleted_at = ?, updated_at = ? WHERE id = ?")
+    async softDelete(id: string): Promise<void> {
+      await sql.prepare("UPDATE memories SET status = 'deleted', deleted_at = ?, updated_at = ? WHERE id = ?")
         .run(Date.now(), Date.now(), id);
     }
   };
 
   const storyBooks = {
-    ensureForElder(elderId: string, title = "我的人生故事"): DbStoryBook {
-      const existing = raw
-        .prepare("SELECT * FROM story_books WHERE elder_id = ? ORDER BY created_at ASC LIMIT 1")
+    async ensureForElder(elderId: string, title = "我的人生故事"): Promise<DbStoryBook> {
+      const existing = await sql.prepare("SELECT * FROM story_books WHERE elder_id = ? ORDER BY created_at ASC LIMIT 1")
         .get(elderId) as any;
       if (existing) return mapStoryBook(existing);
 
       const id = `sb_${randomUUID()}`;
       const now = Date.now();
-      raw
-        .prepare(
+      await sql.prepare(
           "INSERT INTO story_books (id, elder_id, title, cover_upload_id, share_token, created_at) VALUES (?, ?, ?, ?, ?, ?)"
         )
         .run(id, elderId, title, null, null, now);
       return { id, elderId, title, coverUploadId: null, shareToken: null, createdAt: now };
     },
-    getById(id: string): DbStoryBook | null {
-      const row = raw.prepare("SELECT * FROM story_books WHERE id = ?").get(id) as any;
+    async getById(id: string): Promise<DbStoryBook | null> {
+      const row = await sql.prepare("SELECT * FROM story_books WHERE id = ?").get(id) as any;
       return row ? mapStoryBook(row) : null;
     },
-    getByElder(elderId: string): DbStoryBook | null {
-      const row = raw
-        .prepare("SELECT * FROM story_books WHERE elder_id = ? ORDER BY created_at ASC LIMIT 1")
+    async getByElder(elderId: string): Promise<DbStoryBook | null> {
+      const row = await sql.prepare("SELECT * FROM story_books WHERE elder_id = ? ORDER BY created_at ASC LIMIT 1")
         .get(elderId) as any;
       return row ? mapStoryBook(row) : null;
     }
   };
 
   const storyChapters = {
-    create(input: {
+    async create(input: {
       bookId: string;
       title: string;
       memoryIds: string[];
@@ -1281,11 +1238,10 @@ export function createDb(dbPath: string, options: CreateDbOptions) {
       orderIndex: number;
       status?: string;
       fidelity?: StoryFidelity | null;
-    }): DbStoryChapter {
+    }): Promise<DbStoryChapter> {
       const id = `ch_${randomUUID()}`;
       const now = Date.now();
-      raw
-        .prepare(
+      await sql.prepare(
           `INSERT INTO story_chapters
             (id, book_id, title, memory_ids_json, content, audio_url, order_index, status, family_notes_enc, fidelity_json, created_at, updated_at)
            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
@@ -1304,32 +1260,30 @@ export function createDb(dbPath: string, options: CreateDbOptions) {
           now,
           now
         );
-      return storyChapters.getById(id)!;
+      return (await storyChapters.getById(id))!;
     },
-    getById(id: string): DbStoryChapter | null {
-      const row = raw.prepare("SELECT * FROM story_chapters WHERE id = ?").get(id) as any;
+    async getById(id: string): Promise<DbStoryChapter | null> {
+      const row = await sql.prepare("SELECT * FROM story_chapters WHERE id = ?").get(id) as any;
       return row ? mapStoryChapter(row) : null;
     },
-    listByBook(bookId: string): DbStoryChapter[] {
-      const rows = raw
-        .prepare("SELECT * FROM story_chapters WHERE book_id = ? ORDER BY order_index ASC")
+    async listByBook(bookId: string): Promise<DbStoryChapter[]> {
+      const rows = await sql.prepare("SELECT * FROM story_chapters WHERE book_id = ? ORDER BY order_index ASC")
         .all(bookId) as any[];
       return rows.map(mapStoryChapter);
     }
   };
 
   const interviews = {
-    create(input: {
+    async create(input: {
       elderId: string;
       topic: string | null;
       photoId: string | null;
       maxTurns: number;
       questions: string[];
-    }): DbInterview {
+    }): Promise<DbInterview> {
       const id = `iv_${randomUUID()}`;
       const now = Date.now();
-      raw
-        .prepare(
+      await sql.prepare(
           `INSERT INTO interviews
             (id, elder_id, topic, photo_id, turn, max_turns, status, transcript_json, current_question, created_at, updated_at)
            VALUES (?, ?, ?, ?, 1, ?, 'asking', '[]', ?, ?, ?)`
@@ -1344,25 +1298,24 @@ export function createDb(dbPath: string, options: CreateDbOptions) {
           now,
           now
         );
-      return interviews.get(id)!;
+      return (await interviews.get(id))!;
     },
-    get(id: string): DbInterview | null {
-      const row = raw.prepare("SELECT * FROM interviews WHERE id = ?").get(id) as any;
+    async get(id: string): Promise<DbInterview | null> {
+      const row = await sql.prepare("SELECT * FROM interviews WHERE id = ?").get(id) as any;
       return row ? mapInterview(row) : null;
     },
-    update(
+    async update(
       id: string,
       patch: { turn?: number; transcript?: InterviewQA[]; currentQuestion?: string | null; status?: string }
-    ): DbInterview | null {
-      const current = interviews.get(id);
+    ): Promise<DbInterview | null> {
+      const current = await interviews.get(id);
       if (!current) return null;
       const next = {
         ...current,
         ...Object.fromEntries(Object.entries(patch).filter(([, value]) => value !== undefined)),
         updatedAt: Date.now()
       } as DbInterview;
-      raw
-        .prepare(
+      await sql.prepare(
           "UPDATE interviews SET turn = ?, transcript_json = ?, current_question = ?, status = ?, updated_at = ? WHERE id = ?"
         )
         .run(
@@ -1373,32 +1326,30 @@ export function createDb(dbPath: string, options: CreateDbOptions) {
           next.updatedAt,
           id
         );
-      return interviews.get(id);
+      return await interviews.get(id);
     }
   };
 
   const geofences = {
-    listByElder(elderId: string): DbGeofence[] {
-      const rows = raw
-        .prepare("SELECT * FROM geofences WHERE elder_id = ? AND active = 1 ORDER BY created_at ASC")
+    async listByElder(elderId: string): Promise<DbGeofence[]> {
+      const rows = await sql.prepare("SELECT * FROM geofences WHERE elder_id = ? AND active = 1 ORDER BY created_at ASC")
         .all(elderId) as any[];
       return rows.map(mapGeofence);
     },
-    getById(id: string): DbGeofence | null {
-      const row = raw.prepare("SELECT * FROM geofences WHERE id = ?").get(id) as any;
+    async getById(id: string): Promise<DbGeofence | null> {
+      const row = await sql.prepare("SELECT * FROM geofences WHERE id = ?").get(id) as any;
       return row ? mapGeofence(row) : null;
     },
-    create(input: {
+    async create(input: {
       elderId: string;
       name: string;
       shape: GeofenceShape;
       notifyOn?: string[];
       schedule?: unknown;
-    }): DbGeofence {
+    }): Promise<DbGeofence> {
       const id = `gf_${randomUUID()}`;
       const now = Date.now();
-      raw
-        .prepare(
+      await sql.prepare(
           `INSERT INTO geofences
             (id, elder_id, name, shape_json, schedule_json, notify_on_json, active, created_at, updated_at)
            VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?)`
@@ -1413,9 +1364,9 @@ export function createDb(dbPath: string, options: CreateDbOptions) {
           now,
           now
         );
-      return geofences.getById(id)!;
+      return (await geofences.getById(id))!;
     },
-    update(
+    async update(
       id: string,
       patch: Partial<{
         name: string;
@@ -1424,15 +1375,14 @@ export function createDb(dbPath: string, options: CreateDbOptions) {
         schedule: unknown;
         active: boolean;
       }>
-    ): DbGeofence | null {
-      const current = geofences.getById(id);
+    ): Promise<DbGeofence | null> {
+      const current = await geofences.getById(id);
       if (!current) return null;
       const next = {
         ...current,
         ...Object.fromEntries(Object.entries(patch).filter(([, value]) => value !== undefined))
       } as DbGeofence;
-      raw
-        .prepare(
+      await sql.prepare(
           `UPDATE geofences SET name = ?, shape_json = ?, schedule_json = ?, notify_on_json = ?, active = ?, updated_at = ? WHERE id = ?`
         )
         .run(
@@ -1444,24 +1394,23 @@ export function createDb(dbPath: string, options: CreateDbOptions) {
           Date.now(),
           id
         );
-      return geofences.getById(id);
+      return await geofences.getById(id);
     },
-    remove(id: string): void {
-      raw.prepare("DELETE FROM geofences WHERE id = ?").run(id);
+    async remove(id: string): Promise<void> {
+      await sql.prepare("DELETE FROM geofences WHERE id = ?").run(id);
     }
   };
 
   const safetyAlerts = {
-    create(input: {
+    async create(input: {
       elderId: string;
       type: string;
       level: string;
       payload: unknown;
-    }): DbSafetyAlert {
+    }): Promise<DbSafetyAlert> {
       const id = `al_${randomUUID()}`;
       const now = Date.now();
-      raw
-        .prepare(
+      await sql.prepare(
           `INSERT INTO safety_alerts (id, elder_id, type, level, payload_json, status, created_at)
            VALUES (?, ?, ?, ?, ?, 'open', ?)`
         )
@@ -1476,54 +1425,47 @@ export function createDb(dbPath: string, options: CreateDbOptions) {
         createdAt: now
       };
     },
-    getById(id: string): DbSafetyAlert | null {
-      const row = raw.prepare("SELECT * FROM safety_alerts WHERE id = ?").get(id) as any;
+    async getById(id: string): Promise<DbSafetyAlert | null> {
+      const row = await sql.prepare("SELECT * FROM safety_alerts WHERE id = ?").get(id) as any;
       return row ? mapAlert(row) : null;
     },
-    updatePayload(id: string, payload: unknown): DbSafetyAlert | null {
-      raw
-        .prepare("UPDATE safety_alerts SET payload_json = ? WHERE id = ?")
+    async updatePayload(id: string, payload: unknown): Promise<DbSafetyAlert | null> {
+      await sql.prepare("UPDATE safety_alerts SET payload_json = ? WHERE id = ?")
         .run(JSON.stringify(payload), id);
-      return safetyAlerts.getById(id);
+      return await safetyAlerts.getById(id);
     },
-    listByElder(elderId: string, status?: string): DbSafetyAlert[] {
+    async listByElder(elderId: string, status?: string): Promise<DbSafetyAlert[]> {
       const rows = status
-        ? (raw
-            .prepare(
+        ? (await sql.prepare(
               "SELECT * FROM safety_alerts WHERE elder_id = ? AND status = ? ORDER BY created_at DESC LIMIT 50"
             )
             .all(elderId, status) as any[])
-        : (raw
-            .prepare(
+        : (await sql.prepare(
               "SELECT * FROM safety_alerts WHERE elder_id = ? ORDER BY created_at DESC LIMIT 50"
             )
             .all(elderId) as any[]);
       return rows.map(mapAlert);
     },
-    listOpen(limit = 10): DbSafetyAlert[] {
-      const rows = raw
-        .prepare(
+    async listOpen(limit = 10): Promise<DbSafetyAlert[]> {
+      const rows = await sql.prepare(
           "SELECT * FROM safety_alerts WHERE status = 'open' ORDER BY created_at DESC LIMIT ?"
         )
         .all(Math.max(1, Math.min(limit, 50))) as any[];
       return rows.map(mapAlert);
     },
-    ack(id: string, status: string): void {
-      raw
-        .prepare("UPDATE safety_alerts SET status = ?, handled_at = ? WHERE id = ?")
+    async ack(id: string, status: string): Promise<void> {
+      await sql.prepare("UPDATE safety_alerts SET status = ?, handled_at = ? WHERE id = ?")
         .run(status, Date.now(), id);
     },
-    hasRecent(elderId: string, type: string, sinceTs: number): boolean {
-      const row = raw
-        .prepare(
+    async hasRecent(elderId: string, type: string, sinceTs: number): Promise<boolean> {
+      const row = await sql.prepare(
           "SELECT COUNT(*) AS n FROM safety_alerts WHERE elder_id = ? AND type = ? AND created_at >= ?"
         )
         .get(elderId, type, sinceTs) as any;
       return Number(row?.n ?? 0) > 0;
     },
-    deleteHandledBefore(ts: number): number {
-      const result = raw
-        .prepare(
+    async deleteHandledBefore(ts: number): Promise<number> {
+      const result = await sql.prepare(
           "DELETE FROM safety_alerts WHERE created_at < ? AND status IN ('ack', 'resolved')"
         )
         .run(ts);
@@ -1532,7 +1474,7 @@ export function createDb(dbPath: string, options: CreateDbOptions) {
   };
 
   const missingPosters = {
-    create(input: {
+    async create(input: {
       elderId: string;
       lastSeenText: string;
       lastSeenTs: number | null;
@@ -1541,11 +1483,10 @@ export function createDb(dbPath: string, options: CreateDbOptions) {
       shareToken: string;
       expiresAt: number;
       photoUploadId?: string | null;
-    }): DbMissingPoster {
+    }): Promise<DbMissingPoster> {
       const id = `mp_${randomUUID()}`;
       const now = Date.now();
-      raw
-        .prepare(
+      await sql.prepare(
           `INSERT INTO missing_posters
             (id, elder_id, last_seen_text_enc, last_seen_ts, clothing_enc, photo_upload_id, contact_enc, image_url, share_token, expires_at, status, created_at)
            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', ?)`
@@ -1563,11 +1504,10 @@ export function createDb(dbPath: string, options: CreateDbOptions) {
           input.expiresAt,
           now
         );
-      return missingPosters.getByToken(input.shareToken)!;
+      return (await missingPosters.getByToken(input.shareToken))!;
     },
-    getByToken(token: string): DbMissingPoster | null {
-      const row = raw
-        .prepare(
+    async getByToken(token: string): Promise<DbMissingPoster | null> {
+      const row = await sql.prepare(
           `SELECT p.*, e.display_name AS elder_name, e.birth_year
            FROM missing_posters p
            JOIN elders e ON e.id = p.elder_id
@@ -1576,24 +1516,23 @@ export function createDb(dbPath: string, options: CreateDbOptions) {
         .get(token) as any;
       return row ? mapPoster(row) : null;
     },
-    deleteExpiredBefore(ts: number): number {
-      const result = raw.prepare("DELETE FROM missing_posters WHERE expires_at < ?").run(ts);
+    async deleteExpiredBefore(ts: number): Promise<number> {
+      const result = await sql.prepare("DELETE FROM missing_posters WHERE expires_at < ?").run(ts);
       return Number(result.changes ?? 0);
     }
   };
 
   const medicationLogs = {
-    create(input: {
+    async create(input: {
       medicationId: string;
       elderId: string;
       status: "taken" | "skipped" | "late";
       scheduledTime?: string | null;
       ts?: number;
-    }): DbMedicationLog {
+    }): Promise<DbMedicationLog> {
       const id = `ml_${randomUUID()}`;
       const ts = input.ts ?? Date.now();
-      raw
-        .prepare(
+      await sql.prepare(
           `INSERT INTO medication_logs (id, medication_id, elder_id, status, scheduled_time, ts)
            VALUES (?, ?, ?, ?, ?, ?)`
         )
@@ -1614,9 +1553,8 @@ export function createDb(dbPath: string, options: CreateDbOptions) {
         ts
       };
     },
-    listByElder(elderId: string, from: number, to: number): DbMedicationLog[] {
-      const rows = raw
-        .prepare(
+    async listByElder(elderId: string, from: number, to: number): Promise<DbMedicationLog[]> {
+      const rows = await sql.prepare(
           "SELECT * FROM medication_logs WHERE elder_id = ? AND ts >= ? AND ts <= ? ORDER BY ts DESC"
         )
         .all(elderId, from, to) as any[];
@@ -1647,31 +1585,30 @@ export function createDb(dbPath: string, options: CreateDbOptions) {
   }
 
   const roleplaySessions = {
-    create(input: {
+    async create(input: {
       elderId: string;
       scenarioId: string;
       maxTurns: number;
       opener: string;
-    }): DbRoleplaySession {
+    }): Promise<DbRoleplaySession> {
       const id = `rp_${randomUUID()}`;
       const now = Date.now();
       const messages: RoleplayMessage[] = [
         { role: "scammer", text: input.opener, ts: now }
       ];
-      raw
-        .prepare(
+      await sql.prepare(
           `INSERT INTO roleplay_sessions
             (id, elder_id, scenario_id, status, turn, max_turns, messages_json, report_json, created_at, updated_at)
            VALUES (?, ?, ?, 'active', 1, ?, ?, NULL, ?, ?)`
         )
         .run(id, input.elderId, input.scenarioId, input.maxTurns, JSON.stringify(messages), now, now);
-      return roleplaySessions.get(id)!;
+      return (await roleplaySessions.get(id))!;
     },
-    get(id: string): DbRoleplaySession | null {
-      const row = raw.prepare("SELECT * FROM roleplay_sessions WHERE id = ?").get(id) as any;
+    async get(id: string): Promise<DbRoleplaySession | null> {
+      const row = await sql.prepare("SELECT * FROM roleplay_sessions WHERE id = ?").get(id) as any;
       return row ? mapRoleplay(row) : null;
     },
-    update(
+    async update(
       id: string,
       patch: {
         status?: string;
@@ -1679,16 +1616,15 @@ export function createDb(dbPath: string, options: CreateDbOptions) {
         messages?: RoleplayMessage[];
         report?: unknown;
       }
-    ): DbRoleplaySession | null {
-      const current = roleplaySessions.get(id);
+    ): Promise<DbRoleplaySession | null> {
+      const current = await roleplaySessions.get(id);
       if (!current) return null;
       const next = {
         ...current,
         ...Object.fromEntries(Object.entries(patch).filter(([, value]) => value !== undefined)),
         updatedAt: Date.now()
       } as DbRoleplaySession;
-      raw
-        .prepare(
+      await sql.prepare(
           "UPDATE roleplay_sessions SET status = ?, turn = ?, messages_json = ?, report_json = ?, updated_at = ? WHERE id = ?"
         )
         .run(
@@ -1699,14 +1635,13 @@ export function createDb(dbPath: string, options: CreateDbOptions) {
           next.updatedAt,
           id
         );
-      return roleplaySessions.get(id);
+      return await roleplaySessions.get(id);
     }
   };
 
   const evalCases = {
-    upsert(input: { id: string; module: string; question: string; expected: unknown }): void {
-      raw
-        .prepare(
+    async upsert(input: { id: string; module: string; question: string; expected: unknown }): Promise<void> {
+      await sql.prepare(
           `INSERT INTO eval_cases (id, module, question, expected_json, created_at)
            VALUES (?, ?, ?, ?, ?)
            ON CONFLICT(id) DO UPDATE SET
@@ -1722,12 +1657,11 @@ export function createDb(dbPath: string, options: CreateDbOptions) {
           Date.now()
         );
     },
-    list(module?: string): DbEvalCase[] {
+    async list(module?: string): Promise<DbEvalCase[]> {
       const rows = module
-        ? (raw
-            .prepare("SELECT * FROM eval_cases WHERE module = ? ORDER BY id ASC")
+        ? (await sql.prepare("SELECT * FROM eval_cases WHERE module = ? ORDER BY id ASC")
             .all(module) as any[])
-        : (raw.prepare("SELECT * FROM eval_cases ORDER BY module ASC, id ASC").all() as any[]);
+        : (await sql.prepare("SELECT * FROM eval_cases ORDER BY module ASC, id ASC").all() as any[]);
       return rows.map((row) => ({
         id: String(row.id),
         module: String(row.module),
@@ -1739,27 +1673,23 @@ export function createDb(dbPath: string, options: CreateDbOptions) {
   };
 
   const evalRuns = {
-    start(): string {
+    async start(): Promise<string> {
       const id = `er_${randomUUID()}`;
-      raw
-        .prepare("INSERT INTO eval_runs (id, started_at, finished_at, metrics_json) VALUES (?, ?, NULL, NULL)")
+      await sql.prepare("INSERT INTO eval_runs (id, started_at, finished_at, metrics_json) VALUES (?, ?, NULL, NULL)")
         .run(id, Date.now());
       return id;
     },
-    finish(id: string, metrics: unknown): void {
-      raw
-        .prepare("UPDATE eval_runs SET finished_at = ?, metrics_json = ? WHERE id = ?")
+    async finish(id: string, metrics: unknown): Promise<void> {
+      await sql.prepare("UPDATE eval_runs SET finished_at = ?, metrics_json = ? WHERE id = ?")
         .run(Date.now(), JSON.stringify(metrics ?? null), id);
     },
-    latest(): DbEvalRun | null {
-      const row = raw
-        .prepare("SELECT * FROM eval_runs ORDER BY started_at DESC LIMIT 1")
+    async latest(): Promise<DbEvalRun | null> {
+      const row = await sql.prepare("SELECT * FROM eval_runs ORDER BY started_at DESC LIMIT 1")
         .get() as any;
       return row ? mapEvalRun(row) : null;
     },
-    list(limit = 10): DbEvalRun[] {
-      const rows = raw
-        .prepare("SELECT * FROM eval_runs ORDER BY started_at DESC LIMIT ?")
+    async list(limit = 10): Promise<DbEvalRun[]> {
+      const rows = await sql.prepare("SELECT * FROM eval_runs ORDER BY started_at DESC LIMIT ?")
         .all(limit) as any[];
       return rows.map(mapEvalRun);
     }
@@ -1793,7 +1723,7 @@ export function createDb(dbPath: string, options: CreateDbOptions) {
   }
 
   const agentTraces = {
-    create(input: {
+    async create(input: {
       elderId: string;
       userId: string;
       agent: string;
@@ -1805,11 +1735,10 @@ export function createDb(dbPath: string, options: CreateDbOptions) {
       citations: AgentCitation[];
       model: string;
       latencyMs: number;
-    }): DbAgentTrace {
+    }): Promise<DbAgentTrace> {
       const id = `tr_${randomUUID()}`;
       const now = Date.now();
-      raw
-        .prepare(
+      await sql.prepare(
           `INSERT INTO agent_traces
             (id, elder_id, user_id, agent, trigger, goal, status, decision_json, steps_json,
              citations_json, model, latency_ms, created_at)
@@ -1830,22 +1759,21 @@ export function createDb(dbPath: string, options: CreateDbOptions) {
           input.latencyMs,
           now
         );
-      return agentTraces.getById(id)!;
+      return (await agentTraces.getById(id))!;
     },
-    getById(id: string): DbAgentTrace | null {
-      const row = raw.prepare("SELECT * FROM agent_traces WHERE id = ?").get(id) as any;
+    async getById(id: string): Promise<DbAgentTrace | null> {
+      const row = await sql.prepare("SELECT * FROM agent_traces WHERE id = ?").get(id) as any;
       return row ? mapAgentTrace(row) : null;
     },
-    listByElder(elderId: string, limit = 20): DbAgentTrace[] {
-      const rows = raw
-        .prepare(
+    async listByElder(elderId: string, limit = 20): Promise<DbAgentTrace[]> {
+      const rows = await sql.prepare(
           "SELECT * FROM agent_traces WHERE elder_id = ? ORDER BY created_at DESC LIMIT ?"
         )
         .all(elderId, Math.max(1, Math.min(limit, 50))) as any[];
       return rows.map(mapAgentTrace);
     },
-    deleteBefore(ts: number): number {
-      const result = raw.prepare("DELETE FROM agent_traces WHERE created_at < ?").run(ts);
+    async deleteBefore(ts: number): Promise<number> {
+      const result = await sql.prepare("DELETE FROM agent_traces WHERE created_at < ?").run(ts);
       return Number(result.changes ?? 0);
     }
   };
@@ -1871,14 +1799,13 @@ export function createDb(dbPath: string, options: CreateDbOptions) {
   }
 
   const agentBriefs = {
-    upsert(input: {
+    async upsert(input: {
       elderId: string;
       briefDate: string;
       content: AgentBriefContent;
-    }): DbAgentBrief {
+    }): Promise<DbAgentBrief> {
       const now = Date.now();
-      raw
-        .prepare(
+      await sql.prepare(
           `INSERT INTO agent_briefs (id, elder_id, brief_date, content_json, created_at, updated_at)
            VALUES (?, ?, ?, ?, ?, ?)
            ON CONFLICT(elder_id, brief_date) DO UPDATE SET
@@ -1893,16 +1820,15 @@ export function createDb(dbPath: string, options: CreateDbOptions) {
           now,
           now
         );
-      return agentBriefs.getByDate(input.elderId, input.briefDate)!;
+      return (await agentBriefs.getByDate(input.elderId, input.briefDate))!;
     },
-    getByDate(elderId: string, briefDate: string): DbAgentBrief | null {
-      const row = raw
-        .prepare("SELECT * FROM agent_briefs WHERE elder_id = ? AND brief_date = ?")
+    async getByDate(elderId: string, briefDate: string): Promise<DbAgentBrief | null> {
+      const row = await sql.prepare("SELECT * FROM agent_briefs WHERE elder_id = ? AND brief_date = ?")
         .get(elderId, briefDate) as any;
       return row ? mapAgentBrief(row) : null;
     },
-    deleteBefore(date: string): number {
-      const result = raw.prepare("DELETE FROM agent_briefs WHERE brief_date < ?").run(date);
+    async deleteBefore(date: string): Promise<number> {
+      const result = await sql.prepare("DELETE FROM agent_briefs WHERE brief_date < ?").run(date);
       return Number(result.changes ?? 0);
     }
   };
@@ -1927,13 +1853,12 @@ export function createDb(dbPath: string, options: CreateDbOptions) {
   }
 
   const memoryProfiles = {
-    upsert(input: {
+    async upsert(input: {
       elderId: string;
       profile: MemoryProfile;
       sourceCount: number;
-    }): DbMemoryProfile {
-      raw
-        .prepare(
+    }): Promise<DbMemoryProfile> {
+      await sql.prepare(
           `INSERT INTO memory_profiles (elder_id, profile_json, source_count, updated_at)
            VALUES (?, ?, ?, ?)
            ON CONFLICT(elder_id) DO UPDATE SET
@@ -1942,16 +1867,16 @@ export function createDb(dbPath: string, options: CreateDbOptions) {
              updated_at = excluded.updated_at`
         )
         .run(input.elderId, JSON.stringify(input.profile), input.sourceCount, Date.now());
-      return memoryProfiles.getByElder(input.elderId)!;
+      return (await memoryProfiles.getByElder(input.elderId))!;
     },
-    getByElder(elderId: string): DbMemoryProfile | null {
-      const row = raw.prepare("SELECT * FROM memory_profiles WHERE elder_id = ?").get(elderId) as any;
+    async getByElder(elderId: string): Promise<DbMemoryProfile | null> {
+      const row = await sql.prepare("SELECT * FROM memory_profiles WHERE elder_id = ?").get(elderId) as any;
       return row ? mapMemoryProfile(row) : null;
     }
   };
 
   return {
-    raw,
+    sql,
     users,
     elders,
     sessions,
@@ -1978,8 +1903,8 @@ export function createDb(dbPath: string, options: CreateDbOptions) {
     agentTraces,
     agentBriefs,
     memoryProfiles,
-    close: () => raw.close()
+    close: () => sql.close()
   };
 }
 
-export type AppDb = ReturnType<typeof createDb>;
+export type AppDb = Awaited<ReturnType<typeof createDb>>;

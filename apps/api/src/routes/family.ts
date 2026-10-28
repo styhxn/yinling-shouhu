@@ -12,10 +12,10 @@ export const familyRoutes: FastifyPluginAsync = async (server) => {
   server.get("/summary", { preHandler: requireAuth }, async (req, reply) => {
     const query = QuerySchema.safeParse(req.query);
     if (!query.success) return reply.code(400).send({ error: "invalid_body" });
-    const elderId = resolveElderId(req, query.data.elderId);
+    const elderId = await resolveElderId(req, query.data.elderId);
     if (!elderId) return reply.code(403).send({ error: "forbidden" });
     try {
-      return { ok: true, summary: family.summary(elderId) };
+      return { ok: true, summary: await family.summary(elderId) };
     } catch {
       return reply.code(404).send({ error: "not_found" });
     }
@@ -24,10 +24,10 @@ export const familyRoutes: FastifyPluginAsync = async (server) => {
   server.get("/report/weekly", { preHandler: requireAuth }, async (req, reply) => {
     const query = QuerySchema.safeParse(req.query);
     if (!query.success) return reply.code(400).send({ error: "invalid_body" });
-    const elderId = resolveElderId(req, query.data.elderId);
+    const elderId = await resolveElderId(req, query.data.elderId);
     if (!elderId) return reply.code(403).send({ error: "forbidden" });
     try {
-      return { ok: true, report: family.weeklyReport(elderId) };
+      return { ok: true, report: await family.weeklyReport(elderId) };
     } catch {
       return reply.code(404).send({ error: "not_found" });
     }

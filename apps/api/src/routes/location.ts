@@ -127,24 +127,24 @@ export const locationRoutes: FastifyPluginAsync = async (server) => {
   server.get("/geofence", { preHandler: requireAuth }, async (req, reply) => {
     const query = TimeRangeSchema.safeParse(req.query);
     if (!query.success) return reply.code(400).send({ error: "invalid_body" });
-    const elderId = resolveElderId(req, query.data.elderId);
+    const elderId = await resolveElderId(req, query.data.elderId);
     if (!elderId) return reply.code(403).send({ error: "forbidden" });
-    return { items: server.db.geofences.listByElder(elderId) };
+    return { items: await server.db.geofences.listByElder(elderId) };
   });
 
   server.post("/geofence", { preHandler: requireAuth }, async (req, reply) => {
     const parsed = GeofenceCreateSchema.safeParse(req.body);
     if (!parsed.success) return reply.code(400).send({ error: "invalid_body" });
-    const elderId = resolveElderId(req, parsed.data.elderId);
+    const elderId = await resolveElderId(req, parsed.data.elderId);
     if (!elderId) return reply.code(403).send({ error: "forbidden" });
-    const geofence = server.db.geofences.create({
+    const geofence = await server.db.geofences.create({
       elderId,
       name: parsed.data.name,
       shape: parsed.data.shape,
       ...(parsed.data.notifyOn ? { notifyOn: parsed.data.notifyOn } : {}),
       ...(typeof parsed.data.schedule !== "undefined" ? { schedule: parsed.data.schedule } : {})
     });
-    server.db.auditLogs.insert({
+    await server.db.auditLogs.insert({
       userId: req.user!.userId,
       action: "geofence.create",
       targetType: "geofence",
@@ -158,11 +158,11 @@ export const locationRoutes: FastifyPluginAsync = async (server) => {
     const params = z.object({ id: z.string().min(1).max(80) }).safeParse(req.params);
     const body = GeofenceUpdateSchema.safeParse(req.body);
     if (!params.success || !body.success) return reply.code(400).send({ error: "invalid_body" });
-    const current = server.db.geofences.getById(params.data.id);
+    const current = await server.db.geofences.getById(params.data.id);
     if (!current) return reply.code(404).send({ error: "not_found" });
-    const elderId = resolveElderId(req, current.elderId);
+    const elderId = await resolveElderId(req, current.elderId);
     if (elderId !== current.elderId) return reply.code(403).send({ error: "forbidden" });
-    const geofence = server.db.geofences.update(
+    const geofence = await server.db.geofences.update(
       current.id,
       body.data as Parameters<typeof server.db.geofences.update>[1]
     );
@@ -172,18 +172,18 @@ export const locationRoutes: FastifyPluginAsync = async (server) => {
   server.delete("/geofence/:id", { preHandler: requireAuth }, async (req, reply) => {
     const params = z.object({ id: z.string().min(1).max(80) }).safeParse(req.params);
     if (!params.success) return reply.code(400).send({ error: "invalid_body" });
-    const current = server.db.geofences.getById(params.data.id);
+    const current = await server.db.geofences.getById(params.data.id);
     if (!current) return reply.code(404).send({ error: "not_found" });
-    const elderId = resolveElderId(req, current.elderId);
+    const elderId = await resolveElderId(req, current.elderId);
     if (elderId !== current.elderId) return reply.code(403).send({ error: "forbidden" });
-    server.db.geofences.remove(current.id);
+    await server.db.geofences.remove(current.id);
     return { ok: true };
   });
 
   server.post("/location", { preHandler: requireAuth }, async (req, reply) => {
     const parsed = LocationSchema.safeParse(req.body);
     if (!parsed.success) return reply.code(400).send({ error: "invalid_body" });
-    const elderId = resolveElderId(req, parsed.data.elderId);
+    const elderId = await resolveElderId(req, parsed.data.elderId);
     if (!elderId) return reply.code(403).send({ error: "forbidden" });
 
     const point = {
@@ -194,25 +194,25 @@ export const locationRoutes: FastifyPluginAsync = async (server) => {
       source: parsed.data.source ?? "demo",
       ts: Date.now()
     };
-    server.db.locations.insert(point);
+    await server.db.locations.insert(point);
     server.eventBus.publish({
       type: "location.updated",
       ts: Date.now(),
       payload: { elderId, point }
     });
 
-    const geofences = server.db.geofences.listByElder(elderId);
+    const geofences = await server.db.geofences.listByElder(elderId);
     const inside = geofences.every((geofence) => isInsideGeofence(point, geofence.shape));
     const alerts = [];
 
     for (const geofence of geofences) {
       if (!geofence.notifyOn.includes("exit")) continue;
       if (isInsideGeofence(point, geofence.shape)) continue;
-      if (server.db.safetyAlerts.hasRecent(elderId, "geofence.exit", Date.now() - 5 * 60 * 1000)) {
+      if (await server.db.safetyAlerts.hasRecent(elderId, "geofence.exit", Date.now() - 5 * 60 * 1000)) {
         continue;
       }
       const distance = Math.round(distanceToGeofence(point, geofence.shape));
-      const alert = server.db.safetyAlerts.create({
+      const alert = await server.db.safetyAlerts.create({
         elderId,
         type: "geofence.exit",
         level: "critical",
@@ -237,28 +237,28 @@ export const locationRoutes: FastifyPluginAsync = async (server) => {
   server.get("/location/latest", { preHandler: requireAuth }, async (req, reply) => {
     const query = TimeRangeSchema.safeParse(req.query);
     if (!query.success) return reply.code(400).send({ error: "invalid_body" });
-    const elderId = resolveElderId(req, query.data.elderId);
+    const elderId = await resolveElderId(req, query.data.elderId);
     if (!elderId) return reply.code(403).send({ error: "forbidden" });
-    return { point: server.db.locations.latest(elderId) };
+    return { point: await server.db.locations.latest(elderId) };
   });
 
   server.get("/location/history", { preHandler: requireAuth }, async (req, reply) => {
     const query = TimeRangeSchema.safeParse(req.query);
     if (!query.success) return reply.code(400).send({ error: "invalid_body" });
-    const elderId = resolveElderId(req, query.data.elderId);
+    const elderId = await resolveElderId(req, query.data.elderId);
     if (!elderId) return reply.code(403).send({ error: "forbidden" });
     const to = query.data.to ?? Date.now();
     const from = query.data.from ?? to - 24 * 60 * 60 * 1000;
-    return { points: server.db.locations.history(elderId, from, to) };
+    return { points: await server.db.locations.history(elderId, from, to) };
   });
 
   server.get("/alerts", { preHandler: requireAuth }, async (req, reply) => {
     const query = AlertsQuerySchema.safeParse(req.query);
     if (!query.success) return reply.code(400).send({ error: "invalid_body" });
-    const elderId = resolveElderId(req, query.data.elderId);
+    const elderId = await resolveElderId(req, query.data.elderId);
     if (!elderId) return reply.code(403).send({ error: "forbidden" });
     return {
-      items: server.db.safetyAlerts.listByElder(elderId, query.data.status)
+      items: await server.db.safetyAlerts.listByElder(elderId, query.data.status)
     };
   });
 
@@ -266,14 +266,14 @@ export const locationRoutes: FastifyPluginAsync = async (server) => {
     const params = z.object({ id: z.string().min(1).max(80) }).safeParse(req.params);
     const body = AlertUpdateSchema.safeParse(req.body);
     if (!params.success || !body.success) return reply.code(400).send({ error: "invalid_body" });
-    const elderId = resolveElderId(req);
+    const elderId = await resolveElderId(req);
     if (!elderId) return reply.code(403).send({ error: "forbidden" });
-    const alerts = server.db.safetyAlerts.listByElder(elderId);
+    const alerts = await server.db.safetyAlerts.listByElder(elderId);
     const current = alerts.find((alert) => alert.id === params.data.id);
     if (!current) {
       return reply.code(404).send({ error: "not_found" });
     }
-    server.db.safetyAlerts.ack(params.data.id, body.data.status);
+    await server.db.safetyAlerts.ack(params.data.id, body.data.status);
     server.eventBus.publish({
       type: "safety.alert.updated",
       ts: Date.now(),
@@ -285,12 +285,12 @@ export const locationRoutes: FastifyPluginAsync = async (server) => {
   server.post("/missing-poster", { preHandler: requireAuth }, async (req, reply) => {
     const parsed = PosterSchema.safeParse(req.body);
     if (!parsed.success) return reply.code(400).send({ error: "invalid_body" });
-    const elderId = resolveElderId(req, parsed.data.elderId);
+    const elderId = await resolveElderId(req, parsed.data.elderId);
     if (!elderId) return reply.code(403).send({ error: "forbidden" });
 
     const token = crypto.randomUUID().replace(/-/g, "");
     const expiresAt = Date.now() + 24 * 60 * 60 * 1000;
-    const poster = server.db.missingPosters.create({
+    const poster = await server.db.missingPosters.create({
       elderId,
       lastSeenText: parsed.data.lastSeenText,
       lastSeenTs: parsed.data.lastSeenTs ?? Date.now(),
@@ -300,7 +300,7 @@ export const locationRoutes: FastifyPluginAsync = async (server) => {
       expiresAt,
       ...(parsed.data.photoId ? { photoUploadId: parsed.data.photoId } : {})
     });
-    server.db.auditLogs.insert({
+    await server.db.auditLogs.insert({
       userId: req.user!.userId,
       action: "missing_poster.create",
       targetType: "missing_poster",
@@ -320,7 +320,7 @@ export const locationRoutes: FastifyPluginAsync = async (server) => {
   server.get("/share/:token", async (req, reply) => {
     const params = z.object({ token: z.string().min(1).max(80) }).safeParse(req.params);
     if (!params.success) return reply.code(404).type("text/html").send("<h1>链接无效</h1>");
-    const poster = server.db.missingPosters.getByToken(params.data.token);
+    const poster = await server.db.missingPosters.getByToken(params.data.token);
     if (!poster || poster.expiresAt < Date.now()) {
       return reply
         .code(404)

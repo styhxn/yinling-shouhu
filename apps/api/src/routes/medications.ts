@@ -54,11 +54,11 @@ export const medicationRoutes: FastifyPluginAsync = async (server) => {
   server.get("/", { preHandler: requireAuth }, async (req, reply) => {
     const query = QuerySchema.safeParse(req.query);
     if (!query.success) return reply.code(400).send({ error: "invalid_body" });
-    const elderId = resolveElderId(req, query.data.elderId);
+    const elderId = await resolveElderId(req, query.data.elderId);
     if (!elderId) return reply.code(403).send({ error: "forbidden" });
 
-    const items = server.db.medications.listByElder(elderId);
-    const logs = server.db.medicationLogs.listByElder(elderId, startOfToday(), Date.now());
+    const items = await server.db.medications.listByElder(elderId);
+    const logs = await server.db.medicationLogs.listByElder(elderId, startOfToday(), Date.now());
     const due = items.reduce((count, med) => count + med.schedule.length, 0);
     const taken = logs.filter((log) => log.status === "taken").length;
     const logged = logs.length;
@@ -69,10 +69,10 @@ export const medicationRoutes: FastifyPluginAsync = async (server) => {
   server.post("/", { preHandler: requireAuth }, async (req, reply) => {
     const parsed = MedicationCreateSchema.safeParse(req.body);
     if (!parsed.success) return reply.code(400).send({ error: "invalid_body" });
-    const elderId = resolveElderId(req, parsed.data.elderId);
+    const elderId = await resolveElderId(req, parsed.data.elderId);
     if (!elderId) return reply.code(403).send({ error: "forbidden" });
 
-    const medication = server.db.medications.create({
+    const medication = await server.db.medications.create({
       elderId,
       name: parsed.data.name,
       ...(parsed.data.genericName ? { genericName: parsed.data.genericName } : {}),
@@ -88,11 +88,11 @@ export const medicationRoutes: FastifyPluginAsync = async (server) => {
     const params = IdParamsSchema.safeParse(req.params);
     const body = MedicationUpdateSchema.safeParse(req.body);
     if (!params.success || !body.success) return reply.code(400).send({ error: "invalid_body" });
-    const current = server.db.medications.getById(params.data.id);
+    const current = await server.db.medications.getById(params.data.id);
     if (!current) return reply.code(404).send({ error: "not_found" });
-    const elderId = resolveElderId(req, current.elderId);
+    const elderId = await resolveElderId(req, current.elderId);
     if (elderId !== current.elderId) return reply.code(403).send({ error: "forbidden" });
-    const medication = server.db.medications.update(
+    const medication = await server.db.medications.update(
       current.id,
       body.data as Parameters<typeof server.db.medications.update>[1]
     );
@@ -102,21 +102,21 @@ export const medicationRoutes: FastifyPluginAsync = async (server) => {
   server.delete("/:id", { preHandler: requireAuth }, async (req, reply) => {
     const params = IdParamsSchema.safeParse(req.params);
     if (!params.success) return reply.code(400).send({ error: "invalid_body" });
-    const current = server.db.medications.getById(params.data.id);
+    const current = await server.db.medications.getById(params.data.id);
     if (!current) return reply.code(404).send({ error: "not_found" });
-    const elderId = resolveElderId(req, current.elderId);
+    const elderId = await resolveElderId(req, current.elderId);
     if (elderId !== current.elderId) return reply.code(403).send({ error: "forbidden" });
-    server.db.medications.remove(current.id);
+    await server.db.medications.remove(current.id);
     return { ok: true };
   });
 
   server.post("/scan", { preHandler: requireAuth }, async (req, reply) => {
     const parsed = ScanSchema.safeParse(req.body);
     if (!parsed.success) return reply.code(400).send({ error: "invalid_body" });
-    const elderId = resolveElderId(req);
+    const elderId = await resolveElderId(req);
     if (!elderId) return reply.code(403).send({ error: "forbidden" });
 
-    const upload = server.db.uploads.getById(parsed.data.imageId);
+    const upload = await server.db.uploads.getById(parsed.data.imageId);
     if (!upload) return reply.code(404).send({ error: "not_found", message: "图片不存在" });
     if (upload.ownerUserId !== req.user!.userId && upload.elderId !== elderId) {
       return reply.code(403).send({ error: "forbidden" });
@@ -140,12 +140,12 @@ export const medicationRoutes: FastifyPluginAsync = async (server) => {
   server.post("/log", { preHandler: requireAuth }, async (req, reply) => {
     const parsed = LogSchema.safeParse(req.body);
     if (!parsed.success) return reply.code(400).send({ error: "invalid_body" });
-    const elderId = resolveElderId(req);
+    const elderId = await resolveElderId(req);
     if (!elderId) return reply.code(403).send({ error: "forbidden" });
-    const medication = server.db.medications.getById(parsed.data.medicationId);
+    const medication = await server.db.medications.getById(parsed.data.medicationId);
     if (!medication) return reply.code(404).send({ error: "not_found" });
     if (medication.elderId !== elderId) return reply.code(403).send({ error: "forbidden" });
-    const log = server.db.medicationLogs.create({
+    const log = await server.db.medicationLogs.create({
       medicationId: medication.id,
       elderId,
       status: parsed.data.status,
@@ -157,10 +157,10 @@ export const medicationRoutes: FastifyPluginAsync = async (server) => {
   server.get("/logs", { preHandler: requireAuth }, async (req, reply) => {
     const query = QuerySchema.safeParse(req.query);
     if (!query.success) return reply.code(400).send({ error: "invalid_body" });
-    const elderId = resolveElderId(req, query.data.elderId);
+    const elderId = await resolveElderId(req, query.data.elderId);
     if (!elderId) return reply.code(403).send({ error: "forbidden" });
     const to = query.data.to ?? Date.now();
     const from = query.data.from ?? to - 30 * 24 * 60 * 60 * 1000;
-    return { items: server.db.medicationLogs.listByElder(elderId, from, to) };
+    return { items: await server.db.medicationLogs.listByElder(elderId, from, to) };
   });
 };

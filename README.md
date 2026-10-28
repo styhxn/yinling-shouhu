@@ -3,7 +3,7 @@
 > 会倾听，也会守护的江苏长者 AI 陪伴系统。
 > 以 Agent 为“主脑”：页面是入口，AI 负责理解、计划、调工具、解释与主动守护。
 
-本仓库为“本地优先 + 可选云端”的前后端分离工程：`frontend/`（React + Vite，可独立交接）、`apps/api`（Fastify + TypeScript）、npm workspaces monorepo。现有能力包括适老化界面、Agent 工具调用、反诈鉴定与演练、记忆故事、用药照护、家属协同、MCP 工具与生产部署。
+本仓库为“本地优先 + 可选云端”的前后端分离工程：`frontend/`（React + Vite，可独立交接）、`apps/api`（Fastify + TypeScript）、npm workspaces monorepo。现有能力包括适老化界面、Agent 工具调用、反诈鉴定与演练、记忆故事、用药照护、家属协同、MCP 工具与生产部署。存储支持双轨：SQLite 零配置本地/离线运行，PostgreSQL 16 + pgvector 用于生产与答辩。
 
 ## 当前进度
 
@@ -25,6 +25,10 @@
   - 聊天、首页简报、守护告警统一展示「AI 决策轨迹」，可解释但只展示结构化依据，不暴露原始思维链。
   - 记忆画像从口述中提炼人物、地点、习惯、偏好与沟通注意点，进入聊天系统提示和简报。
   - 陪伴 / 守护 / 家属三类 Agent 使用不同提示词与工具子集；新增 Agent 轨迹评测（任务成功、工具覆盖、升级准确、轨迹完整）。
+- W7「工程存储」：
+  - 新增 `SqlClient` 驱动抽象，仓储层全部异步化，SQLite 与 PostgreSQL 共用一份迁移和业务代码。
+  - PostgreSQL 16 + pgvector 进入 Docker Compose，生产/答辩默认使用；反诈知识库支持向量语义检索，扩展不可用时自动回退内存打分。
+  - 新增 PGlite（WASM PostgreSQL）集成测试，覆盖共享迁移、演示种子与核心仓储；`docs/schema.sql` 与 `docs/schema.postgres.sql` 均由迁移代码生成。
 - 数字人静态资源来自 DH_live（MIT）；示例头像仅用于比赛演示，商业使用需遵循上游授权。
 - 待办：真实模型 Key 与在线演示环境、比赛视频/PDF、团队信息补全。
 
@@ -37,7 +41,8 @@
 - [后端开发文档](docs/后端开发文档.md)：数据层、Agent、RAG、安全、位置、用药、部署。
 - [部署与在线演示](docs/部署.md)：生产构建、Docker Compose、Nginx、数据库初始化、数据备份。
 - [AI 评测报告](docs/评测报告.md)：反诈、故事生成与 Agent 轨迹的用例、指标定义和复现方式。
-- [数据库表结构](docs/schema.sql)：SQLite 建表 SQL（由迁移代码生成，可手动执行）。
+- [SQLite 表结构](docs/schema.sql)：SQLite 建表 SQL（33 张表 + 21 个索引，由迁移代码生成，可手动执行）。
+- [PostgreSQL 表结构](docs/schema.postgres.sql)：PostgreSQL 16 + pgvector 建表 SQL（34 张表 + 21 个索引，含向量扩展）。
 - [MCP Server](apps/mcp-server/README.md)：把天气、用药、反诈、定位、围栏能力开放给外部 AI 助手。
 - [提交信息规范](docs/提交规范.md)：Conventional Commits + 中文改动详情模板。
 - [第三方开源声明](THIRD_PARTY_NOTICES.md)：DH_live / 数字人示例资源说明。
@@ -59,6 +64,15 @@ LLM_MOCK=1 DEMO_MODE=1 npm run dev -w apps/api
 
 演示登录：`POST /api/auth/demo-login`，body `{"role":"elder"}`。环境变量见 [apps/api/.env.example](apps/api/.env.example)。
 
+本地默认 SQLite，无需安装数据库。要使用 PostgreSQL 16 + pgvector，推荐直接启动 Compose（含数据库、健康检查与数据卷）：
+
+```bash
+# 根目录 .env 至少设置 SESSION_SECRET 与 POSTGRES_PASSWORD
+docker compose up -d --build
+```
+
+也可在本机数据库上设置 `DB_DRIVER=postgres`、`DATABASE_URL=postgres://user:password@127.0.0.1:5432/yinling` 后启动后端。
+
 ### 前端独立交接
 
 `frontend/` 已内置契约类型，不依赖仓库内其他 workspace，可单独复制或压缩后：
@@ -79,7 +93,7 @@ npm run build
 NODE_ENV=production SESSION_SECRET=change-me DEMO_MODE=1 npm run start -w apps/api
 ```
 
-后端会同时托管 `frontend/dist` 并提供 SPA 回退；也可使用 `docker compose up -d --build`。详见 [部署文档](docs/部署.md)。
+后端会同时托管 `frontend/dist` 并提供 SPA 回退。以上命令默认 SQLite；生产/答辩建议 `docker compose up -d --build`（PostgreSQL + pgvector），详见 [部署文档](docs/部署.md)。
 
 ### MCP Server
 

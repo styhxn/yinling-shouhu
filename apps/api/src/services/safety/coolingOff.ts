@@ -7,14 +7,14 @@ export type CoolingOffDeps = {
 };
 
 export function createCoolingOffService(deps: CoolingOffDeps) {
-  function start(input: {
+  async function start(input: {
     elderId: string;
     userId: string;
     amount?: number;
     counterparty?: string;
     reason?: string;
-  }): { coolingOff: DbCoolingOff; familyConfirm: DbFamilyConfirm } {
-    const familyConfirm = deps.db.familyConfirms.create({
+  }): Promise<{ coolingOff: DbCoolingOff; familyConfirm: DbFamilyConfirm }> {
+    const familyConfirm = await deps.db.familyConfirms.create({
       elderId: input.elderId,
       type: "transfer",
       payload: {
@@ -25,7 +25,7 @@ export function createCoolingOffService(deps: CoolingOffDeps) {
       }
     });
 
-    const coolingOff = deps.db.coolingOffs.create({
+    const coolingOff = await deps.db.coolingOffs.create({
       elderId: input.elderId,
       riskLevel: "high",
       questions: [
@@ -39,7 +39,7 @@ export function createCoolingOffService(deps: CoolingOffDeps) {
       familyConfirmId: familyConfirm.id
     });
 
-    const alert = deps.db.safetyAlerts.create({
+    const alert = await deps.db.safetyAlerts.create({
       elderId: input.elderId,
       type: "cooling_off",
       level: "critical",
@@ -60,8 +60,8 @@ export function createCoolingOffService(deps: CoolingOffDeps) {
     return { coolingOff, familyConfirm };
   }
 
-  function respond(input: { id: string; elderId: string; action: "cancel" | "continue" }): DbCoolingOff {
-    const coolingOff = deps.db.coolingOffs.get(input.id);
+  async function respond(input: { id: string; elderId: string; action: "cancel" | "continue" }): Promise<DbCoolingOff> {
+    const coolingOff = await deps.db.coolingOffs.get(input.id);
     if (!coolingOff || coolingOff.elderId !== input.elderId) {
       throw new Error("not_found");
     }
@@ -69,11 +69,11 @@ export function createCoolingOffService(deps: CoolingOffDeps) {
       throw new Error("already_responded");
     }
     if (input.action === "cancel") {
-      deps.db.coolingOffs.setStatus(input.id, "cancelled", "elder_cancelled");
+      await deps.db.coolingOffs.setStatus(input.id, "cancelled", "elder_cancelled");
     } else {
-      deps.db.coolingOffs.setStatus(input.id, "family_pending", "elder_requested_continue");
+      await deps.db.coolingOffs.setStatus(input.id, "family_pending", "elder_requested_continue");
     }
-    return deps.db.coolingOffs.get(input.id)!;
+    return (await deps.db.coolingOffs.get(input.id))!;
   }
 
   return { start, respond };

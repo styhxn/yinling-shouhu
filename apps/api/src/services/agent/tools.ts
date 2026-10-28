@@ -62,7 +62,7 @@ function requireElder(ctx: ToolContext): string {
   return ctx.elderId;
 }
 
-function formatMedications(items: ReturnType<AppDb["medications"]["listByElder"]>): string {
+function formatMedications(items: Awaited<ReturnType<AppDb["medications"]["listByElder"]>>): string {
   if (!items.length) return "还没有添加用药计划。";
   return items
     .map(
@@ -132,7 +132,7 @@ export function createToolRegistry(deps: ToolDeps): ToolRegistry {
       requiresConfirmation: false,
       async handler(_args, ctx) {
         const elderId = requireElder(ctx);
-        const items = deps.db.medications.listByElder(elderId);
+        const items = await deps.db.medications.listByElder(elderId);
         return {
           summary: formatMedications(items),
           data: items
@@ -161,7 +161,7 @@ export function createToolRegistry(deps: ToolDeps): ToolRegistry {
         const elderId = requireElder(ctx);
         const query: string = typeof args.query === "string" ? args.query.trim() : "";
         const limit: number = typeof args.limit === "number" ? args.limit : 3;
-        const items = deps.db.memories.listByElder(elderId);
+        const items = await deps.db.memories.listByElder(elderId);
         const compact = query.replace(/\s+/g, "").toLowerCase();
         const terms = new Set<string>();
         if (compact.length <= 8) terms.add(compact);
@@ -233,7 +233,7 @@ export function createToolRegistry(deps: ToolDeps): ToolRegistry {
       requiresConfirmation: false,
       async handler(_args, ctx) {
         const elderId = requireElder(ctx);
-        const record = deps.db.memoryProfiles.getByElder(elderId);
+        const record = await deps.db.memoryProfiles.getByElder(elderId);
         if (!record || !record.profile.summary || record.profile.summary.startsWith("还没有")) {
           return {
             summary: "还没有形成记忆画像。可以先完成一次记忆访谈。",
@@ -285,7 +285,7 @@ export function createToolRegistry(deps: ToolDeps): ToolRegistry {
         });
         const enriched = { ...result };
 
-        deps.db.scamChecks.insert({
+        await deps.db.scamChecks.insert({
           elderId: ctx.elderId ?? ctx.user.userId,
           inputType: args.inputType,
           inputText: typeof args.text === "string" ? args.text : null,
@@ -340,7 +340,7 @@ export function createToolRegistry(deps: ToolDeps): ToolRegistry {
       requiresConfirmation: true,
       async prepare(args, ctx) {
         const elderId = requireElder(ctx);
-        const created = deps.coolingOff.start({
+        const created = await deps.coolingOff.start({
           elderId,
           userId: ctx.user.userId,
           ...(typeof args.amount === "number" ? { amount: args.amount } : {}),
@@ -385,7 +385,7 @@ export function createToolRegistry(deps: ToolDeps): ToolRegistry {
       requiresConfirmation: false,
       async handler(_args, ctx) {
         const elderId = requireElder(ctx);
-        const latest = deps.location.latest(elderId);
+        const latest = await deps.location.latest(elderId);
         if (!latest) {
           return { summary: "还没有收到位置信息。可以先打电话确认，或让家属开启位置共享。" };
         }

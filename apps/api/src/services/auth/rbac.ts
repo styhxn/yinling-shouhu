@@ -18,12 +18,12 @@ export function requireRole(...roles: Role[]): preHandlerHookHandler {
   };
 }
 
-export function canAccessElder(req: FastifyRequest, elderId: string): boolean {
+export async function canAccessElder(req: FastifyRequest, elderId: string): Promise<boolean> {
   if (!req.user) return false;
   if (req.user.role === "admin") return true;
   if (req.user.role === "elder") return req.user.elderId === elderId;
   if (req.user.role === "family") {
-    const links = req.server.db.users.listFamilyLinks(req.user.userId);
+    const links = await req.server.db.users.listFamilyLinks(req.user.userId);
     return links.some((link) => link.elderId === elderId);
   }
   return false;
@@ -34,7 +34,7 @@ export function requireElderAccess(elderId: string): preHandlerHookHandler {
     if (!req.user) {
       return reply.code(401).send({ error: "unauthorized", message: "请先选择身份" });
     }
-    if (!canAccessElder(req, elderId)) {
+    if (!(await canAccessElder(req, elderId))) {
       return reply.code(403).send({ error: "forbidden", message: "无权访问该老人数据" });
     }
   };

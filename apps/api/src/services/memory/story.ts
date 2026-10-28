@@ -107,8 +107,7 @@ function applyFidelity(input: {
 export function createStoryService(db: AppDb, modelRouter: ModelRouter) {
   async function generate(input: { elderId: string; memoryIds: string[]; style?: string }) {
     const ids = Array.from(new Set(input.memoryIds));
-    const memories = ids
-      .map((id) => db.memories.getById(id))
+    const memories = (await Promise.all(ids.map((id) => db.memories.getById(id))))
       .filter(
         (memory): memory is DbMemory =>
           Boolean(memory) && memory!.elderId === input.elderId && memory!.status === "active"
@@ -116,7 +115,7 @@ export function createStoryService(db: AppDb, modelRouter: ModelRouter) {
 
     if (!memories.length) throw new Error("no_memories");
 
-    const book = db.storyBooks.ensureForElder(input.elderId);
+    const book = await db.storyBooks.ensureForElder(input.elderId);
     const fallbackTitle = memories[0]?.title ?? "我的一段回忆";
     const fallbackContent = memories
       .map((memory) => {
@@ -187,8 +186,8 @@ export function createStoryService(db: AppDb, modelRouter: ModelRouter) {
       // Keep the deterministic draft when the model is unavailable.
     }
 
-    const orderIndex = db.storyChapters.listByBook(book.id).length + 1;
-    const chapter = db.storyChapters.create({
+    const orderIndex = (await db.storyChapters.listByBook(book.id)).length + 1;
+    const chapter = await db.storyChapters.create({
       bookId: book.id,
       title,
       memoryIds: ids,
@@ -199,18 +198,18 @@ export function createStoryService(db: AppDb, modelRouter: ModelRouter) {
     return { chapter, book };
   }
 
-  function get(id: string) {
-    const chapter = db.storyChapters.getById(id);
+  async function get(id: string) {
+    const chapter = await db.storyChapters.getById(id);
     if (!chapter) return null;
-    const book = db.storyBooks.getById(chapter.bookId);
+    const book = await db.storyBooks.getById(chapter.bookId);
     return book ? { chapter, book } : null;
   }
 
-  function listByElder(elderId: string) {
-    const book = db.storyBooks.getByElder(elderId);
+  async function listByElder(elderId: string) {
+    const book = await db.storyBooks.getByElder(elderId);
     return {
       book,
-      chapters: book ? db.storyChapters.listByBook(book.id) : []
+      chapters: book ? await db.storyChapters.listByBook(book.id) : []
     };
   }
 

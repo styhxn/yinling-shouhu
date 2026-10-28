@@ -38,7 +38,7 @@ export function canReceiveEvent(
 }
 
 export const wsRoutes: FastifyPluginAsync = async (server) => {
-  server.get("/ws", { websocket: true }, (socket, req) => {
+  server.get("/ws", { websocket: true }, async (socket, req) => {
     const token = readCookie(req.headers.cookie, server.config.cookieName);
     const user = token ? verifySessionToken(token, server.config.sessionSecret) : null;
     if (!user) {
@@ -48,7 +48,7 @@ export const wsRoutes: FastifyPluginAsync = async (server) => {
 
     const familyElderIds =
       user.role === "family"
-        ? server.db.users.listFamilyLinks(user.userId).map((link) => link.elderId)
+        ? (await server.db.users.listFamilyLinks(user.userId)).map((link) => link.elderId)
         : [];
 
     const unsubscribe = server.eventBus.subscribe((event) => {

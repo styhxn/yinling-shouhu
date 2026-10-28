@@ -116,16 +116,16 @@ function fallbackDistill(topic: string, transcript: InterviewQA[]): Distilled {
 }
 
 export function createInterviewService(db: AppDb, modelRouter: ModelRouter) {
-  function get(id: string): DbInterview | null {
+  async function get(id: string): Promise<DbInterview | null> {
     return db.interviews.get(id);
   }
 
-  function start(input: { elderId: string; topic?: string; photoId?: string }) {
+  async function start(input: { elderId: string; topic?: string; photoId?: string }) {
     const topic = input.topic && TOPIC_QUESTIONS[input.topic] ? input.topic : "童年";
     const hasPhoto = Boolean(input.photoId);
     const questions = buildQuestions(topic, hasPhoto);
     const maxTurns = Math.min(5, questions.length);
-    const interview = db.interviews.create({
+    const interview = await db.interviews.create({
       elderId: input.elderId,
       topic,
       photoId: input.photoId ?? null,
@@ -231,7 +231,7 @@ export function createInterviewService(db: AppDb, modelRouter: ModelRouter) {
   }
 
   async function answer(input: { interviewId: string; elderId: string; text: string }) {
-    const interview = db.interviews.get(input.interviewId);
+    const interview = await db.interviews.get(input.interviewId);
     if (!interview || interview.elderId !== input.elderId) throw new Error("not_found");
     if (interview.status !== "asking") throw new Error("interview_closed");
 
@@ -247,7 +247,7 @@ export function createInterviewService(db: AppDb, modelRouter: ModelRouter) {
 
     if (done) {
       const distilled = await distill(topic, transcript);
-      const memory: DbMemory = db.memories.create({
+      const memory: DbMemory = await db.memories.create({
         elderId: input.elderId,
         title: distilled.title,
         timeRange: distilled.timeRange,
@@ -260,7 +260,7 @@ export function createInterviewService(db: AppDb, modelRouter: ModelRouter) {
         visibility: "family",
         consent: true
       });
-      db.interviews.update(interview.id, {
+      await db.interviews.update(interview.id, {
         transcript,
         currentQuestion: null,
         status: "completed"
@@ -285,7 +285,7 @@ export function createInterviewService(db: AppDb, modelRouter: ModelRouter) {
     const fallbackQuestion = questions[interview.turn] ?? "还有什么想补充的吗？";
     const adaptive = await followUp({ topic, transcript, fallback: fallbackQuestion });
     const nextQuestion = adaptive?.question ?? fallbackQuestion;
-    db.interviews.update(interview.id, {
+    await db.interviews.update(interview.id, {
       turn: interview.turn + 1,
       transcript,
       currentQuestion: nextQuestion,

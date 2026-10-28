@@ -155,7 +155,7 @@ export const agentRoutes: FastifyPluginAsync = async (server) => {
     if (!query.success) return reply.code(400).send({ error: "invalid_body" });
     const user = req.user;
     if (!user) return reply.code(401).send({ error: "unauthorized" });
-    const elderId = resolveElderId(req, query.data.elderId);
+    const elderId = await resolveElderId(req, query.data.elderId);
     if (!elderId) return reply.code(403).send({ error: "forbidden" });
     const result = await server.brief.generate({
       elderId,
@@ -169,23 +169,23 @@ export const agentRoutes: FastifyPluginAsync = async (server) => {
   server.get("/traces", { preHandler: requireAuth }, async (req, reply) => {
     const query = TraceQuerySchema.safeParse(req.query);
     if (!query.success) return reply.code(400).send({ error: "invalid_body" });
-    const elderId = resolveElderId(req, query.data.elderId);
+    const elderId = await resolveElderId(req, query.data.elderId);
     if (!elderId) return reply.code(403).send({ error: "forbidden" });
     return {
       ok: true,
-      items: server.db.agentTraces.listByElder(elderId, query.data.limit ?? 20)
+      items: await server.db.agentTraces.listByElder(elderId, query.data.limit ?? 20)
     };
   });
 
   server.get("/traces/:id", { preHandler: requireAuth }, async (req, reply) => {
     const params = TraceParamsSchema.safeParse(req.params);
     if (!params.success) return reply.code(400).send({ error: "invalid_body" });
-    const trace = server.db.agentTraces.getById(params.data.id);
+    const trace = await server.db.agentTraces.getById(params.data.id);
     if (!trace) return reply.code(404).send({ error: "not_found" });
     const user = req.user;
     if (!user) return reply.code(401).send({ error: "unauthorized" });
     if (user.role !== "admin") {
-      const elderId = resolveElderId(req, trace.elderId);
+      const elderId = await resolveElderId(req, trace.elderId);
       if (!elderId || elderId !== trace.elderId) {
         return reply.code(403).send({ error: "forbidden" });
       }
@@ -201,7 +201,7 @@ export const agentRoutes: FastifyPluginAsync = async (server) => {
     const user = req.user;
     if (!user) return reply.code(401).send({ error: "unauthorized" });
 
-    const session = server.db.sessions.get(params.data.id);
+    const session = await server.db.sessions.get(params.data.id);
     if (!session) return reply.code(404).send({ error: "not_found" });
     if (session.userId !== user.userId) {
       return reply.code(403).send({ error: "forbidden" });

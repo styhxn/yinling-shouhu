@@ -520,7 +520,7 @@ export function createAgentRuntime(deps: { db: AppDb; modelRouter: ModelRouter; 
         ok: true
       });
 
-      const trace = deps.db.agentTraces.create({
+      const trace = await deps.db.agentTraces.create({
         elderId: input.elderId,
         userId: input.userId,
         agent: input.agent,
@@ -550,7 +550,7 @@ export function createAgentRuntime(deps: { db: AppDb; modelRouter: ModelRouter; 
         false,
         deps.modelRouter.mode
       );
-      const trace = deps.db.agentTraces.create({
+      const trace = await deps.db.agentTraces.create({
         elderId: input.elderId,
         userId: input.userId,
         agent: input.agent,

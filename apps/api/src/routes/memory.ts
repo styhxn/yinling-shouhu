@@ -1,5 +1,6 @@
-import type { FastifyPluginAsync, FastifyRequest } from "fastify";
+import type { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
+import { resolveElderId } from "../services/auth/elder.js";
 import { canAccessElder, requireAuth, requireRole } from "../services/auth/rbac.js";
 import type { StoryFidelity } from "../store/db.js";
 
@@ -51,18 +52,6 @@ const ProfileQuerySchema = z.object({
 });
 const IdParamsSchema = z.object({ id: z.string().min(1).max(80) });
 
-function resolveElderId(req: FastifyRequest, requested?: string): string | null {
-  const user = req.user;
-  if (!user) return null;
-  if (user.role === "elder") return user.elderId ?? null;
-  if (user.role === "family") {
-    const candidate =
-      requested ?? req.server.db.users.listFamilyLinks(user.userId)[0]?.elderId ?? null;
-    if (!candidate) return null;
-    return canAccessElder(req, candidate) ? candidate : null;
-  }
-  return null;
-}
 
 function escapeHtml(value: string) {
   return value
@@ -187,22 +176,22 @@ export const memoryRoutes: FastifyPluginAsync = async (server) => {
   server.get("/profile", { preHandler: requireAuth }, async (req, reply) => {
     const query = ProfileQuerySchema.safeParse(req.query);
     if (!query.success) return reply.code(400).send({ error: "invalid_body" });
-    const elderId = resolveElderId(req, query.data.elderId);
+    const elderId = await resolveElderId(req, query.data.elderId);
     if (!elderId) return reply.code(403).send({ error: "forbidden" });
     const profile = await server.memoryProfile.get(elderId, {
       refresh: query.data.refresh === "1"
     });
-    const record = server.db.memoryProfiles.getByElder(elderId);
+    const record = await server.db.memoryProfiles.getByElder(elderId);
     return { ok: true, profile, sourceCount: record?.sourceCount ?? 0 };
   });
 
   server.get("/items", { preHandler: requireAuth }, async (req, reply) => {
     const query = ListQuerySchema.safeParse(req.query);
     if (!query.success) return reply.code(400).send({ error: "invalid_body" });
-    const elderId = resolveElderId(req, query.data.elderId);
+    const elderId = await resolveElderId(req, query.data.elderId);
     if (!elderId) return reply.code(403).send({ error: "forbidden" });
 
-    let items = server.db.memories.listByElder(elderId);
+    let items = await server.db.memories.listByElder(elderId);
     const keyword = query.data.q?.trim();
     if (keyword) {
       const lower = keyword.toLowerCase();
@@ -221,10 +210,10 @@ export const memoryRoutes: FastifyPluginAsync = async (server) => {
     if (!parsed.success) {
       return reply.code(400).send({ error: "invalid_body", message: "记忆内容不完整" });
     }
-    const elderId = resolveElderId(req, parsed.data.elderId);
+    const elderId = await resolveElderId(req, parsed.data.elderId);
     if (!elderId) return reply.code(403).send({ error: "forbidden" });
 
-    const item = server.db.memories.create({
+    const item = await server.db.memories.create({
       elderId,
       title: parsed.data.title,
       timeRange: parsed.data.timeRange ?? null,
@@ -247,17 +236,17 @@ export const memoryRoutes: FastifyPluginAsync = async (server) => {
     if (!params.success || !body.success) {
       return reply.code(400).send({ error: "invalid_body" });
     }
-    const current = server.db.memories.getById(params.data.id);
+    const current = await server.db.memories.getById(params.data.id);
     if (!current || current.status === "deleted") {
       return reply.code(404).send({ error: "not_found" });
     }
-    if (!canAccessElder(req, current.elderId)) {
+    if (!(await canAccessElder(req, current.elderId))) {
       return reply.code(403).send({ error: "forbidden" });
     }
     const patch = Object.fromEntries(
       Object.entries(body.data).filter(([, value]) => value !== undefined)
     ) as Parameters<typeof server.db.memories.update>[1];
-    const item = server.db.memories.update(params.data.id, patch);
+    const item = await server.db.memories.update(params.data.id, patch);
     void server.memoryProfile.refresh(current.elderId).catch(() => undefined);
     return { item };
   });
@@ -265,16 +254,16 @@ export const memoryRoutes: FastifyPluginAsync = async (server) => {
   server.delete("/items/:id", { preHandler: requireAuth }, async (req, reply) => {
     const params = IdParamsSchema.safeParse(req.params);
     if (!params.success) return reply.code(400).send({ error: "invalid_body" });
-    const current = server.db.memories.getById(params.data.id);
+    const current = await server.db.memories.getById(params.data.id);
     if (!current || current.status === "deleted") {
       return reply.code(404).send({ error: "not_found" });
     }
-    if (!canAccessElder(req, current.elderId)) {
+    if (!(await canAccessElder(req, current.elderId))) {
       return reply.code(403).send({ error: "forbidden" });
     }
-    server.db.memories.softDelete(current.id);
+    await server.db.memories.softDelete(current.id);
     void server.memoryProfile.refresh(current.elderId).catch(() => undefined);
-    server.db.auditLogs.insert({
+    await server.db.auditLogs.insert({
       userId: req.user!.userId,
       action: "memory.delete",
       targetType: "memory",
@@ -294,7 +283,7 @@ export const memoryRoutes: FastifyPluginAsync = async (server) => {
       if (!user.elderId) {
         return reply.code(403).send({ error: "forbidden", message: "当前账号未绑定老人" });
       }
-      const result = server.interview.start({
+      const result = await server.interview.start({
         elderId: user.elderId,
         ...(parsed.data.topic ? { topic: parsed.data.topic } : {}),
         ...(parsed.data.photoId ? { photoId: parsed.data.photoId } : {})
@@ -343,7 +332,7 @@ export const memoryRoutes: FastifyPluginAsync = async (server) => {
     if (!parsed.success) {
       return reply.code(400).send({ error: "invalid_body", message: "请选择要整理的记忆" });
     }
-    const elderId = resolveElderId(req, parsed.data.elderId);
+    const elderId = await resolveElderId(req, parsed.data.elderId);
     if (!elderId) return reply.code(403).send({ error: "forbidden" });
     try {
       const result = await server.story.generate({
@@ -364,23 +353,23 @@ export const memoryRoutes: FastifyPluginAsync = async (server) => {
   server.get("/story", { preHandler: requireAuth }, async (req, reply) => {
     const query = StoryQuerySchema.safeParse(req.query);
     if (!query.success) return reply.code(400).send({ error: "invalid_body" });
-    const elderId = resolveElderId(req, query.data.elderId);
+    const elderId = await resolveElderId(req, query.data.elderId);
     if (!elderId) return reply.code(403).send({ error: "forbidden" });
-    return { ok: true, ...server.story.listByElder(elderId) };
+    return { ok: true, ...(await server.story.listByElder(elderId)) };
   });
 
   server.get("/story/export", { preHandler: requireAuth }, async (req, reply) => {
     const query = StoryQuerySchema.safeParse(req.query);
     if (!query.success) return reply.code(400).send({ error: "invalid_body" });
-    const elderId = resolveElderId(req, query.data.elderId);
+    const elderId = await resolveElderId(req, query.data.elderId);
     if (!elderId) return reply.code(403).send({ error: "forbidden" });
 
-    const { book, chapters } = server.story.listByElder(elderId);
+    const { book, chapters } = await server.story.listByElder(elderId);
     if (!book || chapters.length === 0) {
       return reply.code(404).send({ error: "not_found", message: "还没有生成故事章节" });
     }
 
-    const elder = server.db.elders.getById(elderId);
+    const elder = await server.db.elders.getById(elderId);
     const html = storyBookHtml({
       bookTitle: book.title,
       elderName: elder?.displayName ?? "长辈",
@@ -388,7 +377,7 @@ export const memoryRoutes: FastifyPluginAsync = async (server) => {
       chapters
     });
     const filename = `${book.title}.html`.replace(/[\\/:*?"<>|]/g, "_");
-    server.db.auditLogs.insert({
+    await server.db.auditLogs.insert({
       userId: req.user!.userId,
       action: "story.export",
       targetType: "story_book",
@@ -407,9 +396,9 @@ export const memoryRoutes: FastifyPluginAsync = async (server) => {
   server.get("/story/:id", { preHandler: requireAuth }, async (req, reply) => {
     const params = IdParamsSchema.safeParse(req.params);
     if (!params.success) return reply.code(400).send({ error: "invalid_body" });
-    const found = server.story.get(params.data.id);
+    const found = await server.story.get(params.data.id);
     if (!found) return reply.code(404).send({ error: "not_found" });
-    if (!canAccessElder(req, found.book.elderId)) {
+    if (!(await canAccessElder(req, found.book.elderId))) {
       return reply.code(403).send({ error: "forbidden" });
     }
     return { ok: true, ...found };
@@ -418,9 +407,9 @@ export const memoryRoutes: FastifyPluginAsync = async (server) => {
   server.post("/story/:id/audio", { preHandler: requireAuth }, async (req, reply) => {
     const params = IdParamsSchema.safeParse(req.params);
     if (!params.success) return reply.code(400).send({ error: "invalid_body" });
-    const found = server.story.get(params.data.id);
+    const found = await server.story.get(params.data.id);
     if (!found) return reply.code(404).send({ error: "not_found" });
-    if (!canAccessElder(req, found.book.elderId)) {
+    if (!(await canAccessElder(req, found.book.elderId))) {
       return reply.code(403).send({ error: "forbidden" });
     }
     // Server-side TTS is a later milestone; the client uses SpeechSynthesis.

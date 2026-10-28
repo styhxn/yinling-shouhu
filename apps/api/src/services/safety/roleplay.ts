@@ -234,9 +234,9 @@ export function createRoleplayService(db: AppDb, modelRouter: ModelRouter) {
     return scenario;
   }
 
-  function start(elderId: string, scenarioId: string) {
+  async function start(elderId: string, scenarioId: string) {
     const scenario = scenarioById(scenarioId);
-    const session = db.roleplaySessions.create({
+    const session = await db.roleplaySessions.create({
       elderId,
       scenarioId,
       maxTurns: 5,
@@ -295,7 +295,7 @@ export function createRoleplayService(db: AppDb, modelRouter: ModelRouter) {
   }
 
   async function turn(id: string, elderId: string, text: string) {
-    const session = db.roleplaySessions.get(id);
+    const session = await db.roleplaySessions.get(id);
     if (!session || session.elderId !== elderId) throw new Error("not_found");
     if (session.status !== "active") throw new Error("roleplay_closed");
     const scenario = scenarioById(session.scenarioId);
@@ -307,13 +307,13 @@ export function createRoleplayService(db: AppDb, modelRouter: ModelRouter) {
     const nextTurn = session.turn + 1;
 
     if (nextTurn > session.maxTurns) {
-      const completed = db.roleplaySessions.update(id, {
+      const completed = await db.roleplaySessions.update(id, {
         turn: session.turn,
         messages,
         status: "completed"
       });
       const report = buildReport(completed ?? session, scenario);
-      db.roleplaySessions.update(id, { report });
+      await db.roleplaySessions.update(id, { report });
       return {
         done: true,
         reply: "（演练结束）对方不再回复。下面是复盘。",
@@ -323,7 +323,7 @@ export function createRoleplayService(db: AppDb, modelRouter: ModelRouter) {
 
     const next = await nextScammerReply(session, scenario, messages);
     messages.push({ role: "scammer", text: next.reply, tactic: next.tactic, ts: Date.now() });
-    db.roleplaySessions.update(id, { turn: nextTurn, messages });
+    await db.roleplaySessions.update(id, { turn: nextTurn, messages });
     return {
       done: false,
       reply: next.reply,
@@ -333,12 +333,12 @@ export function createRoleplayService(db: AppDb, modelRouter: ModelRouter) {
     };
   }
 
-  function end(id: string, elderId: string) {
-    const session = db.roleplaySessions.get(id);
+  async function end(id: string, elderId: string) {
+    const session = await db.roleplaySessions.get(id);
     if (!session || session.elderId !== elderId) throw new Error("not_found");
     const scenario = scenarioById(session.scenarioId);
     const report = buildReport(session, scenario);
-    db.roleplaySessions.update(id, { status: "completed", report });
+    await db.roleplaySessions.update(id, { status: "completed", report });
     return { report };
   }
 

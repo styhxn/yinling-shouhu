@@ -27,8 +27,10 @@ import { createStoryService, type StoryService } from "./services/memory/story.j
 import { createAntiFraudService, type AntiFraudService } from "./services/safety/antiFraud.js";
 import { createCoolingOffService, type CoolingOffService } from "./services/safety/coolingOff.js";
 import { createStore } from "./services/store.js";
+import { createVectorStore, type VectorStore } from "./services/search/vectorStore.js";
 import { createWeatherService } from "./services/weather.js";
 import { createDb, type AppDb } from "./store/db.js";
+import { createPostgresClient, createSqliteClient } from "./store/sql.js";
 
 export type CreateServerOptions = {
   config?: ConfigOverrides;
@@ -45,14 +47,23 @@ export async function createServer(options: CreateServerOptions = {}) {
     : loadOrCreateMasterKey({ dataDir: config.dataDir });
   if (masterKey.length !== 32) throw new Error("invalid_master_key");
 
-  const db = createDb(config.dbPath, { masterKey, seed: config.demoMode });
+  const sql =
+    config.db.driver === "postgres"
+      ? createPostgresClient({
+          connectionString: config.db.url,
+          max: config.db.poolMax,
+          ssl: config.db.ssl
+        })
+      : createSqliteClient(config.dbPath);
+  const db = await createDb(sql, { masterKey, seed: config.demoMode });
   const store = await createStore({ dataDir: config.dataDir, masterKey });
   const eventBus = createEventBus();
   const modelRouter = createModelRouter(config);
   const rateLimiter = createRateLimiter(config.rateLimit.enabled);
   const weather = createWeatherService(config);
   const location = createLocationService(db);
-  const antiFraud = createAntiFraudService(modelRouter);
+  const vectorStore = createVectorStore({ sql, modelRouter });
+  const antiFraud = createAntiFraudService(modelRouter, vectorStore);
   const coolingOff = createCoolingOffService({ db, eventBus });
   const interview = createInterviewService(db, modelRouter);
   const story = createStoryService(db, modelRouter);
@@ -102,6 +113,7 @@ export async function createServer(options: CreateServerOptions = {}) {
   server.decorate("rateLimiter", rateLimiter);
   server.decorate("toolRegistry", toolRegistry);
   server.decorate("agent", agent);
+  server.decorate("vectorStore", vectorStore);
   server.decorate("agentRuntime", agentRuntime);
   server.decorate("brief", brief);
   server.decorate("proactive", proactive);
@@ -295,7 +307,7 @@ export async function createServer(options: CreateServerOptions = {}) {
   server.addHook("onClose", async () => {
     stopProactive();
     store.close();
-    db.close();
+    await db.close();
   });
 
   return server;
@@ -320,6 +332,7 @@ declare module "fastify" {
     proactive: ProactiveAgent;
     memoryProfile: MemoryProfileService;
     antiFraud: AntiFraudService;
+    vectorStore: VectorStore;
     coolingOff: CoolingOffService;
     weather: ReturnType<typeof createWeatherService>;
     interview: InterviewService;

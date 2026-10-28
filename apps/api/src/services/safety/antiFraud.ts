@@ -1,4 +1,5 @@
 import type { ModelRouter } from "../llm/types.js";
+import type { VectorStore } from "../search/vectorStore.js";
 
 export type AntiFraudEntry = {
   id: string;
@@ -152,8 +153,9 @@ function cosine(a: number[], b: number[]): number {
   return dot / (Math.sqrt(na) * Math.sqrt(nb));
 }
 
-export function createAntiFraudService(modelRouter: ModelRouter) {
+export function createAntiFraudService(modelRouter: ModelRouter, vectorStore?: VectorStore) {
   let vectors: Map<string, number[]> | null = null;
+  let vectorIndexing: Promise<boolean> | null = null;
 
   async function ensureVectors(): Promise<Map<string, number[]> | null> {
     if (vectors) return vectors;
@@ -168,25 +170,57 @@ export function createAntiFraudService(modelRouter: ModelRouter) {
     }
   }
 
+  async function semanticScores(query: string): Promise<Map<string, number> | null> {
+    if (!vectorStore?.enabled) return null;
+    try {
+      if (!vectorIndexing) {
+        vectorIndexing = vectorStore.indexDocs(
+          "anti_fraud_kb",
+          KB.map((entry) => ({
+            ownerId: entry.id,
+            content: `${entry.title} ${entry.summary} ${entry.keywords.join(" ")}`,
+            metadata: { title: entry.title, source: entry.source }
+          }))
+        );
+      }
+      const ready = await vectorIndexing;
+      if (!ready) {
+        vectorIndexing = null;
+        return null;
+      }
+      const hits = await vectorStore.search("anti_fraud_kb", query, KB.length);
+      if (!hits) return null;
+      return new Map(hits.map((hit) => [hit.ownerId, hit.score]));
+    } catch {
+      vectorIndexing = null;
+      return null;
+    }
+  }
+
   async function search(query: string, topK = 3): Promise<AntiFraudHit[]> {
     const queryTokens = tokenize(query);
     const entryTokens = new Map(KB.map((entry) => [entry.id, tokenize(`${entry.title} ${entry.summary} ${entry.keywords.join(" ")}`)]));
+    const pgScores = await semanticScores(query);
 
     let queryVector: number[] | null = null;
-    const entryVectors = await ensureVectors();
-    if (entryVectors) {
-      try {
-        const [vector] = await modelRouter.embed([query]);
-        queryVector = vector ?? null;
-      } catch {
-        queryVector = null;
+    let entryVectors: Map<string, number[]> | null = null;
+    if (!pgScores) {
+      entryVectors = await ensureVectors();
+      if (entryVectors) {
+        try {
+          const [vector] = await modelRouter.embed([query]);
+          queryVector = vector ?? null;
+        } catch {
+          queryVector = null;
+        }
       }
     }
 
     const scored = KB.map((entry) => {
       const keyword = overlapScore(entryTokens.get(entry.id) ?? new Set(), queryTokens);
-      const semantic =
-        queryVector && entryVectors
+      const semantic = pgScores
+        ? pgScores.get(entry.id) ?? 0
+        : queryVector && entryVectors
           ? cosine(queryVector, entryVectors.get(entry.id) ?? [])
           : 0;
       return {

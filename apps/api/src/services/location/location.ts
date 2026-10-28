@@ -14,8 +14,8 @@ function formatTime(ts: number) {
 }
 
 export function createLocationService(db: AppDb) {
-  function latest(elderId: string): LocationSummary | null {
-    const point = db.locations.latest(elderId);
+  async function latest(elderId: string): Promise<LocationSummary | null> {
+    const point = await db.locations.latest(elderId);
     if (!point) return null;
     return {
       point,
