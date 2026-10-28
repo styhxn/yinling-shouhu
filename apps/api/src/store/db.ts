@@ -189,6 +189,21 @@ export type DbStoryChapter = {
   updatedAt: number;
 };
 
+export type DbEvalCase = {
+  id: string;
+  module: string;
+  question: string;
+  expected: unknown;
+  createdAt: number;
+};
+
+export type DbEvalRun = {
+  id: string;
+  startedAt: number;
+  finishedAt: number | null;
+  metrics: unknown;
+};
+
 export type InterviewQA = {
   question: string;
   answer: string;
@@ -1566,6 +1581,77 @@ export function createDb(dbPath: string, options: CreateDbOptions) {
     }
   };
 
+  const evalCases = {
+    upsert(input: { id: string; module: string; question: string; expected: unknown }): void {
+      raw
+        .prepare(
+          `INSERT INTO eval_cases (id, module, question, expected_json, created_at)
+           VALUES (?, ?, ?, ?, ?)
+           ON CONFLICT(id) DO UPDATE SET
+             module = excluded.module,
+             question = excluded.question,
+             expected_json = excluded.expected_json`
+        )
+        .run(
+          input.id,
+          input.module,
+          input.question,
+          JSON.stringify(input.expected ?? null),
+          Date.now()
+        );
+    },
+    list(module?: string): DbEvalCase[] {
+      const rows = module
+        ? (raw
+            .prepare("SELECT * FROM eval_cases WHERE module = ? ORDER BY id ASC")
+            .all(module) as any[])
+        : (raw.prepare("SELECT * FROM eval_cases ORDER BY module ASC, id ASC").all() as any[]);
+      return rows.map((row) => ({
+        id: String(row.id),
+        module: String(row.module),
+        question: String(row.question),
+        expected: parseJson<unknown>(row.expected_json, null),
+        createdAt: Number(row.created_at)
+      }));
+    }
+  };
+
+  const evalRuns = {
+    start(): string {
+      const id = `er_${randomUUID()}`;
+      raw
+        .prepare("INSERT INTO eval_runs (id, started_at, finished_at, metrics_json) VALUES (?, ?, NULL, NULL)")
+        .run(id, Date.now());
+      return id;
+    },
+    finish(id: string, metrics: unknown): void {
+      raw
+        .prepare("UPDATE eval_runs SET finished_at = ?, metrics_json = ? WHERE id = ?")
+        .run(Date.now(), JSON.stringify(metrics ?? null), id);
+    },
+    latest(): DbEvalRun | null {
+      const row = raw
+        .prepare("SELECT * FROM eval_runs ORDER BY started_at DESC LIMIT 1")
+        .get() as any;
+      return row ? mapEvalRun(row) : null;
+    },
+    list(limit = 10): DbEvalRun[] {
+      const rows = raw
+        .prepare("SELECT * FROM eval_runs ORDER BY started_at DESC LIMIT ?")
+        .all(limit) as any[];
+      return rows.map(mapEvalRun);
+    }
+  };
+
+  function mapEvalRun(row: any): DbEvalRun {
+    return {
+      id: String(row.id),
+      startedAt: Number(row.started_at),
+      finishedAt: row.finished_at === null ? null : Number(row.finished_at),
+      metrics: parseJson<unknown>(row.metrics_json, null)
+    };
+  }
+
   return {
     raw,
     users,
@@ -1589,6 +1675,8 @@ export function createDb(dbPath: string, options: CreateDbOptions) {
     missingPosters,
     medicationLogs,
     roleplaySessions,
+    evalCases,
+    evalRuns,
     close: () => raw.close()
   };
 }

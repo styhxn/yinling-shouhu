@@ -47,7 +47,8 @@ VITE_PROXY_TARGET=http://127.0.0.1:3100 npm run dev
 | 变量 | 说明 |
 | --- | --- |
 | `VITE_API_BASE_URL` | 生产环境 API 前缀，例如 `https://api.example.com/api`；默认走同源 `/api` |
-| `VITE_PROXY_TARGET` | 开发代理的后端地址，默认 `http://127.0.0.1:3100` |
+| `VITE_PROXY_TARGET` | 开发代理的后端地址，默认自动读取后端 `apps/api/.env` 的 `PORT`，读不到时用 `http://127.0.0.1:3100` |
+| `VITE_WS_URL` | 生产 WebSocket 地址，例如 `wss://api.example.com/ws`；留空走同源 `/ws` |
 | `DH_LIVE_STATIC_DIR` | 可选，DH_live 数字人静态资源目录；不存在时自动跳过 |
 
 ## 页面与路由
@@ -61,7 +62,7 @@ VITE_PROXY_TARGET=http://127.0.0.1:3100 npm run dev
 | `/elder/story/new` | `MemoryInterviewPage` | 5 轮记忆访谈 |
 | `/elder/story/:id` | `StoryChapterPage` | 故事阅读、朗读、导出故事书 |
 | `/elder/meds` | `MedicationsPage` | 用药计划、服药记录、拍照识药 |
-| `/elder/safety` | `SafetyHomePage` | 位置、电子围栏、寻人海报 |
+| `/elder/safety` | `SafetyHomePage` | 实时位置共享、围栏、告警知悉、寻人海报 |
 | `/elder/safety/scam` | `ScamCheckPage` | 文字/链接/截图反诈鉴定 |
 | `/elder/safety/roleplay` | `RoleplayPage` | 反诈演练与六维复盘 |
 | `/family` | `FamilyDashboardPage` | 家属照护概览、本周简报、待确认 |
@@ -95,7 +96,7 @@ frontend/
 - 所有请求通过 `src/lib/http.ts`，默认 `credentials: "include"`。
 - 后端使用 HttpOnly Cookie 会话；演示登录接口为 `POST /api/auth/demo-login`，body `{ "role": "elder" | "family" }`。
 - SSE 对话：`POST /api/agent/chat`，事件解析在 `src/lib/sse.ts`。
-- WebSocket：`/ws`，用于安全告警与家属确认推送，需携带会话 Cookie。
+- WebSocket：`/ws`，用于位置更新、安全告警与家属确认推送，需携带会话 Cookie；连接层内置指数退避重连、30 秒心跳与“实时连接/连接中/已断开”状态。
 - 接口字段与错误码见 [docs/接口契约.md](docs/接口契约.md)，页面与组件约定见 [docs/前端开发文档.md](docs/前端开发文档.md)。
 
 ## 设计规范
