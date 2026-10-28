@@ -83,4 +83,65 @@ export function seedDemo(db: DatabaseSync, masterKey: Buffer) {
     now,
     now
   );
+
+  const memory = db.prepare(
+    `INSERT OR IGNORE INTO memories
+      (id, elder_id, title, time_range, place, people_json, tags_json, photo_ids_json,
+       transcript_enc, summary, visibility, consent, status, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'family', 1, 'active', ?, ?)`
+  );
+  const demoMemories = [
+    {
+      id: "m_seed_river",
+      title: "河边捉鱼的夏天",
+      timeRange: "小时候",
+      place: "苏州河边",
+      people: ["母亲", "邻居"],
+      tags: ["童年", "苏州"],
+      transcript:
+        "问：小时候住在哪里？\n答：我小时候住在苏州河边，夏天常和邻居下河捉鱼，回家晚了母亲会在岸上喊我。\n\n问：最难忘的是什么？\n答：母亲总在岸上喊我回家吃饭，我假装没听见。",
+      summary: "小时候住在苏州河边，夏天常和邻居下河捉鱼，母亲总在岸上喊我回家吃饭。",
+      createdAt: now - 3 * 24 * 60 * 60 * 1000
+    },
+    {
+      id: "m_seed_workshop",
+      title: "纺织厂的第一天",
+      timeRange: "十八岁",
+      place: "无锡国棉厂",
+      people: ["师傅"],
+      tags: ["工作", "青春"],
+      transcript:
+        "问：第一份工作是什么？\n答：我十八岁进无锡国棉厂当挡车工，第一天师傅教我看纱线，手把手教了三遍。\n\n问：最自豪的事？\n答：后来我带的徒弟比我还多。",
+      summary: "十八岁进无锡国棉厂当挡车工，师傅手把手教看纱线，后来带出的徒弟比师傅还多。",
+      createdAt: now - 2 * 24 * 60 * 60 * 1000
+    },
+    {
+      id: "m_seed_newyear",
+      title: "一家人的年夜饭",
+      timeRange: "每年除夕",
+      place: "南京老房子",
+      people: ["老伴", "女儿"],
+      tags: ["家庭", "春节"],
+      transcript:
+        "问：家里的年夜饭是谁做？\n答：每年除夕都是老伴负责烧菜，我负责包春卷，女儿贴春联。\n\n问：最喜欢哪道菜？\n答：最喜欢老伴做的红烧肉，孩子们也爱吃。",
+      summary: "每年除夕老伴烧菜，我包春卷，女儿贴春联，一家人最喜欢红烧肉。",
+      createdAt: now - 1 * 24 * 60 * 60 * 1000
+    }
+  ];
+  for (const item of demoMemories) {
+    memory.run(
+      item.id,
+      "e_li",
+      item.title,
+      item.timeRange,
+      item.place,
+      JSON.stringify(item.people),
+      JSON.stringify(item.tags),
+      JSON.stringify([]),
+      encryptJson(masterKey, item.transcript),
+      item.summary,
+      item.createdAt,
+      item.createdAt
+    );
+  }
 }

@@ -1,11 +1,14 @@
 import crypto from "node:crypto";
+import { z } from "zod";
 import type { AppDb } from "../store/db.js";
 import { createDb } from "../store/db.js";
+import { createAgentRuntime } from "./agent/runtime.js";
+import type { ToolDef, ToolRegistry } from "./agent/tools.js";
 import type { ModelRouter } from "./llm/types.js";
 import { createStoryService } from "./memory/story.js";
 import { analyzeScamHybrid } from "./safety/scamAI.js";
 
-export type EvalModule = "scam" | "story";
+export type EvalModule = "scam" | "story" | "agent";
 
 type ScamExpected = {
   riskLevel: "high" | "medium" | "low" | "unknown";
@@ -22,6 +25,21 @@ type StoryCase = {
   title: string;
   summary: string;
   transcript: string;
+};
+
+type AgentExpected = {
+  kind: "brief" | "alert";
+  expectTools: string[];
+  expectedRisk?: "low" | "medium" | "high";
+  expectedEscalation?: "none" | "family" | "emergency";
+  expectBriefItems?: boolean;
+};
+
+type AgentCase = {
+  id: string;
+  goal: string;
+  context: Record<string, unknown>;
+  expected: AgentExpected;
 };
 
 export type EvalFailure = {
@@ -125,6 +143,163 @@ const STORY_CASES: Array<{ id: string; input: StoryCase; expected: StoryExpected
   }
 ];
 
+const AGENT_CASES: AgentCase[] = [
+  {
+    id: "agent_brief",
+    goal: "为长辈生成今天的贴心简报：先看用药，再看天气和位置安全，最后带一句与口述记忆有关的陪伴。",
+    context: { briefDate: "2026-10-28" },
+    expected: {
+      kind: "brief",
+      expectTools: ["get_medications", "get_weather", "get_memory_profile"],
+      expectBriefItems: true
+    }
+  },
+  {
+    id: "agent_alert_geofence",
+    goal: "研判一条电子围栏越界：结合最近位置、用药、天气和老人习惯，判断可能原因并给出下一步。",
+    context: {
+      alertType: "geofence.exit",
+      alertLevel: "critical",
+      geofenceName: "家附近",
+      distanceMeters: 1200
+    },
+    expected: {
+      kind: "alert",
+      expectTools: ["get_location", "get_medications"],
+      expectedRisk: "high",
+      expectedEscalation: "family"
+    }
+  },
+  {
+    id: "agent_alert_cooling_off",
+    goal: "研判一条转账冷静期：结合最近位置、用药、天气和老人习惯，判断可能原因并给出下一步。",
+    context: { alertType: "cooling_off", alertLevel: "critical", amount: 50000 },
+    expected: {
+      kind: "alert",
+      expectTools: ["get_location", "get_weather"],
+      expectedRisk: "high",
+      expectedEscalation: "family"
+    }
+  },
+  {
+    id: "agent_alert_stale",
+    goal: "研判一条长时间没有位置更新：结合最近位置、用药、天气和老人习惯，判断可能原因并给出下一步。",
+    context: { alertType: "location.stale", alertLevel: "info" },
+    expected: {
+      kind: "alert",
+      expectTools: ["get_location"],
+      expectedRisk: "low",
+      expectedEscalation: "none"
+    }
+  }
+];
+
+const AGENT_EVAL_TOOLS: ToolDef[] = [
+  {
+    name: "get_memory_profile",
+    description: "读取记忆画像",
+    parameters: z.object({}),
+    jsonSchema: { type: "object", properties: {} },
+    risk: "read",
+    roles: ["elder", "family"],
+    requiresConfirmation: false,
+    async handler() {
+      return {
+        summary: "记忆画像：常提到母亲、邻居；对苏州河边有清晰记忆。",
+        data: { profile: { summary: "常提到母亲、邻居" } }
+      };
+    }
+  },
+  {
+    name: "get_medications",
+    description: "读取用药计划",
+    parameters: z.object({}),
+    jsonSchema: { type: "object", properties: {} },
+    risk: "read",
+    roles: ["elder", "family"],
+    requiresConfirmation: false,
+    async handler() {
+      return {
+        summary: "氨氯地平 5mg：每日一次，每次 1 片；时间 08:00",
+        data: { items: [{ name: "氨氯地平" }] }
+      };
+    }
+  },
+  {
+    name: "get_weather",
+    description: "查询天气",
+    parameters: z.object({ location: z.string().min(1).max(64) }),
+    jsonSchema: { type: "object", properties: { location: { type: "string" } } },
+    risk: "read",
+    roles: ["elder", "family"],
+    requiresConfirmation: false,
+    async handler() {
+      return { summary: "南京：多云，18℃（来源：演示数据）", data: { city: "南京", tempC: 18 } };
+    }
+  },
+  {
+    name: "get_location",
+    description: "读取最后位置",
+    parameters: z.object({}),
+    jsonSchema: { type: "object", properties: {} },
+    risk: "read",
+    roles: ["elder", "family"],
+    requiresConfirmation: false,
+    async handler() {
+      return {
+        summary: "最后位置：南京市鼓楼区附近，5 分钟前（精度约 20 米）",
+        data: { text: "南京市鼓楼区附近" }
+      };
+    }
+  },
+  {
+    name: "search_memories",
+    description: "检索记忆",
+    parameters: z.object({
+      query: z.string().max(100).optional(),
+      limit: z.number().int().min(1).max(5).optional()
+    }),
+    jsonSchema: { type: "object", properties: {} },
+    risk: "read",
+    roles: ["elder", "family"],
+    requiresConfirmation: false,
+    async handler() {
+      return {
+        summary: "找到 1 段相关记忆：河边捉鱼的夏天",
+        data: {
+          items: [{ title: "河边捉鱼的夏天" }],
+          citations: [{ title: "河边捉鱼的夏天", type: "memory", id: "m_eval" }]
+        }
+      };
+    }
+  }
+];
+
+const AGENT_EVAL_REGISTRY: ToolRegistry = {
+  list(role) {
+    return AGENT_EVAL_TOOLS.filter((tool) => tool.roles.includes(role));
+  },
+  get(name) {
+    return AGENT_EVAL_TOOLS.find((tool) => tool.name === name) ?? null;
+  },
+  schemas(role) {
+    return AGENT_EVAL_TOOLS.filter((tool) => tool.roles.includes(role)).map((tool) => ({
+      type: "function" as const,
+      function: {
+        name: tool.name,
+        description: tool.description,
+        parameters: tool.jsonSchema
+      }
+    }));
+  },
+  async execute(name, input, ctx) {
+    const tool = AGENT_EVAL_TOOLS.find((item) => item.name === name);
+    if (!tool) throw new Error("unknown_tool");
+    if (!tool.roles.includes(ctx.user.role)) throw new Error("forbidden_tool");
+    return tool.handler(tool.parameters.parse(input), ctx);
+  }
+};
+
 function normalize(value: string) {
   return value.replace(/\s+/g, "");
 }
@@ -147,6 +322,14 @@ export function seedEvalCases(db: AppDb) {
       id: item.id,
       module: "story",
       question: JSON.stringify(item.input),
+      expected: item.expected
+    });
+  }
+  for (const item of AGENT_CASES) {
+    db.evalCases.upsert({
+      id: item.id,
+      module: "agent",
+      question: JSON.stringify({ goal: item.goal, context: item.context }),
       expected: item.expected
     });
   }
@@ -363,6 +546,137 @@ async function runStoryCases(db: AppDb, modelRouter: ModelRouter): Promise<EvalM
   };
 }
 
+async function runAgentCases(db: AppDb, modelRouter: ModelRouter): Promise<EvalModuleReport> {
+  const startedAt = Date.now();
+  const cases = db.evalCases.list("agent");
+  const failures: EvalFailure[] = [];
+  const temp = createDb(":memory:", { masterKey: crypto.randomBytes(32), seed: false });
+  const runtime = createAgentRuntime({
+    db: temp,
+    modelRouter,
+    toolRegistry: AGENT_EVAL_REGISTRY
+  });
+  let passed = 0;
+  let expectedToolTotal = 0;
+  let expectedToolHit = 0;
+  let riskChecked = 0;
+  let riskMatched = 0;
+  let escalationChecked = 0;
+  let escalationMatched = 0;
+  let toolCalls = 0;
+  let stepTotal = 0;
+  let completeTraces = 0;
+
+  try {
+    for (const item of cases) {
+      const expected = (item.expected ?? {}) as AgentExpected;
+      let input: { goal: string; context: Record<string, unknown> };
+      try {
+        input = JSON.parse(item.question) as { goal: string; context: Record<string, unknown> };
+      } catch {
+        failures.push({ id: item.id, reasons: ["用例 JSON 无法解析"] });
+        continue;
+      }
+
+      try {
+        const result = await runtime.runTask({
+          kind: expected.kind,
+          agent: expected.kind === "alert" ? "guardian" : "companion",
+          trigger: expected.kind === "alert" ? "event" : "schedule",
+          elderId: "eval_elder",
+          userId: "eval_agent",
+          requestId: `eval_${item.id}`,
+          goal: input.goal,
+          context: input.context,
+          maxTools: 4
+        });
+        const trace = temp.agentTraces.getById(result.traceId);
+        const calledTools =
+          trace?.steps.filter((step) => step.type === "tool_call").map((step) => step.tool ?? "") ?? [];
+        toolCalls += calledTools.length;
+        stepTotal += trace?.steps.length ?? 0;
+
+        const calledSet = new Set(calledTools);
+        const hit = expected.expectTools.filter((tool) => calledSet.has(tool));
+        expectedToolTotal += expected.expectTools.length;
+        expectedToolHit += hit.length;
+
+        const hasPlan = Boolean(trace?.steps.some((step) => step.type === "plan"));
+        const hasToolResult = Boolean(trace?.steps.some((step) => step.type === "tool_result"));
+        const hasDecision = Boolean(trace?.steps.some((step) => step.type === "decision"));
+        if (hasPlan && hasToolResult && hasDecision) completeTraces += 1;
+
+        const reasons: string[] = [];
+        if (!result.decision.summary.trim()) reasons.push("缺少决策摘要");
+        if (hit.length < expected.expectTools.length) {
+          reasons.push(
+            `缺少工具：${expected.expectTools.filter((tool) => !calledSet.has(tool)).join("、")}`
+          );
+        }
+        if (expected.expectBriefItems && !(result.decision.briefItems?.length ?? 0)) {
+          reasons.push("简报没有生成 briefItems");
+        }
+        if (expected.kind === "alert" && result.decision.actions.length === 0) {
+          reasons.push("告警没有给出建议动作");
+        }
+        if (expected.expectedRisk) {
+          riskChecked += 1;
+          if (result.decision.riskLevel === expected.expectedRisk) riskMatched += 1;
+          else reasons.push(`风险 ${result.decision.riskLevel} ≠ ${expected.expectedRisk}`);
+        }
+        if (expected.expectedEscalation) {
+          escalationChecked += 1;
+          if (result.decision.escalation === expected.expectedEscalation) escalationMatched += 1;
+          else reasons.push(`升级 ${result.decision.escalation} ≠ ${expected.expectedEscalation}`);
+        }
+        if (!hasPlan || !hasToolResult || !hasDecision) {
+          reasons.push("轨迹不完整（缺少计划/工具结果/决策）");
+        }
+
+        if (reasons.length === 0) passed += 1;
+        else {
+          failures.push({
+            id: item.id,
+            reasons,
+            actual: {
+              riskLevel: result.decision.riskLevel,
+              escalation: result.decision.escalation,
+              tools: calledTools,
+              steps: trace?.steps.length ?? 0
+            }
+          });
+        }
+      } catch (err) {
+        failures.push({
+          id: item.id,
+          reasons: [err instanceof Error ? err.message : "failed"]
+        });
+      }
+    }
+  } finally {
+    temp.close();
+  }
+
+  return {
+    module: "agent",
+    total: cases.length,
+    passed,
+    passRate: percent(passed, cases.length),
+    metrics: {
+      taskSuccessPct: percent(passed, cases.length),
+      toolCoveragePct: percent(expectedToolHit, expectedToolTotal),
+      riskAccuracyPct: percent(riskMatched, riskChecked),
+      escalationAccuracyPct: percent(escalationMatched, escalationChecked),
+      traceCompletenessPct: percent(completeTraces, cases.length),
+      avgToolCalls: cases.length ? Number((toolCalls / cases.length).toFixed(1)) : 0,
+      avgSteps: cases.length ? Number((stepTotal / cases.length).toFixed(1)) : 0,
+      mode: modelRouter.mode
+    },
+    failures,
+    durationMs: Date.now() - startedAt
+  };
+}
+
 export async function runEvaluation(input: {
   db: AppDb;
   modelRouter: ModelRouter;
@@ -370,7 +684,9 @@ export async function runEvaluation(input: {
 }): Promise<EvalReport> {
   seedEvalCases(input.db);
   const modules =
-    input.modules && input.modules.length > 0 ? input.modules : (["scam", "story"] as const);
+    input.modules && input.modules.length > 0
+      ? input.modules
+      : (["scam", "story", "agent"] as const);
   const runId = input.db.evalRuns.start();
   const startedAt = Date.now();
 
@@ -379,6 +695,7 @@ export async function runEvaluation(input: {
     for (const module of modules) {
       if (module === "scam") reports.push(await runScamCases(input.db, input.modelRouter));
       if (module === "story") reports.push(await runStoryCases(input.db, input.modelRouter));
+      if (module === "agent") reports.push(await runAgentCases(input.db, input.modelRouter));
     }
     const total = reports.reduce((sum, report) => sum + report.total, 0);
     const passed = reports.reduce((sum, report) => sum + report.passed, 0);

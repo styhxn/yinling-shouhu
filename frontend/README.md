@@ -56,16 +56,18 @@ VITE_PROXY_TARGET=http://127.0.0.1:3100 npm run dev
 | 路由 | 页面 | 说明 |
 | --- | --- | --- |
 | `/` | `RoleSelectPage` | 长者 / 家属角色选择与演示登录 |
-| `/elder` | `ElderHomePage` | 今日：用药、位置、待确认、故事入口 |
-| `/elder/chat` | `AgentChatPage` | 小助手（SSE 流式、语音输入） |
-| `/elder/story` | `MemoryListPage` | 记忆时间轴与故事列表 |
+| `/elder` | `ElderHomePage` | AI 今日简报、用药、位置、待确认、故事入口 |
+| `/elder/chat` | `AgentChatPage` | 小助手（SSE 流式、语音输入、轨迹入口） |
+| `/elder/trace/:id` | `AgentTracePage` | AI 决策轨迹：计划、工具、依据、建议动作 |
+| `/elder/story` | `MemoryListPage` | AI 记忆画像、记忆时间轴与故事列表 |
 | `/elder/story/new` | `MemoryInterviewPage` | 5 轮记忆访谈 |
 | `/elder/story/:id` | `StoryChapterPage` | 故事阅读、朗读、导出故事书 |
 | `/elder/meds` | `MedicationsPage` | 用药计划、服药记录、拍照识药 |
-| `/elder/safety` | `SafetyHomePage` | 实时位置共享、围栏、告警知悉、寻人海报 |
+| `/elder/safety` | `SafetyHomePage` | 实时位置共享、围栏、告警知悉与守护 Agent 研判 |
 | `/elder/safety/scam` | `ScamCheckPage` | 文字/链接/截图反诈鉴定 |
 | `/elder/safety/roleplay` | `RoleplayPage` | 反诈演练与六维复盘 |
-| `/family` | `FamilyDashboardPage` | 家属照护概览、本周简报、待确认 |
+| `/family` | `FamilyDashboardPage` | 家属照护概览、AI 简报、告警研判、待确认 |
+| `/family/trace/:id` | `AgentTracePage` | 家属视角的决策轨迹 |
 
 > `src/ui/pages/` 中还保留了一些早期页面（如 HomePage、SettingsPage、QaPage），当前未挂载路由，可逐步清理，不影响构建。
 
@@ -95,8 +97,10 @@ frontend/
 
 - 所有请求通过 `src/lib/http.ts`，默认 `credentials: "include"`。
 - 后端使用 HttpOnly Cookie 会话；演示登录接口为 `POST /api/auth/demo-login`，body `{ "role": "elder" | "family" }`。
-- SSE 对话：`POST /api/agent/chat`，事件解析在 `src/lib/sse.ts`。
+- SSE 对话：`POST /api/agent/chat`，事件解析在 `src/lib/sse.ts`；`done.traceId` 可跳转决策轨迹。
+- AI 主路径：`GET /api/agent/brief`（今日简报）、`GET /api/agent/traces/:id`（决策轨迹）、`GET /api/memory/profile`（记忆画像）。
 - WebSocket：`/ws`，用于位置更新、安全告警与家属确认推送，需携带会话 Cookie；连接层内置指数退避重连、30 秒心跳与“实时连接/连接中/已断开”状态。
+- 告警研判：`SafetyAlert.payload.assessment` 异步写入，`safety.alert.updated` 推送后原地刷新。
 - 接口字段与错误码见 [docs/接口契约.md](docs/接口契约.md)，页面与组件约定见 [docs/前端开发文档.md](docs/前端开发文档.md)。
 
 ## 设计规范

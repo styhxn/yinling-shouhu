@@ -2,7 +2,7 @@ import React from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Icon } from "../components/Icon.js";
 import { api } from "../../lib/api.js";
-import type { MemoryItem, StoryChapter } from "../../lib/types.js";
+import type { MemoryItem, MemoryProfile, StoryChapter } from "../../lib/types.js";
 import { useToast } from "../state/toast.js";
 
 function formatDate(ts: number) {
@@ -18,6 +18,7 @@ export function MemoryListPage() {
   const toast = useToast();
   const [items, setItems] = React.useState<MemoryItem[]>([]);
   const [chapters, setChapters] = React.useState<StoryChapter[]>([]);
+  const [profile, setProfile] = React.useState<MemoryProfile | null>(null);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
   const [busyId, setBusyId] = React.useState<string | null>(null);
@@ -32,6 +33,10 @@ export function MemoryListPage() {
       ]);
       setItems(memories.items);
       setChapters(stories.chapters);
+      void api.memory
+        .profile()
+        .then((res) => setProfile(res.profile))
+        .catch(() => undefined);
     } catch (err) {
       setError(err instanceof Error ? err.message : "加载失败");
     } finally {
@@ -71,6 +76,28 @@ export function MemoryListPage() {
           开始新故事
         </Link>
       </section>
+
+      {profile?.summary && !profile.summary.startsWith("还没有") && (
+        <section className="yl-memoryProfile" aria-label="AI 记忆画像">
+          <div className="yl-memoryProfileHead">
+            <span className="ys-aiBadge">
+              <Icon name="sparkles" size="sm" />
+              AI 记得您 · {profile.engine === "rules+llm" ? "模型整理" : "规则整理"}
+            </span>
+          </div>
+          <p>{profile.summary}</p>
+          {profile.people.length > 0 && (
+            <div className="yl-memoryProfileTags">
+              {profile.people.slice(0, 6).map((person) => (
+                <span key={person.name}>{person.name}</span>
+              ))}
+              {profile.places.slice(0, 3).map((place) => (
+                <span key={place.name}>{place.name}</span>
+              ))}
+            </div>
+          )}
+        </section>
+      )}
 
       {chapters.length > 0 && (
         <section className="yl-storyShelf">

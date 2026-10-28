@@ -1,9 +1,16 @@
 import type { AppConfig } from "../../config.js";
-import type { AppDb, DbSession } from "../../store/db.js";
+import type {
+  AgentCitation,
+  AgentDecision,
+  AgentTraceStep,
+  AppDb,
+  DbSession
+} from "../../store/db.js";
 import type { SessionUser } from "../auth/types.js";
 import type { createEventBus } from "../eventBus.js";
 import type { ChatMessage, ModelRouter, ToolCall, Usage } from "../llm/types.js";
 import { ModelError } from "../llm/types.js";
+import type { MemoryProfileService } from "../memory/profile.js";
 import type { createStore } from "../store.js";
 import { AGENT_SYSTEM_PROMPT } from "./prompts.js";
 import type { ToolContext, ToolRegistry, ToolResult } from "./tools.js";
@@ -25,7 +32,8 @@ export type AgentEvent =
       type: "done";
       sessionId: string;
       riskLevel: "low" | "medium" | "high";
-      citations: unknown[];
+      citations: AgentCitation[];
+      traceId: string;
       usage?: Usage;
     }
   | { type: "error"; code: string; message: string };
@@ -37,6 +45,7 @@ export type AgentRunnerDeps = {
   modelRouter: ModelRouter;
   toolRegistry: ToolRegistry;
   eventBus: ReturnType<typeof createEventBus>;
+  memoryProfile: MemoryProfileService;
 };
 
 export type AgentRunInput = {
@@ -102,7 +111,7 @@ function confirmationSummary(tool: string, args: unknown): string {
   return "这一步涉及高风险操作，需要您确认。";
 }
 
-type Citation = { title: string; url?: string; type?: string; id?: string };
+type Citation = AgentCitation;
 
 function extractCitations(data: unknown): Citation[] {
   if (!data || typeof data !== "object") return [];
@@ -146,6 +155,44 @@ function errorMessage(err: unknown): string {
   return "agent_failed";
 }
 
+type TraceRecorder = {
+  startedAt: number;
+  steps: AgentTraceStep[];
+  facts: string[];
+  citations: Citation[];
+};
+
+function newRecorder(): TraceRecorder {
+  return { startedAt: Date.now(), steps: [], facts: [], citations: [] };
+}
+
+function pushStep(recorder: TraceRecorder, step: Omit<AgentTraceStep, "index">) {
+  recorder.steps.push({ index: recorder.steps.length, ...step });
+}
+
+function traceDecision(input: {
+  summary: string;
+  riskLevel: "low" | "medium" | "high";
+  citations: Citation[];
+  engine?: "rules" | "rules+llm";
+  needsConfirmation?: boolean;
+  escalation?: "none" | "family" | "emergency";
+}): AgentDecision {
+  return {
+    summary: input.summary,
+    riskLevel: input.riskLevel,
+    confidence: 0.8,
+    needsConfirmation: input.needsConfirmation ?? false,
+    escalation: input.escalation ?? "none",
+    facts: input.citations.map((citation) => citation.title).slice(0, 6),
+    actions: [],
+    explanation: "对话 Agent 的模型回复与工具调用轨迹。",
+    citations: input.citations,
+    engine: input.engine ?? "rules+llm",
+    model: "chat"
+  };
+}
+
 export function createAgentRunner(deps: AgentRunnerDeps): AgentRunner {
   function resolveElderId(user: SessionUser): string | undefined {
     if (user.elderId) return user.elderId;
@@ -157,7 +204,42 @@ export function createAgentRunner(deps: AgentRunnerDeps): AgentRunner {
 
   function buildSystemPrompt(user: SessionUser): string {
     const name = deps.db.users.getById(user.userId)?.displayName ?? "用户";
-    return `${AGENT_SYSTEM_PROMPT}\n当前用户：${name}（${user.role}）。`;
+    const elderId = resolveElderId(user);
+    const profile = elderId ? deps.memoryProfile.getCached(elderId) : null;
+    const profileLine =
+      profile?.summary && !profile.summary.startsWith("还没有")
+        ? `\n已知记忆画像（只用于个性化陪伴，不要逐条复述）：${profile.summary}` +
+          (profile.sensitivities.length ? ` 沟通注意：${profile.sensitivities.join("；")}` : "")
+        : "";
+    return `${AGENT_SYSTEM_PROMPT}\n当前用户：${name}（${user.role}）。${profileLine}`;
+  }
+
+  function persistTrace(input: {
+    ctx: ToolContext;
+    goal: string;
+    status: "ok" | "needs_confirmation" | "error";
+    decision: AgentDecision;
+    recorder: TraceRecorder;
+  }): string {
+    const elderId = input.ctx.elderId ?? input.ctx.user.elderId ?? input.ctx.user.userId;
+    const trace = deps.db.agentTraces.create({
+      elderId,
+      userId: input.ctx.user.userId,
+      agent: "companion",
+      trigger: "user",
+      goal: input.goal.slice(0, 300),
+      status: input.status,
+      decision: {
+        ...input.decision,
+        citations: input.recorder.citations,
+        model: deps.modelRouter.mode
+      },
+      steps: input.recorder.steps,
+      citations: input.recorder.citations,
+      model: deps.modelRouter.mode,
+      latencyMs: Date.now() - input.recorder.startedAt
+    });
+    return trace.id;
   }
 
   function saveSession(session: DbSession, messages: ChatMessage[], summary?: string) {
@@ -217,14 +299,19 @@ export function createAgentRunner(deps: AgentRunnerDeps): AgentRunner {
     messages: ChatMessage[];
     session: DbSession;
     ctx: ToolContext;
+    recorder: TraceRecorder;
+    goal: string;
     signal?: AbortSignal;
     initialRisk?: "low" | "medium" | "high";
     initialCitations?: Citation[];
   }): AsyncGenerator<AgentEvent> {
-    const { messages, session, ctx, signal } = input;
+    const { messages, session, ctx, signal, recorder } = input;
     let riskLevel: "low" | "medium" | "high" = input.initialRisk ?? "low";
     let lastUsage: Usage | undefined;
-    const citations: Citation[] = [...(input.initialCitations ?? [])];
+    if (input.initialCitations?.length) {
+      mergeCitations(recorder.citations, input.initialCitations);
+    }
+    const citations = recorder.citations;
 
     for (let step = 0; step < 4; step += 1) {
       const toolSchemas = deps.toolRegistry.schemas(ctx.user.role);
@@ -251,7 +338,25 @@ export function createAgentRunner(deps: AgentRunnerDeps): AgentRunner {
           }
         }
       } catch (err) {
-        yield { type: "error", code: err instanceof ModelError ? err.code : "agent_failed", message: errorMessage(err) };
+        const message = errorMessage(err);
+        pushStep(recorder, {
+          type: "error",
+          label: "模型调用失败",
+          detail: message,
+          ok: false
+        });
+        persistTrace({
+          ctx,
+          goal: input.goal,
+          status: "error",
+          decision: traceDecision({ summary: message, riskLevel, citations, engine: "rules" }),
+          recorder
+        });
+        yield {
+          type: "error",
+          code: err instanceof ModelError ? err.code : "agent_failed",
+          message
+        };
         return;
       }
 
@@ -260,11 +365,25 @@ export function createAgentRunner(deps: AgentRunnerDeps): AgentRunner {
         for (const piece of chunkText(answer)) yield { type: "token", text: piece };
         messages.push({ role: "assistant", content: answer });
         saveSession(session, messages);
+        pushStep(recorder, {
+          type: "decision",
+          label: "生成回答",
+          detail: answer.slice(0, 300),
+          ok: true
+        });
+        const traceId = persistTrace({
+          ctx,
+          goal: input.goal,
+          status: "ok",
+          decision: traceDecision({ summary: answer, riskLevel, citations }),
+          recorder
+        });
         yield {
           type: "done",
           sessionId: session.id,
           riskLevel,
           citations,
+          traceId,
           ...(lastUsage ? { usage: lastUsage } : {})
         };
         return;
@@ -281,11 +400,26 @@ export function createAgentRunner(deps: AgentRunnerDeps): AgentRunner {
             name: call.name,
             content: "未知工具"
           });
+          pushStep(recorder, {
+            type: "tool_result",
+            label: `${call.name} 不可用`,
+            tool: call.name,
+            ok: false,
+            latencyMs: 0,
+            detail: "未知工具"
+          });
           yield { type: "tool_result", id: call.id, ok: false, summary: "未知工具", latencyMs: 0 };
           continue;
         }
 
         yield { type: "tool_call", id: call.id, name: call.name, args: redactArgs(call.args), risk: tool.risk };
+        pushStep(recorder, {
+          type: "tool_call",
+          label: `调用 ${call.name}`,
+          tool: call.name,
+          args: redactArgs(call.args),
+          detail: tool.description
+        });
 
         if (tool.requiresConfirmation) {
           let preparedArgs: unknown = call.args;
@@ -302,6 +436,14 @@ export function createAgentRunner(deps: AgentRunnerDeps): AgentRunner {
                 tool_call_id: call.id,
                 name: call.name,
                 content: `准备失败：${message}`
+              });
+              pushStep(recorder, {
+                type: "tool_result",
+                label: `${call.name} 准备失败`,
+                tool: call.name,
+                ok: false,
+                latencyMs: 0,
+                detail: message
               });
               yield {
                 type: "tool_result",
@@ -321,6 +463,25 @@ export function createAgentRunner(deps: AgentRunnerDeps): AgentRunner {
             ttlMs: call.name === "start_cooling_off" ? 60_000 : 5 * 60_000
           });
           saveSession(session, messages);
+          pushStep(recorder, {
+            type: "decision",
+            label: "等待用户确认",
+            detail: preparedSummary,
+            ok: true
+          });
+          persistTrace({
+            ctx,
+            goal: input.goal,
+            status: "needs_confirmation",
+            decision: traceDecision({
+              summary: preparedSummary,
+              riskLevel: "high",
+              citations,
+              needsConfirmation: true,
+              escalation: call.name === "start_cooling_off" ? "family" : "none"
+            }),
+            recorder
+          });
           yield {
             type: "confirmation_required",
             id: confirmation.id,
@@ -334,6 +495,15 @@ export function createAgentRunner(deps: AgentRunnerDeps): AgentRunner {
 
         const result = await executeTool(call, ctx);
         mergeCitations(citations, extractCitations(result.data));
+        recorder.facts.push(result.summary.slice(0, 200));
+        pushStep(recorder, {
+          type: "tool_result",
+          label: `${call.name} 返回`,
+          tool: call.name,
+          ok: result.ok,
+          latencyMs: result.latencyMs,
+          detail: result.summary.slice(0, 300)
+        });
         messages.push({
           role: "tool",
           tool_call_id: call.id,
@@ -358,29 +528,72 @@ export function createAgentRunner(deps: AgentRunnerDeps): AgentRunner {
     for (const piece of chunkText(fallback)) yield { type: "token", text: piece };
     messages.push({ role: "assistant", content: fallback });
     saveSession(session, messages);
-    yield { type: "done", sessionId: session.id, riskLevel, citations };
+    pushStep(recorder, {
+      type: "decision",
+      label: "达到工具步数上限",
+      detail: fallback,
+      ok: true
+    });
+    const traceId = persistTrace({
+      ctx,
+      goal: input.goal,
+      status: "ok",
+      decision: traceDecision({ summary: fallback, riskLevel, citations }),
+      recorder
+    });
+    yield { type: "done", sessionId: session.id, riskLevel, citations, traceId };
   }
 
   async function* resumeConfirmation(
     input: AgentRunInput,
     session: DbSession,
-    ctx: ToolContext
+    ctx: ToolContext,
+    recorder: TraceRecorder
   ): AsyncGenerator<AgentEvent> {
     const confirmation = deps.db.confirmations.get(input.confirmationId!);
+    const goal = confirmation ? `确认并继续：${confirmation.tool}` : "确认高风险操作";
     if (!confirmation) {
+      persistTrace({
+        ctx,
+        goal,
+        status: "error",
+        decision: traceDecision({ summary: "确认记录不存在", riskLevel: "medium", citations: [] }),
+        recorder
+      });
       yield { type: "error", code: "confirmation_not_found", message: "确认记录不存在" };
       return;
     }
     if (confirmation.sessionId !== session.id || confirmation.userId !== input.user.userId) {
+      persistTrace({
+        ctx,
+        goal,
+        status: "error",
+        decision: traceDecision({ summary: "确认记录不属于当前会话", riskLevel: "medium", citations: [] }),
+        recorder
+      });
       yield { type: "error", code: "forbidden", message: "确认记录不属于当前会话" };
       return;
     }
     if (confirmation.status !== "pending") {
+      persistTrace({
+        ctx,
+        goal,
+        status: "error",
+        decision: traceDecision({ summary: "这条确认已经处理过了", riskLevel: "medium", citations: [] }),
+        recorder
+      });
       yield { type: "error", code: "confirmation_used", message: "这条确认已经处理过了" };
       return;
     }
     if (confirmation.expiresAt < Date.now()) {
       deps.db.confirmations.setStatus(confirmation.id, "expired");
+      persistTrace({
+        ctx,
+        goal,
+        status: "error",
+        decision: traceDecision({ summary: "确认已过期，请重新发起", riskLevel: "medium", citations: [] }),
+        recorder
+      });
       yield { type: "error", code: "confirmation_expired", message: "确认已过期，请重新发起" };
       return;
     }
@@ -392,14 +605,40 @@ export function createAgentRunner(deps: AgentRunnerDeps): AgentRunner {
       const answer = "好的，已经取消。您先不要转账，有需要可以再叫我。";
       messages.push({ role: "assistant", content: answer });
       saveSession(session, messages);
+      pushStep(recorder, {
+        type: "decision",
+        label: "用户取消高风险操作",
+        detail: answer,
+        ok: true
+      });
+      const traceId = persistTrace({
+        ctx,
+        goal,
+        status: "ok",
+        decision: traceDecision({ summary: answer, riskLevel: "high", citations: [] }),
+        recorder
+      });
       yield { type: "token", text: answer };
-      yield { type: "done", sessionId: session.id, riskLevel: "high", citations: [] };
+      yield {
+        type: "done",
+        sessionId: session.id,
+        riskLevel: "high",
+        citations: [],
+        traceId
+      };
       return;
     }
 
     deps.db.confirmations.setStatus(confirmation.id, "approved");
     const tool = deps.toolRegistry.get(confirmation.tool);
     if (!tool) {
+      persistTrace({
+        ctx,
+        goal,
+        status: "error",
+        decision: traceDecision({ summary: "工具不存在", riskLevel: "medium", citations: [] }),
+        recorder
+      });
       yield { type: "error", code: "unknown_tool", message: "工具不存在" };
       return;
     }
@@ -407,14 +646,30 @@ export function createAgentRunner(deps: AgentRunnerDeps): AgentRunner {
     const callId = lastToolCallId(messages) ?? `call_${confirmation.id}`;
     const call: ToolCall = { id: callId, name: confirmation.tool, args: confirmation.args };
     yield { type: "tool_call", id: callId, name: call.name, args: redactArgs(call.args), risk: tool.risk };
+    pushStep(recorder, {
+      type: "tool_call",
+      label: `用户确认后执行 ${call.name}`,
+      tool: call.name,
+      args: redactArgs(call.args),
+      detail: tool.description
+    });
 
     const result = await executeTool(call, ctx);
     const approvedCitations = extractCitations(result.data);
+    recorder.facts.push(result.summary.slice(0, 200));
     messages.push({
       role: "tool",
       tool_call_id: callId,
       name: call.name,
       content: result.summary
+    });
+    pushStep(recorder, {
+      type: "tool_result",
+      label: `${call.name} 返回`,
+      tool: call.name,
+      ok: result.ok,
+      latencyMs: result.latencyMs,
+      detail: result.summary.slice(0, 300)
     });
     yield {
       type: "tool_result",
@@ -428,6 +683,8 @@ export function createAgentRunner(deps: AgentRunnerDeps): AgentRunner {
       messages,
       session,
       ctx,
+      recorder,
+      goal,
       ...(input.signal ? { signal: input.signal } : {}),
       initialRisk: "high",
       initialCitations: approvedCitations
@@ -436,6 +693,7 @@ export function createAgentRunner(deps: AgentRunnerDeps): AgentRunner {
 
   async function* run(input: AgentRunInput): AsyncGenerator<AgentEvent> {
     const elderId = resolveElderId(input.user);
+    const recorder = newRecorder();
     const ctx: ToolContext = {
       user: input.user,
       sessionId: input.sessionId ?? "",
@@ -456,20 +714,40 @@ export function createAgentRunner(deps: AgentRunnerDeps): AgentRunner {
     yield { type: "meta", sessionId: session.id };
 
     if (input.confirmationId) {
-      yield* resumeConfirmation(input, session, ctx);
+      yield* resumeConfirmation(input, session, ctx, recorder);
       return;
     }
 
     if (!input.message.trim()) {
+      pushStep(recorder, {
+        type: "error",
+        label: "空消息",
+        detail: "请说点什么",
+        ok: false
+      });
+      persistTrace({
+        ctx,
+        goal: "用户对话",
+        status: "error",
+        decision: traceDecision({ summary: "请说点什么", riskLevel: "low", citations: [] }),
+        recorder
+      });
       yield { type: "error", code: "empty_message", message: "请说点什么" };
       return;
     }
 
+    pushStep(recorder, {
+      type: "plan",
+      label: "理解用户请求",
+      detail: input.message.slice(0, 300)
+    });
     const messages = [...(session.messages as ChatMessage[]), { role: "user", content: input.message } as ChatMessage];
     yield* runLoop({
       messages,
       session,
       ctx,
+      recorder,
+      goal: input.message,
       ...(input.signal ? { signal: input.signal } : {})
     });
   }

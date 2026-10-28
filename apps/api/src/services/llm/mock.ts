@@ -242,6 +242,234 @@ export class MockModelProvider implements ModelRouter {
       });
     }
 
+    if (req.task === "memory_profile") {
+      const input = lastUserJson(req.messages);
+      const memories = Array.isArray(input.memories)
+        ? (input.memories as Array<Record<string, unknown>>)
+        : [];
+      const corpus = memories
+        .map((memory) =>
+          [
+            typeof memory.title === "string" ? memory.title : "",
+            typeof memory.summary === "string" ? memory.summary : "",
+            typeof memory.transcript === "string" ? memory.transcript : "",
+            Array.isArray(memory.people) ? memory.people.join(" ") : "",
+            Array.isArray(memory.tags) ? memory.tags.join(" ") : "",
+            typeof memory.place === "string" ? memory.place : ""
+          ].join("\n")
+        )
+        .join("\n");
+      const people = Array.from(
+        new Set(
+          memories
+            .flatMap((memory) => (Array.isArray(memory.people) ? memory.people : []))
+            .filter((item): item is string => typeof item === "string")
+            .concat(
+              corpus.match(/母亲|父亲|妈妈|爸爸|老伴|女儿|儿子|邻居|同事|老师|朋友|孙子|孙女|师傅/g) ??
+                []
+            )
+        )
+      ).slice(0, 8);
+      const places = Array.from(
+        new Set(
+          memories
+            .map((memory) => (typeof memory.place === "string" ? memory.place : ""))
+            .filter(Boolean)
+            .concat(
+              Array.from(
+                corpus.matchAll(
+                  /(?:住在|在)([\u4e00-\u9fa5]{2,10}(?:河边|村|镇|街|路|桥|厂|学校|公园))/g
+                )
+              ).map((match) => match[1] ?? "")
+            )
+        )
+      )
+        .filter(Boolean)
+        .slice(0, 8);
+      const routines = Array.from(
+        corpus.matchAll(/(?:每天|常常|总是|经常)([^。！？\n]{2,24})/g)
+      )
+        .map((match) => (match[1] ?? "").trim())
+        .filter(Boolean)
+        .slice(0, 4);
+      const preferences = Array.from(
+        corpus.matchAll(/(?:喜欢|爱|最爱)([^。！？\n]{2,24})/g)
+      )
+        .map((match) => (match[1] ?? "").trim())
+        .filter(Boolean)
+        .slice(0, 4);
+      const summaryParts = [
+        people.length ? `常提到${people.slice(0, 3).join("、")}` : "",
+        places.length ? `对${places.slice(0, 2).join("、")}有清晰记忆` : "",
+        routines.length ? `习惯${routines[0]}` : ""
+      ].filter(Boolean);
+      return req.schema.parse({
+        summary: summaryParts.length ? `${summaryParts.join("；")}。` : "还没有足够的记忆形成画像。",
+        people: people.map((name) => ({ name })),
+        places: places.map((name) => ({ name })),
+        routines,
+        preferences,
+        sensitivities: /去世|走了|不在了|过世/.test(corpus)
+          ? ["提到已故亲人时，先共情，不追问细节"]
+          : []
+      });
+    }
+
+    if (req.task === "agent_plan") {
+      const input = lastUserJson(req.messages);
+      const catalog = Array.isArray(input.allowedTools)
+        ? (input.allowedTools as Array<Record<string, unknown>>)
+        : [];
+      const allowed = catalog
+        .map((item) => (typeof item.name === "string" ? item.name : ""))
+        .filter(Boolean);
+      const kind = input.kind === "brief" || input.kind === "alert" ? input.kind : "custom";
+      const preferred =
+        kind === "brief"
+          ? ["get_memory_profile", "get_medications", "get_weather", "get_location"]
+          : kind === "alert"
+            ? ["get_location", "get_memory_profile", "get_medications", "get_weather"]
+            : ["get_medications", "get_memory_profile", "get_weather", "search_memories"];
+      const picked = preferred.filter((tool) => allowed.includes(tool)).slice(0, 4);
+      const steps = (picked.length ? picked : allowed.slice(0, 2)).map((tool) => ({
+        tool,
+        args:
+          tool === "get_weather"
+            ? { location: "南京" }
+            : tool === "search_memories"
+              ? { limit: 2 }
+              : {},
+        reason:
+          tool === "get_medications"
+            ? "先看今天的用药计划"
+            : tool === "get_weather"
+              ? "判断天气是否影响出门"
+              : tool === "get_location"
+                ? "看最后一次位置上报"
+                : tool === "get_memory_profile"
+                  ? "带上老人熟悉的人和习惯"
+                  : "找与今天相关的口述记忆"
+      }));
+      return req.schema.parse({
+        steps,
+        rationale: "按任务类型读取用药、天气、位置和记忆，再给出一条可执行建议。"
+      });
+    }
+
+    if (req.task === "agent_decision") {
+      const input = lastUserJson(req.messages);
+      const facts = Array.isArray(input.facts)
+        ? (input.facts as unknown[])
+            .filter((item): item is string => typeof item === "string")
+            .slice(0, 5)
+        : [];
+      const context =
+        input.context && typeof input.context === "object" && !Array.isArray(input.context)
+          ? (input.context as Record<string, unknown>)
+          : {};
+      const kind = input.kind;
+      if (kind === "brief") {
+        const items = facts.slice(0, 3).map((fact) => {
+          if (/记忆画像|常提到|沟通提醒/.test(fact)) {
+            return {
+              title: "AI 记得您",
+              detail: fact.replace(/^记忆画像：/, "").slice(0, 150),
+              priority: "later",
+              actionLabel: "看看故事",
+              href: "/elder/story"
+            };
+          }
+          if (/药|服用|打卡|mg|片|每日|每次/.test(fact)) {
+            return {
+              title: "按时吃药",
+              detail: fact.slice(0, 150),
+              priority: "now",
+              actionLabel: "去打卡",
+              href: "/elder/meds"
+            };
+          }
+          if (/天气|℃|雨|风/.test(fact)) {
+            return {
+              title: "出门看天气",
+              detail: fact.slice(0, 150),
+              priority: "today",
+              actionLabel: "问小助手",
+              href: "/elder/chat"
+            };
+          }
+          if (/位置|围栏|最后/.test(fact)) {
+            return {
+              title: "位置与安全",
+              detail: fact.slice(0, 150),
+              priority: "today",
+              actionLabel: "查看守护",
+              href: "/elder/safety"
+            };
+          }
+          return {
+            title: "今天的回忆",
+            detail: fact.slice(0, 150),
+            priority: "later",
+            actionLabel: "看看故事",
+            href: "/elder/story"
+          };
+        });
+        return req.schema.parse({
+          summary: "今天先把药吃好、把天气看明白，其他的慢慢来。",
+          riskLevel: "low",
+          confidence: 0.82,
+          needsConfirmation: false,
+          escalation: "none",
+          facts: facts.map((fact) => fact.slice(0, 160)),
+          actions: [
+            { label: "和小助手说说", kind: "link", href: "/elder/chat" },
+            { label: "看看故事", kind: "link", href: "/elder/story" }
+          ],
+          briefItems: items.length
+            ? items
+            : [
+                {
+                  title: "今天先照顾好自己",
+                  detail: "还没有足够的数据生成更多提醒，先喝口水、慢慢来。",
+                  priority: "today"
+                }
+              ],
+          explanation: "根据用药、天气、位置和记忆记录整理。"
+        });
+      }
+
+      const alertLevel =
+        typeof context.alertLevel === "string" ? context.alertLevel.toLowerCase() : "warn";
+      const riskLevel = alertLevel === "critical" ? "high" : alertLevel === "info" ? "low" : "medium";
+      const alertType =
+        typeof context.alertType === "string" ? context.alertType : "safety_alert";
+      const alertLabel =
+        alertType === "geofence.exit"
+          ? "越界提醒"
+          : alertType === "cooling_off"
+            ? "转账冷静期"
+            : "安全提醒";
+      return req.schema.parse({
+        summary:
+          riskLevel === "high"
+            ? `我注意到一条${alertLabel}，先别慌，建议马上电话确认并联系家人。`
+            : `我注意到一条${alertLabel}，先确认一下情况，再决定要不要通知家人。`,
+        riskLevel,
+        confidence: 0.78,
+        needsConfirmation: riskLevel === "high",
+        escalation: riskLevel === "high" ? "family" : "none",
+        facts: facts.map((fact) => fact.slice(0, 160)),
+        actions: [
+          { label: "查看位置", kind: "link", href: "/elder/safety" },
+          { label: "联系家人", kind: "link", href: "/elder/chat" },
+          ...(riskLevel === "high"
+            ? [{ label: "拨打 110", kind: "call", href: "tel:110" }]
+            : [])
+        ],
+        explanation: `事件类型：${alertLabel}；结合最近位置、用药和天气记录做综合研判。`
+      });
+    }
+
     return req.schema.parse({});
   }
 

@@ -1,7 +1,14 @@
 import React from "react";
+import { Link } from "react-router-dom";
 import { Icon } from "../components/Icon.js";
 import { api } from "../../lib/api.js";
-import type { FamilyConfirm, FamilySummary, SafetyAlert, WeeklyReport } from "../../lib/types.js";
+import type {
+  AgentBrief,
+  FamilyConfirm,
+  FamilySummary,
+  SafetyAlert,
+  WeeklyReport
+} from "../../lib/types.js";
 import { useAuth } from "../state/auth.js";
 import { useRealtime } from "../state/realtime.js";
 import { useToast } from "../state/toast.js";
@@ -56,6 +63,7 @@ export function FamilyDashboardPage() {
   const elderId = me?.familyLinks[0]?.elderId ?? "";
   const [summary, setSummary] = React.useState<FamilySummary | null>(null);
   const [report, setReport] = React.useState<WeeklyReport | null>(null);
+  const [brief, setBrief] = React.useState<AgentBrief | null>(null);
   const [items, setItems] = React.useState<FamilyConfirm[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
@@ -82,6 +90,10 @@ export function FamilyDashboardPage() {
       setSummary(summaryRes.summary);
       setReport(reportRes.report);
       setItems(pendingRes.items);
+      void api.agent
+        .brief({ elderId })
+        .then((res) => setBrief(res.brief))
+        .catch(() => undefined);
     } catch (err) {
       if (!silent) setError(err instanceof Error ? err.message : "加载失败");
     } finally {
@@ -230,6 +242,39 @@ export function FamilyDashboardPage() {
             </div>
           </section>
 
+          {brief && (
+            <section className="ys-panel ys-familyBrief">
+              <div className="ys-sectionTitle">
+                <Icon name="sparkles" size="sm" />
+                AI 今日简报
+                <span className="ys-aiPriority ys-aiPriority--today" style={{ marginLeft: "auto" }}>
+                  {brief.engine === "rules+llm" ? "模型整理" : "规则整理"}
+                </span>
+              </div>
+              <h2>{brief.summary}</h2>
+              <p className="ys-mutedText">
+                {brief.greeting}。{brief.encouragement}
+              </p>
+              {brief.items.length > 0 && (
+                <div className="ys-familyBriefItems">
+                  {brief.items.map((item) => (
+                    <div key={item.title} className="ys-familyBriefItem">
+                      <span>{item.priority === "now" ? "现在" : item.priority === "today" ? "今天" : "有空时"}</span>
+                      <strong>{item.title}</strong>
+                      <p>{item.detail}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {brief.traceId && (
+                <Link to={`/family/trace/${brief.traceId}`} className="yl-traceLink">
+                  <Icon name="sparkles" size="sm" />
+                  查看 AI 决策依据
+                </Link>
+              )}
+            </section>
+          )}
+
           {summary && summary.alerts.items.length > 0 ? (
             <section className="ys-panel">
               <div className="ys-sectionTitle">
@@ -244,6 +289,21 @@ export function FamilyDashboardPage() {
                       <strong>{alertLabel(alert.type)}</strong>
                       <small>{formatTime(alert.createdAt)}</small>
                       {alertDetail(alert) ? <p>{alertDetail(alert)}</p> : null}
+                      {alert.payload.assessment ? (
+                        <div className="ys-alertAssessment">
+                          <span className="ys-aiPriority ys-aiPriority--today">
+                            守护 Agent · {alert.payload.assessment.riskLevel === "high" ? "高风险" : "已研判"}
+                          </span>
+                          <p>{alert.payload.assessment.summary}</p>
+                          <Link
+                            to={`/family/trace/${alert.payload.assessment.traceId}`}
+                            className="yl-traceLink"
+                          >
+                            <Icon name="sparkles" size="sm" />
+                            查看 AI 决策依据
+                          </Link>
+                        </div>
+                      ) : null}
                     </div>
                     <button
                       type="button"

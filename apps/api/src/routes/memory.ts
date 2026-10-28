@@ -45,6 +45,10 @@ const ListQuerySchema = z.object({
   q: z.string().max(100).optional()
 });
 const StoryQuerySchema = z.object({ elderId: z.string().max(80).optional() });
+const ProfileQuerySchema = z.object({
+  elderId: z.string().max(80).optional(),
+  refresh: z.enum(["0", "1"]).optional()
+});
 const IdParamsSchema = z.object({ id: z.string().min(1).max(80) });
 
 function resolveElderId(req: FastifyRequest, requested?: string): string | null {
@@ -180,6 +184,18 @@ function storyBookHtml(input: {
 }
 
 export const memoryRoutes: FastifyPluginAsync = async (server) => {
+  server.get("/profile", { preHandler: requireAuth }, async (req, reply) => {
+    const query = ProfileQuerySchema.safeParse(req.query);
+    if (!query.success) return reply.code(400).send({ error: "invalid_body" });
+    const elderId = resolveElderId(req, query.data.elderId);
+    if (!elderId) return reply.code(403).send({ error: "forbidden" });
+    const profile = await server.memoryProfile.get(elderId, {
+      refresh: query.data.refresh === "1"
+    });
+    const record = server.db.memoryProfiles.getByElder(elderId);
+    return { ok: true, profile, sourceCount: record?.sourceCount ?? 0 };
+  });
+
   server.get("/items", { preHandler: requireAuth }, async (req, reply) => {
     const query = ListQuerySchema.safeParse(req.query);
     if (!query.success) return reply.code(400).send({ error: "invalid_body" });
@@ -221,6 +237,7 @@ export const memoryRoutes: FastifyPluginAsync = async (server) => {
       visibility: parsed.data.visibility ?? "family",
       consent: parsed.data.consent
     });
+    void server.memoryProfile.refresh(elderId).catch(() => undefined);
     return { item };
   });
 
@@ -241,6 +258,7 @@ export const memoryRoutes: FastifyPluginAsync = async (server) => {
       Object.entries(body.data).filter(([, value]) => value !== undefined)
     ) as Parameters<typeof server.db.memories.update>[1];
     const item = server.db.memories.update(params.data.id, patch);
+    void server.memoryProfile.refresh(current.elderId).catch(() => undefined);
     return { item };
   });
 
@@ -255,6 +273,7 @@ export const memoryRoutes: FastifyPluginAsync = async (server) => {
       return reply.code(403).send({ error: "forbidden" });
     }
     server.db.memories.softDelete(current.id);
+    void server.memoryProfile.refresh(current.elderId).catch(() => undefined);
     server.db.auditLogs.insert({
       userId: req.user!.userId,
       action: "memory.delete",
@@ -301,6 +320,9 @@ export const memoryRoutes: FastifyPluginAsync = async (server) => {
           elderId: user.elderId,
           text: body.data.text
         });
+        if ((result as { done?: boolean }).done) {
+          void server.memoryProfile.refresh(user.elderId).catch(() => undefined);
+        }
         return { ok: true, ...result };
       } catch (err) {
         const code = err instanceof Error ? err.message : "failed";

@@ -204,6 +204,110 @@ export type DbEvalRun = {
   metrics: unknown;
 };
 
+export type AgentCitation = {
+  title: string;
+  url?: string | undefined;
+  type?: string | undefined;
+  id?: string | undefined;
+};
+
+export type AgentAction = {
+  label: string;
+  kind: "link" | "call" | "confirm" | "tool";
+  href?: string | undefined;
+  tool?: string | undefined;
+};
+
+export type AgentBriefItem = {
+  title: string;
+  detail: string;
+  priority: "now" | "today" | "later";
+  actionLabel?: string | undefined;
+  href?: string | undefined;
+};
+
+export type AgentBriefContent = {
+  greeting: string;
+  summary: string;
+  items: AgentBriefItem[];
+  encouragement: string;
+  riskLevel: "low" | "medium" | "high";
+  confidence: number;
+  engine: "rules" | "rules+llm";
+  model: string;
+  traceId?: string;
+};
+
+export type AgentDecision = {
+  summary: string;
+  riskLevel: "low" | "medium" | "high";
+  confidence: number;
+  needsConfirmation: boolean;
+  escalation: "none" | "family" | "emergency";
+  facts: string[];
+  actions: AgentAction[];
+  briefItems?: AgentBriefItem[] | undefined;
+  explanation: string;
+  citations: AgentCitation[];
+  engine: "rules" | "rules+llm";
+  model: string;
+};
+
+export type AgentTraceStep = {
+  index: number;
+  type: "plan" | "tool_call" | "tool_result" | "decision" | "error";
+  label: string;
+  detail?: string | undefined;
+  tool?: string | undefined;
+  args?: unknown;
+  ok?: boolean | undefined;
+  latencyMs?: number | undefined;
+};
+
+export type DbAgentTrace = {
+  id: string;
+  elderId: string;
+  userId: string;
+  agent: string;
+  trigger: string;
+  goal: string;
+  status: "ok" | "needs_confirmation" | "error";
+  decision: AgentDecision | null;
+  steps: AgentTraceStep[];
+  citations: AgentCitation[];
+  model: string;
+  latencyMs: number;
+  createdAt: number;
+};
+
+export type DbAgentBrief = {
+  id: string;
+  elderId: string;
+  briefDate: string;
+  content: AgentBriefContent;
+  createdAt: number;
+  updatedAt: number;
+};
+
+export type MemoryProfile = {
+  summary: string;
+  people: { name: string; relation?: string | undefined; note?: string | undefined }[];
+  places: { name: string; note?: string | undefined }[];
+  routines: string[];
+  preferences: string[];
+  sensitivities: string[];
+  engine: "rules" | "rules+llm";
+  model: string;
+  updatedAt: number;
+};
+
+export type DbMemoryProfile = {
+  elderId: string;
+  profile: MemoryProfile;
+  sourceCount: number;
+  updatedAt: number;
+};
+
 export type InterviewQA = {
   question: string;
   answer: string;
@@ -1372,6 +1476,16 @@ export function createDb(dbPath: string, options: CreateDbOptions) {
         createdAt: now
       };
     },
+    getById(id: string): DbSafetyAlert | null {
+      const row = raw.prepare("SELECT * FROM safety_alerts WHERE id = ?").get(id) as any;
+      return row ? mapAlert(row) : null;
+    },
+    updatePayload(id: string, payload: unknown): DbSafetyAlert | null {
+      raw
+        .prepare("UPDATE safety_alerts SET payload_json = ? WHERE id = ?")
+        .run(JSON.stringify(payload), id);
+      return safetyAlerts.getById(id);
+    },
     listByElder(elderId: string, status?: string): DbSafetyAlert[] {
       const rows = status
         ? (raw
@@ -1384,6 +1498,14 @@ export function createDb(dbPath: string, options: CreateDbOptions) {
               "SELECT * FROM safety_alerts WHERE elder_id = ? ORDER BY created_at DESC LIMIT 50"
             )
             .all(elderId) as any[]);
+      return rows.map(mapAlert);
+    },
+    listOpen(limit = 10): DbSafetyAlert[] {
+      const rows = raw
+        .prepare(
+          "SELECT * FROM safety_alerts WHERE status = 'open' ORDER BY created_at DESC LIMIT ?"
+        )
+        .all(Math.max(1, Math.min(limit, 50))) as any[];
       return rows.map(mapAlert);
     },
     ack(id: string, status: string): void {
@@ -1652,6 +1774,182 @@ export function createDb(dbPath: string, options: CreateDbOptions) {
     };
   }
 
+  function mapAgentTrace(row: any): DbAgentTrace {
+    return {
+      id: String(row.id),
+      elderId: String(row.elder_id),
+      userId: String(row.user_id),
+      agent: String(row.agent),
+      trigger: String(row.trigger),
+      goal: String(row.goal),
+      status: row.status as DbAgentTrace["status"],
+      decision: parseJson<AgentDecision | null>(row.decision_json, null),
+      steps: parseJson<AgentTraceStep[]>(row.steps_json, []),
+      citations: parseJson<AgentCitation[]>(row.citations_json, []),
+      model: String(row.model),
+      latencyMs: Number(row.latency_ms),
+      createdAt: Number(row.created_at)
+    };
+  }
+
+  const agentTraces = {
+    create(input: {
+      elderId: string;
+      userId: string;
+      agent: string;
+      trigger: string;
+      goal: string;
+      status: DbAgentTrace["status"];
+      decision: AgentDecision | null;
+      steps: AgentTraceStep[];
+      citations: AgentCitation[];
+      model: string;
+      latencyMs: number;
+    }): DbAgentTrace {
+      const id = `tr_${randomUUID()}`;
+      const now = Date.now();
+      raw
+        .prepare(
+          `INSERT INTO agent_traces
+            (id, elder_id, user_id, agent, trigger, goal, status, decision_json, steps_json,
+             citations_json, model, latency_ms, created_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        )
+        .run(
+          id,
+          input.elderId,
+          input.userId,
+          input.agent,
+          input.trigger,
+          input.goal,
+          input.status,
+          input.decision ? JSON.stringify(input.decision) : null,
+          JSON.stringify(input.steps),
+          JSON.stringify(input.citations),
+          input.model,
+          input.latencyMs,
+          now
+        );
+      return agentTraces.getById(id)!;
+    },
+    getById(id: string): DbAgentTrace | null {
+      const row = raw.prepare("SELECT * FROM agent_traces WHERE id = ?").get(id) as any;
+      return row ? mapAgentTrace(row) : null;
+    },
+    listByElder(elderId: string, limit = 20): DbAgentTrace[] {
+      const rows = raw
+        .prepare(
+          "SELECT * FROM agent_traces WHERE elder_id = ? ORDER BY created_at DESC LIMIT ?"
+        )
+        .all(elderId, Math.max(1, Math.min(limit, 50))) as any[];
+      return rows.map(mapAgentTrace);
+    },
+    deleteBefore(ts: number): number {
+      const result = raw.prepare("DELETE FROM agent_traces WHERE created_at < ?").run(ts);
+      return Number(result.changes ?? 0);
+    }
+  };
+
+  function mapAgentBrief(row: any): DbAgentBrief {
+    return {
+      id: String(row.id),
+      elderId: String(row.elder_id),
+      briefDate: String(row.brief_date),
+      content: parseJson<AgentBriefContent>(row.content_json, {
+        greeting: "",
+        summary: "",
+        items: [],
+        encouragement: "",
+        riskLevel: "low",
+        confidence: 0,
+        engine: "rules",
+        model: "rules"
+      }),
+      createdAt: Number(row.created_at),
+      updatedAt: Number(row.updated_at)
+    };
+  }
+
+  const agentBriefs = {
+    upsert(input: {
+      elderId: string;
+      briefDate: string;
+      content: AgentBriefContent;
+    }): DbAgentBrief {
+      const now = Date.now();
+      raw
+        .prepare(
+          `INSERT INTO agent_briefs (id, elder_id, brief_date, content_json, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?)
+           ON CONFLICT(elder_id, brief_date) DO UPDATE SET
+             content_json = excluded.content_json,
+             updated_at = excluded.updated_at`
+        )
+        .run(
+          `br_${randomUUID()}`,
+          input.elderId,
+          input.briefDate,
+          JSON.stringify(input.content),
+          now,
+          now
+        );
+      return agentBriefs.getByDate(input.elderId, input.briefDate)!;
+    },
+    getByDate(elderId: string, briefDate: string): DbAgentBrief | null {
+      const row = raw
+        .prepare("SELECT * FROM agent_briefs WHERE elder_id = ? AND brief_date = ?")
+        .get(elderId, briefDate) as any;
+      return row ? mapAgentBrief(row) : null;
+    },
+    deleteBefore(date: string): number {
+      const result = raw.prepare("DELETE FROM agent_briefs WHERE brief_date < ?").run(date);
+      return Number(result.changes ?? 0);
+    }
+  };
+
+  function mapMemoryProfile(row: any): DbMemoryProfile {
+    return {
+      elderId: String(row.elder_id),
+      profile: parseJson<MemoryProfile>(row.profile_json, {
+        summary: "",
+        people: [],
+        places: [],
+        routines: [],
+        preferences: [],
+        sensitivities: [],
+        engine: "rules",
+        model: "rules",
+        updatedAt: Number(row.updated_at)
+      }),
+      sourceCount: Number(row.source_count),
+      updatedAt: Number(row.updated_at)
+    };
+  }
+
+  const memoryProfiles = {
+    upsert(input: {
+      elderId: string;
+      profile: MemoryProfile;
+      sourceCount: number;
+    }): DbMemoryProfile {
+      raw
+        .prepare(
+          `INSERT INTO memory_profiles (elder_id, profile_json, source_count, updated_at)
+           VALUES (?, ?, ?, ?)
+           ON CONFLICT(elder_id) DO UPDATE SET
+             profile_json = excluded.profile_json,
+             source_count = excluded.source_count,
+             updated_at = excluded.updated_at`
+        )
+        .run(input.elderId, JSON.stringify(input.profile), input.sourceCount, Date.now());
+      return memoryProfiles.getByElder(input.elderId)!;
+    },
+    getByElder(elderId: string): DbMemoryProfile | null {
+      const row = raw.prepare("SELECT * FROM memory_profiles WHERE elder_id = ?").get(elderId) as any;
+      return row ? mapMemoryProfile(row) : null;
+    }
+  };
+
   return {
     raw,
     users,
@@ -1677,6 +1975,9 @@ export function createDb(dbPath: string, options: CreateDbOptions) {
     roleplaySessions,
     evalCases,
     evalRuns,
+    agentTraces,
+    agentBriefs,
+    memoryProfiles,
     close: () => raw.close()
   };
 }

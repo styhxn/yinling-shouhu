@@ -145,8 +145,8 @@ describe("realtime safety loop", () => {
         payload: { status: "ack" }
       });
       expect(ack.statusCode).toBe(200);
-      const updated = events.find((event) => event.type === "safety.alert.updated");
-      expect(updated?.payload.alert.status).toBe("ack");
+      const updated = events.filter((event) => event.type === "safety.alert.updated");
+      expect(updated.some((event) => event.payload.alert.status === "ack")).toBe(true);
     } finally {
       unsubscribe();
     }

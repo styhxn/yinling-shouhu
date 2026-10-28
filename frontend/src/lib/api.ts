@@ -1,6 +1,8 @@
 import { httpBlob, httpJson } from "./http.js";
 import type {
+  AgentBriefResponse,
   AgentTool,
+  AgentTraceResponse,
   AntiFraudHit,
   CoolingOff,
   FamilyConfirm,
@@ -14,6 +16,7 @@ import type {
   MedicationScanResult,
   MeResponse,
   MemoryItem,
+  MemoryProfileResponse,
   MissingPosterResult,
   Role,
   RoleplayReport,
@@ -57,10 +60,37 @@ export const api = {
   agent: {
     tools() {
       return httpJson<{ tools: AgentTool[] }>("/agent/tools");
+    },
+    brief(params: { elderId?: string; refresh?: boolean } = {}) {
+      return httpJson<AgentBriefResponse>(
+        `/agent/brief${query({
+          elderId: params.elderId,
+          refresh: params.refresh ? "1" : undefined
+        })}`
+      );
+    },
+    trace(id: string) {
+      return httpJson<AgentTraceResponse>(`/agent/traces/${id}`);
+    },
+    traces(params: { elderId?: string; limit?: number } = {}) {
+      return httpJson<{ ok: boolean; items: AgentTraceResponse["trace"][] }>(
+        `/agent/traces${query({
+          elderId: params.elderId,
+          limit: params.limit ? String(params.limit) : undefined
+        })}`
+      );
     }
   },
 
   memory: {
+    profile(params: { elderId?: string; refresh?: boolean } = {}) {
+      return httpJson<MemoryProfileResponse>(
+        `/memory/profile${query({
+          elderId: params.elderId,
+          refresh: params.refresh ? "1" : undefined
+        })}`
+      );
+    },
     list(params: { elderId?: string; q?: string } = {}) {
       return httpJson<{ items: MemoryItem[]; nextCursor: null }>(
         `/memory/items${query(params)}`

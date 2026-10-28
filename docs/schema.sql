@@ -10,6 +10,16 @@
 PRAGMA foreign_keys = ON;
 PRAGMA journal_mode = WAL;
 
+CREATE TABLE IF NOT EXISTS agent_briefs (
+      id TEXT PRIMARY KEY,
+      elder_id TEXT NOT NULL,
+      brief_date TEXT NOT NULL,
+      content_json TEXT NOT NULL,
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL,
+      UNIQUE(elder_id, brief_date)
+    );
+
 CREATE TABLE IF NOT EXISTS agent_confirmations (
       id TEXT PRIMARY KEY,
       session_id TEXT NOT NULL,
@@ -20,6 +30,22 @@ CREATE TABLE IF NOT EXISTS agent_confirmations (
       expires_at INTEGER NOT NULL,
       created_at INTEGER NOT NULL,
       responded_at INTEGER
+    );
+
+CREATE TABLE IF NOT EXISTS agent_traces (
+      id TEXT PRIMARY KEY,
+      elder_id TEXT NOT NULL,
+      user_id TEXT NOT NULL,
+      agent TEXT NOT NULL,
+      trigger TEXT NOT NULL,
+      goal TEXT NOT NULL,
+      status TEXT NOT NULL,
+      decision_json TEXT,
+      steps_json TEXT NOT NULL,
+      citations_json TEXT NOT NULL,
+      model TEXT NOT NULL,
+      latency_ms INTEGER NOT NULL,
+      created_at INTEGER NOT NULL
     );
 
 CREATE TABLE IF NOT EXISTS audit_logs (
@@ -201,6 +227,13 @@ CREATE TABLE IF NOT EXISTS memories (
       deleted_at INTEGER
     );
 
+CREATE TABLE IF NOT EXISTS memory_profiles (
+      elder_id TEXT PRIMARY KEY,
+      profile_json TEXT NOT NULL,
+      source_count INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL
+    );
+
 CREATE TABLE IF NOT EXISTS missing_posters (
       id TEXT PRIMARY KEY,
       elder_id TEXT NOT NULL,
@@ -337,6 +370,8 @@ CREATE TABLE IF NOT EXISTS users (
       elder_id TEXT,
       created_at INTEGER NOT NULL
     );
+
+CREATE INDEX IF NOT EXISTS idx_agent_traces_elder ON agent_traces(elder_id, created_at DESC);
 
 CREATE INDEX IF NOT EXISTS idx_alerts_elder ON safety_alerts(elder_id, status, created_at DESC);
 

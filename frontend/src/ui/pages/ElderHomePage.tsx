@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import heroUrl from "../assets/jiangsu-hero.webp";
 import { Icon } from "../components/Icon.js";
 import { api } from "../../lib/api.js";
-import type { FamilySummary, MemoryItem } from "../../lib/types.js";
+import type { AgentBrief, FamilySummary, MemoryItem } from "../../lib/types.js";
 import { useAuth } from "../state/auth.js";
 
 function greeting() {
@@ -27,6 +27,22 @@ export function ElderHomePage() {
   const { me } = useAuth();
   const [summary, setSummary] = React.useState<FamilySummary | null>(null);
   const [latestMemory, setLatestMemory] = React.useState<MemoryItem | null>(null);
+  const [brief, setBrief] = React.useState<AgentBrief | null>(null);
+  const [briefLoading, setBriefLoading] = React.useState(true);
+  const [briefError, setBriefError] = React.useState<string | null>(null);
+
+  const loadBrief = React.useCallback(async (refresh = false) => {
+    setBriefLoading(true);
+    setBriefError(null);
+    try {
+      const res = await api.agent.brief(refresh ? { refresh: true } : {});
+      setBrief(res.brief);
+    } catch (err) {
+      setBriefError(err instanceof Error ? err.message : "简报暂时没整理好");
+    } finally {
+      setBriefLoading(false);
+    }
+  }, []);
 
   React.useEffect(() => {
     let alive = true;
@@ -37,10 +53,11 @@ export function ElderHomePage() {
         setLatestMemory(memoryRes.items[0] ?? null);
       })
       .catch(() => undefined);
+    void loadBrief();
     return () => {
       alive = false;
     };
-  }, []);
+  }, [loadBrief]);
 
   const date = new Date().toLocaleDateString("zh-CN", {
     month: "long",
@@ -69,19 +86,79 @@ export function ElderHomePage() {
         <span className="ys-seal">水韵江苏</span>
       </header>
 
-      <section className="ys-homeHero">
+      <section className={`ys-homeHero ${brief ? "ys-homeHero--brief" : ""}`}>
         <div className="ys-homeHeroText">
-          <h2>把日子过稳，把故事留下。</h2>
-          <p>用药、位置、家人的消息，都在这里。想说话的时候，小助手也在。</p>
-          <div className="ys-homeHeroActions">
-            <Link to="/elder/story" className="btn btnPrimary">
-              看看我的故事
-            </Link>
-            <Link to="/elder/chat" className="ys-textLink">
-              问小助手
-              <Icon name="arrowRight" size="sm" />
-            </Link>
-          </div>
+          <span className="ys-aiBadge">
+            <Icon name="sparkles" size="sm" />
+            {briefLoading
+              ? "AI 正在整理今天的安排"
+              : brief
+                ? `AI 今日简报 · ${brief.engine === "rules+llm" ? "模型整理" : "规则整理"}`
+                : "AI 今日简报"}
+          </span>
+          {brief ? (
+            <>
+              <h2>{brief.summary}</h2>
+              <p className="ys-aiGreeting">
+                {brief.greeting}。{brief.encouragement}
+              </p>
+              <div className="ys-aiItems">
+                {brief.items.map((item) => (
+                  <article key={item.title} className="ys-aiItem">
+                    <span className={`ys-aiPriority ys-aiPriority--${item.priority}`}>
+                      {item.priority === "now" ? "现在" : item.priority === "today" ? "今天" : "有空时"}
+                    </span>
+                    <h3>{item.title}</h3>
+                    <p>{item.detail}</p>
+                    {item.actionLabel && item.href && (
+                      <Link to={item.href} className="ys-aiItemLink">
+                        {item.actionLabel}
+                        <Icon name="arrowRight" size="sm" />
+                      </Link>
+                    )}
+                  </article>
+                ))}
+              </div>
+              <div className="ys-homeHeroActions">
+                <Link to="/elder/chat" className="btn btnPrimary">
+                  和小助手说说
+                </Link>
+                {brief.traceId && (
+                  <Link to={`/elder/trace/${brief.traceId}`} className="ys-textLink">
+                    查看 AI 决策轨迹
+                    <Icon name="arrowRight" size="sm" />
+                  </Link>
+                )}
+                <button
+                  type="button"
+                  className="ys-textLink ys-textLink--button"
+                  onClick={() => void loadBrief(true)}
+                  disabled={briefLoading}
+                >
+                  <Icon name="refresh" size="sm" />
+                  {briefLoading ? "整理中…" : "换一版"}
+                </button>
+              </div>
+            </>
+          ) : (
+            <>
+              <h2>{briefLoading ? "我先看看今天的药、天气和位置。" : "把日子过稳，把故事留下。"}</h2>
+              <p>
+                {briefError
+                  ? "今天的简报暂时没整理好，用药、位置和故事还是可以先看。"
+                  : "用药、位置、家人的消息，都在这里。想说话的时候，小助手也在。"}
+              </p>
+              <div className="ys-homeHeroActions">
+                <Link to="/elder/story" className="btn btnPrimary">
+                  看看我的故事
+                </Link>
+                <Link to="/elder/chat" className="ys-textLink">
+                  问小助手
+                  <Icon name="arrowRight" size="sm" />
+                </Link>
+              </div>
+            </>
+          )}
         </div>
         <figure className="ys-homeHeroMedia">
           <img src={heroUrl} alt="江南水乡清晨" className="ys-homeHeroImage" />

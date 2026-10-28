@@ -36,7 +36,10 @@ const modules = moduleArg
   ? moduleArg
       .split(",")
       .map((item) => item.trim())
-      .filter((item): item is "scam" | "story" => item === "scam" || item === "story")
+      .filter(
+        (item): item is "scam" | "story" | "agent" =>
+          item === "scam" || item === "story" || item === "agent"
+      )
   : undefined;
 
 const db = createDb(config.dbPath, { masterKey, seed: config.demoMode });

@@ -14,6 +14,7 @@ import { MemoryInterviewPage } from "./pages/MemoryInterviewPage.js";
 import { StoryChapterPage } from "./pages/StoryChapterPage.js";
 import { MedicationsPage } from "./pages/MedicationsPage.js";
 import { FamilyDashboardPage } from "./pages/FamilyDashboardPage.js";
+import { AgentTracePage } from "./pages/AgentTracePage.js";
 import { A11yProvider } from "./state/a11y.js";
 import { A11yDock } from "./components/A11yDock.js";
 import { RealtimeProvider } from "./state/realtime.js";
@@ -45,6 +46,7 @@ export function App() {
                   <Route path="safety" element={<SafetyHomePage />} />
                   <Route path="safety/scam" element={<ScamCheckPage />} />
                   <Route path="safety/roleplay" element={<RoleplayPage />} />
+                  <Route path="trace/:id" element={<AgentTracePage />} />
                 </Route>
 
                 <Route
@@ -56,6 +58,7 @@ export function App() {
                   }
                 >
                   <Route index element={<FamilyDashboardPage />} />
+                  <Route path="trace/:id" element={<AgentTracePage />} />
                 </Route>
 
                 <Route path="*" element={<Navigate to="/" replace />} />

@@ -156,8 +156,109 @@ export type ChatMessage = {
   toolEvents: ToolEvent[];
   citations?: Citation[];
   riskLevel?: "low" | "medium" | "high";
+  traceId?: string;
   time: string;
   error?: boolean;
+};
+
+export type AgentAction = {
+  label: string;
+  kind: "link" | "call" | "confirm" | "tool";
+  href?: string;
+  tool?: string;
+};
+
+export type AgentBriefItem = {
+  title: string;
+  detail: string;
+  priority: "now" | "today" | "later";
+  actionLabel?: string;
+  href?: string;
+};
+
+export type AgentBrief = {
+  date: string;
+  greeting: string;
+  summary: string;
+  items: AgentBriefItem[];
+  encouragement: string;
+  riskLevel: "low" | "medium" | "high";
+  confidence: number;
+  engine: "rules" | "rules+llm";
+  model: string;
+  traceId: string | null;
+  generatedAt: number;
+};
+
+export type AgentBriefResponse = {
+  ok: boolean;
+  brief: AgentBrief;
+  cached: boolean;
+};
+
+export type AgentTraceStep = {
+  index: number;
+  type: "plan" | "tool_call" | "tool_result" | "decision" | "error";
+  label: string;
+  detail?: string;
+  tool?: string;
+  args?: unknown;
+  ok?: boolean;
+  latencyMs?: number;
+};
+
+export type AgentDecision = {
+  summary: string;
+  riskLevel: "low" | "medium" | "high";
+  confidence: number;
+  needsConfirmation: boolean;
+  escalation: "none" | "family" | "emergency";
+  facts: string[];
+  actions: AgentAction[];
+  briefItems?: AgentBriefItem[];
+  explanation: string;
+  citations: Citation[];
+  engine: "rules" | "rules+llm";
+  model: string;
+};
+
+export type AgentTrace = {
+  id: string;
+  elderId: string;
+  userId: string;
+  agent: "companion" | "guardian" | "family" | string;
+  trigger: "user" | "schedule" | "event" | "family" | "system" | string;
+  goal: string;
+  status: "ok" | "needs_confirmation" | "error";
+  decision: AgentDecision | null;
+  steps: AgentTraceStep[];
+  citations: Citation[];
+  model: string;
+  latencyMs: number;
+  createdAt: number;
+};
+
+export type AgentTraceResponse = {
+  ok: boolean;
+  trace: AgentTrace;
+};
+
+export type MemoryProfile = {
+  summary: string;
+  people: { name: string; relation?: string; note?: string }[];
+  places: { name: string; note?: string }[];
+  routines: string[];
+  preferences: string[];
+  sensitivities: string[];
+  engine: "rules" | "rules+llm";
+  model: string;
+  updatedAt: number;
+};
+
+export type MemoryProfileResponse = {
+  ok: boolean;
+  profile: MemoryProfile;
+  sourceCount: number;
 };
 
 export type PendingConfirmation = {
@@ -221,12 +322,26 @@ export type Geofence = {
   updatedAt: number;
 };
 
+export type AlertAssessment = {
+  summary: string;
+  riskLevel: "low" | "medium" | "high";
+  confidence: number;
+  needsConfirmation: boolean;
+  escalation: "none" | "family" | "emergency";
+  likelyCause: string;
+  actions: AgentAction[];
+  traceId: string;
+  engine: "rules" | "rules+llm";
+  model: string;
+  generatedAt: number;
+};
+
 export type SafetyAlert = {
   id: string;
   elderId: string;
   type: string;
   level: string;
-  payload: Record<string, unknown>;
+  payload: Record<string, unknown> & { assessment?: AlertAssessment };
   status: string;
   createdAt: number;
 };

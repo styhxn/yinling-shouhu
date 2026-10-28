@@ -9,6 +9,9 @@ import type { ConfigOverrides, AppConfig } from "./config.js";
 import { loadConfig } from "./config.js";
 import { registerRoutes } from "./routes/index.js";
 import { createAgentRunner, type AgentRunner } from "./services/agent/runner.js";
+import { createAgentRuntime, type AgentRuntime } from "./services/agent/runtime.js";
+import { createBriefService, type BriefService } from "./services/agent/brief.js";
+import { createProactiveAgent, type ProactiveAgent } from "./services/agent/proactive.js";
 import { createToolRegistry, type ToolRegistry } from "./services/agent/tools.js";
 import { readCookie, verifySessionToken } from "./services/auth/session.js";
 import type { SessionUser } from "./services/auth/types.js";
@@ -19,6 +22,7 @@ import { createModelRouter } from "./services/llm/router.js";
 import type { ModelRouter } from "./services/llm/types.js";
 import { createRateLimiter } from "./services/rateLimit.js";
 import { createInterviewService, type InterviewService } from "./services/memory/interview.js";
+import { createMemoryProfileService, type MemoryProfileService } from "./services/memory/profile.js";
 import { createStoryService, type StoryService } from "./services/memory/story.js";
 import { createAntiFraudService, type AntiFraudService } from "./services/safety/antiFraud.js";
 import { createCoolingOffService, type CoolingOffService } from "./services/safety/coolingOff.js";
@@ -63,7 +67,24 @@ export async function createServer(options: CreateServerOptions = {}) {
     coolingOff,
     modelRouter
   });
-  const agent = createAgentRunner({ db, store, config, modelRouter, toolRegistry, eventBus });
+  const memoryProfile = createMemoryProfileService(db, modelRouter);
+  const agentRuntime = createAgentRuntime({ db, modelRouter, toolRegistry });
+  const brief = createBriefService({ db, runtime: agentRuntime, memoryProfile });
+  const proactive = createProactiveAgent({
+    db,
+    eventBus,
+    runtime: agentRuntime,
+    memoryProfile
+  });
+  const agent = createAgentRunner({
+    db,
+    store,
+    config,
+    modelRouter,
+    toolRegistry,
+    eventBus,
+    memoryProfile
+  });
 
   const server = Fastify({
     trustProxy: config.trustProxy,
@@ -81,6 +102,10 @@ export async function createServer(options: CreateServerOptions = {}) {
   server.decorate("rateLimiter", rateLimiter);
   server.decorate("toolRegistry", toolRegistry);
   server.decorate("agent", agent);
+  server.decorate("agentRuntime", agentRuntime);
+  server.decorate("brief", brief);
+  server.decorate("proactive", proactive);
+  server.decorate("memoryProfile", memoryProfile);
   server.decorate("antiFraud", antiFraud);
   server.decorate("coolingOff", coolingOff);
   server.decorate("weather", weather);
@@ -106,6 +131,7 @@ export async function createServer(options: CreateServerOptions = {}) {
 
     const isAiPath =
       pathname === "/api/agent/chat" ||
+      pathname === "/api/agent/brief" ||
       pathname === "/qa/ask" ||
       pathname.startsWith("/dh-live-api") ||
       pathname.startsWith("/api/memory/interview") ||
@@ -233,6 +259,7 @@ export async function createServer(options: CreateServerOptions = {}) {
   });
 
   await registerRoutes(server);
+  const stopProactive = proactive.start();
 
   const webIndex = path.join(config.webDistDir, "index.html");
   if (config.env === "production" && fs.existsSync(webIndex)) {
@@ -266,6 +293,7 @@ export async function createServer(options: CreateServerOptions = {}) {
   }
 
   server.addHook("onClose", async () => {
+    stopProactive();
     store.close();
     db.close();
   });
@@ -287,6 +315,10 @@ declare module "fastify" {
     rateLimiter: ReturnType<typeof createRateLimiter>;
     toolRegistry: ToolRegistry;
     agent: AgentRunner;
+    agentRuntime: AgentRuntime;
+    brief: BriefService;
+    proactive: ProactiveAgent;
+    memoryProfile: MemoryProfileService;
     antiFraud: AntiFraudService;
     coolingOff: CoolingOffService;
     weather: ReturnType<typeof createWeatherService>;

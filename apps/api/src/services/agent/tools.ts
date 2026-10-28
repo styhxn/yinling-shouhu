@@ -223,6 +223,33 @@ export function createToolRegistry(deps: ToolDeps): ToolRegistry {
       }
     },
     {
+      name: "get_memory_profile",
+      description:
+        "读取老人的记忆画像（常提到的人、地点、习惯、偏好、沟通注意点），用于个性化陪伴和简报。",
+      parameters: z.object({}),
+      jsonSchema: { type: "object", properties: {} },
+      risk: "read",
+      roles: ["elder", "family"],
+      requiresConfirmation: false,
+      async handler(_args, ctx) {
+        const elderId = requireElder(ctx);
+        const record = deps.db.memoryProfiles.getByElder(elderId);
+        if (!record || !record.profile.summary || record.profile.summary.startsWith("还没有")) {
+          return {
+            summary: "还没有形成记忆画像。可以先完成一次记忆访谈。",
+            data: { profile: null }
+          };
+        }
+        const profile = record.profile;
+        return {
+          summary:
+            `记忆画像：${profile.summary}` +
+            (profile.sensitivities.length ? ` 沟通提醒：${profile.sensitivities.join("；")}` : ""),
+          data: { profile }
+        };
+      }
+    },
+    {
       name: "check_scam",
       description:
         "分析一段文字、短信或链接是否存在诈骗风险。只做模式分析，不访问链接内容；不要用于替代警方判断。",

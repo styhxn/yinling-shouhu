@@ -12,6 +12,7 @@ const TOOL_LABELS: Record<string, string> = {
   get_health_records: "读取健康记录",
   get_medications: "查看用药",
   search_memories: "检索老人口述",
+  get_memory_profile: "读取记忆画像",
   check_scam: "反诈鉴定",
   start_cooling_off: "启动转账冷静期",
   get_location: "查询位置"
@@ -124,6 +125,12 @@ function MessageBubble({ message }: { message: ChatMessage }) {
               )
             )}
           </div>
+        )}
+        {!isUser && message.traceId && (
+          <Link to={`/elder/trace/${message.traceId}`} className="yl-traceLink">
+            <Icon name="sparkles" size="sm" />
+            查看 AI 决策轨迹
+          </Link>
         )}
         <div className="yl-chatMeta">
           <span>{message.time}</span>
@@ -311,7 +318,8 @@ export function AgentChatPage() {
         updateLastAssistant((message) => ({
           ...message,
           riskLevel: data.riskLevel,
-          citations: Array.isArray(data.citations) ? data.citations : []
+          citations: Array.isArray(data.citations) ? data.citations : [],
+          ...(typeof data.traceId === "string" ? { traceId: data.traceId } : {})
         }));
         setStatus("idle");
         break;

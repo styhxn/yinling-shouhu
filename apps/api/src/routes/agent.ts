@@ -1,5 +1,6 @@
 import type { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
+import { resolveElderId } from "../services/auth/elder.js";
 import { requireAuth } from "../services/auth/rbac.js";
 import type { AgentEvent } from "../services/agent/runner.js";
 
@@ -20,6 +21,15 @@ const AgentChatSchema = z
   });
 
 const SessionParamsSchema = z.object({ id: z.string().min(1).max(80) });
+const TraceParamsSchema = z.object({ id: z.string().min(1).max(80) });
+const BriefQuerySchema = z.object({
+  elderId: z.string().max(80).optional(),
+  refresh: z.enum(["0", "1"]).optional()
+});
+const TraceQuerySchema = z.object({
+  elderId: z.string().max(80).optional(),
+  limit: z.coerce.number().int().min(1).max(50).optional()
+});
 
 function sse(reply: any, event: string, data: unknown) {
   if (reply.raw.writableEnded) return;
@@ -64,6 +74,7 @@ function writeEvent(reply: any, event: AgentEvent) {
         sessionId: event.sessionId,
         riskLevel: event.riskLevel,
         citations: event.citations,
+        traceId: event.traceId,
         ...(event.usage ? { usage: event.usage } : {})
       });
       return;
@@ -137,6 +148,49 @@ export const agentRoutes: FastifyPluginAsync = async (server) => {
         requiresConfirmation: tool.requiresConfirmation
       }))
     };
+  });
+
+  server.get("/brief", { preHandler: requireAuth }, async (req, reply) => {
+    const query = BriefQuerySchema.safeParse(req.query);
+    if (!query.success) return reply.code(400).send({ error: "invalid_body" });
+    const user = req.user;
+    if (!user) return reply.code(401).send({ error: "unauthorized" });
+    const elderId = resolveElderId(req, query.data.elderId);
+    if (!elderId) return reply.code(403).send({ error: "forbidden" });
+    const result = await server.brief.generate({
+      elderId,
+      userId: user.userId,
+      requestId: req.id,
+      refresh: query.data.refresh === "1"
+    });
+    return { ok: true, ...result };
+  });
+
+  server.get("/traces", { preHandler: requireAuth }, async (req, reply) => {
+    const query = TraceQuerySchema.safeParse(req.query);
+    if (!query.success) return reply.code(400).send({ error: "invalid_body" });
+    const elderId = resolveElderId(req, query.data.elderId);
+    if (!elderId) return reply.code(403).send({ error: "forbidden" });
+    return {
+      ok: true,
+      items: server.db.agentTraces.listByElder(elderId, query.data.limit ?? 20)
+    };
+  });
+
+  server.get("/traces/:id", { preHandler: requireAuth }, async (req, reply) => {
+    const params = TraceParamsSchema.safeParse(req.params);
+    if (!params.success) return reply.code(400).send({ error: "invalid_body" });
+    const trace = server.db.agentTraces.getById(params.data.id);
+    if (!trace) return reply.code(404).send({ error: "not_found" });
+    const user = req.user;
+    if (!user) return reply.code(401).send({ error: "unauthorized" });
+    if (user.role !== "admin") {
+      const elderId = resolveElderId(req, trace.elderId);
+      if (!elderId || elderId !== trace.elderId) {
+        return reply.code(403).send({ error: "forbidden" });
+      }
+    }
+    return { ok: true, trace };
   });
 
   server.get("/sessions/:id", { preHandler: requireAuth }, async (req, reply) => {

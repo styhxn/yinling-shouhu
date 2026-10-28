@@ -396,6 +396,23 @@ export function SafetyHomePage() {
                       <strong>{alertLabel(alert.type)}</strong>
                       <small>{formatTime(alert.createdAt)}</small>
                       {alertDetail(alert) ? <p>{alertDetail(alert)}</p> : null}
+                      {alert.payload.assessment ? (
+                        <div className="ys-alertAssessment">
+                          <span className={`ys-aiPriority ys-aiPriority--${alert.payload.assessment.riskLevel === "high" ? "now" : "today"}`}>
+                            守护 Agent · {alert.payload.assessment.riskLevel === "high" ? "高风险" : "已研判"}
+                          </span>
+                          <p>{alert.payload.assessment.summary}</p>
+                          <Link
+                            to={`/elder/trace/${alert.payload.assessment.traceId}`}
+                            className="yl-traceLink"
+                          >
+                            <Icon name="sparkles" size="sm" />
+                            查看 AI 决策依据
+                          </Link>
+                        </div>
+                      ) : (
+                        <small className="ys-alertPending">守护 Agent 正在研判这条提醒…</small>
+                      )}
                     </div>
                     <button
                       type="button"

@@ -34,7 +34,17 @@ describe("agent", () => {
     expect(res.body).toContain("get_weather");
     expect(res.body).toContain("event: tool_result");
     expect(res.body).toContain("event: done");
-    expect(parseSse(res.body, "done").length).toBe(1);
+    const done = parseSse(res.body, "done")[0] as { traceId?: string };
+    expect(done.traceId).toMatch(/^tr_/);
+    const trace = await server.inject({
+      method: "GET",
+      url: `/api/agent/traces/${done.traceId}`,
+      headers: { cookie }
+    });
+    expect(trace.statusCode).toBe(200);
+    const traceBody = trace.json() as any;
+    expect(traceBody.trace.agent).toBe("companion");
+    expect(traceBody.trace.steps.some((step: any) => step.tool === "get_weather")).toBe(true);
   });
 
   it("pauses for confirmation on a transfer intent, then resumes", async () => {

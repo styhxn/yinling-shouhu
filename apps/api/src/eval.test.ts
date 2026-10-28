@@ -14,15 +14,15 @@ afterAll(async () => {
 });
 
 describe("evaluation harness", () => {
-  it("runs scam and story suites and persists the run", async () => {
+  it("runs scam, story and agent suites and persists the run", async () => {
     const report = await runEvaluation({
       db: server.db,
       modelRouter: server.modelRouter
     });
 
     expect(report.mode).toBe("mock");
-    expect(report.overall.total).toBe(11);
-    expect(report.overall.passed).toBe(11);
+    expect(report.overall.total).toBe(15);
+    expect(report.overall.passed).toBe(15);
     expect(report.overall.passRate).toBe(100);
 
     const scam = report.modules.find((item) => item.module === "scam");
@@ -30,6 +30,10 @@ describe("evaluation harness", () => {
     const story = report.modules.find((item) => item.module === "story");
     expect(Number(story?.metrics.avgGroundingPct)).toBeGreaterThan(0);
     expect(story?.metrics.fabricatedQuotes).toBe(0);
+    const agent = report.modules.find((item) => item.module === "agent");
+    expect(agent?.metrics.taskSuccessPct).toBe(100);
+    expect(agent?.metrics.traceCompletenessPct).toBe(100);
+    expect(agent?.metrics.escalationAccuracyPct).toBe(100);
 
     const latest = server.db.evalRuns.latest();
     expect(latest?.id).toBe(report.runId);
