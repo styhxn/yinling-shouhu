@@ -419,6 +419,7 @@ export async function createDb(sql: SqlClient, options: CreateDbOptions) {
   await migrate(sql);
   if (options.seed) await seedDemo(sql, options.masterKey);
 
+  const isMysql = sql.driver === "mysql";
   const enc = (value: unknown) => encryptJson(options.masterKey, value);
   const dec = <T>(blob: unknown): T | null => {
     if (typeof blob !== "string" || !blob) return null;
@@ -487,14 +488,20 @@ export async function createDb(sql: SqlClient, options: CreateDbOptions) {
       summary?: string | null;
     }): Promise<void> {
       const now = Date.now();
-      await sql.prepare(
-          `INSERT INTO sessions (id, user_id, elder_id, messages_json, summary, created_at, updated_at)
+      const statement = isMysql
+        ? `INSERT INTO sessions (id, user_id, elder_id, messages_json, summary, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?)
+           ON DUPLICATE KEY UPDATE
+             messages_json = VALUES(messages_json),
+             summary = VALUES(summary),
+             updated_at = VALUES(updated_at)`
+        : `INSERT INTO sessions (id, user_id, elder_id, messages_json, summary, created_at, updated_at)
            VALUES (?, ?, ?, ?, ?, ?, ?)
            ON CONFLICT(id) DO UPDATE SET
              messages_json = excluded.messages_json,
              summary = excluded.summary,
-             updated_at = excluded.updated_at`
-        )
+             updated_at = excluded.updated_at`;
+      await sql.prepare(statement)
         .run(
           input.id,
           input.userId,
@@ -1641,14 +1648,20 @@ export async function createDb(sql: SqlClient, options: CreateDbOptions) {
 
   const evalCases = {
     async upsert(input: { id: string; module: string; question: string; expected: unknown }): Promise<void> {
-      await sql.prepare(
-          `INSERT INTO eval_cases (id, module, question, expected_json, created_at)
+      const statement = isMysql
+        ? `INSERT INTO eval_cases (id, module, question, expected_json, created_at)
+           VALUES (?, ?, ?, ?, ?)
+           ON DUPLICATE KEY UPDATE
+             module = VALUES(module),
+             question = VALUES(question),
+             expected_json = VALUES(expected_json)`
+        : `INSERT INTO eval_cases (id, module, question, expected_json, created_at)
            VALUES (?, ?, ?, ?, ?)
            ON CONFLICT(id) DO UPDATE SET
              module = excluded.module,
              question = excluded.question,
-             expected_json = excluded.expected_json`
-        )
+             expected_json = excluded.expected_json`;
+      await sql.prepare(statement)
         .run(
           input.id,
           input.module,
@@ -1710,7 +1723,7 @@ export async function createDb(sql: SqlClient, options: CreateDbOptions) {
       elderId: String(row.elder_id),
       userId: String(row.user_id),
       agent: String(row.agent),
-      trigger: String(row.trigger),
+      trigger: String(row.trigger_type),
       goal: String(row.goal),
       status: row.status as DbAgentTrace["status"],
       decision: parseJson<AgentDecision | null>(row.decision_json, null),
@@ -1740,7 +1753,7 @@ export async function createDb(sql: SqlClient, options: CreateDbOptions) {
       const now = Date.now();
       await sql.prepare(
           `INSERT INTO agent_traces
-            (id, elder_id, user_id, agent, trigger, goal, status, decision_json, steps_json,
+            (id, elder_id, user_id, agent, trigger_type, goal, status, decision_json, steps_json,
              citations_json, model, latency_ms, created_at)
            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
         )
@@ -1805,13 +1818,18 @@ export async function createDb(sql: SqlClient, options: CreateDbOptions) {
       content: AgentBriefContent;
     }): Promise<DbAgentBrief> {
       const now = Date.now();
-      await sql.prepare(
-          `INSERT INTO agent_briefs (id, elder_id, brief_date, content_json, created_at, updated_at)
+      const statement = isMysql
+        ? `INSERT INTO agent_briefs (id, elder_id, brief_date, content_json, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?)
+           ON DUPLICATE KEY UPDATE
+             content_json = VALUES(content_json),
+             updated_at = VALUES(updated_at)`
+        : `INSERT INTO agent_briefs (id, elder_id, brief_date, content_json, created_at, updated_at)
            VALUES (?, ?, ?, ?, ?, ?)
            ON CONFLICT(elder_id, brief_date) DO UPDATE SET
              content_json = excluded.content_json,
-             updated_at = excluded.updated_at`
-        )
+             updated_at = excluded.updated_at`;
+      await sql.prepare(statement)
         .run(
           `br_${randomUUID()}`,
           input.elderId,
@@ -1858,14 +1876,20 @@ export async function createDb(sql: SqlClient, options: CreateDbOptions) {
       profile: MemoryProfile;
       sourceCount: number;
     }): Promise<DbMemoryProfile> {
-      await sql.prepare(
-          `INSERT INTO memory_profiles (elder_id, profile_json, source_count, updated_at)
+      const statement = isMysql
+        ? `INSERT INTO memory_profiles (elder_id, profile_json, source_count, updated_at)
+           VALUES (?, ?, ?, ?)
+           ON DUPLICATE KEY UPDATE
+             profile_json = VALUES(profile_json),
+             source_count = VALUES(source_count),
+             updated_at = VALUES(updated_at)`
+        : `INSERT INTO memory_profiles (elder_id, profile_json, source_count, updated_at)
            VALUES (?, ?, ?, ?)
            ON CONFLICT(elder_id) DO UPDATE SET
              profile_json = excluded.profile_json,
              source_count = excluded.source_count,
-             updated_at = excluded.updated_at`
-        )
+             updated_at = excluded.updated_at`;
+      await sql.prepare(statement)
         .run(input.elderId, JSON.stringify(input.profile), input.sourceCount, Date.now());
       return (await memoryProfiles.getByElder(input.elderId))!;
     },

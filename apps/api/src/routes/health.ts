@@ -8,12 +8,10 @@ export const healthRoutes: FastifyPluginAsync = async (server) => {
   server.get("/ready", async (_req, reply) => {
     try {
       await server.db.sql.ping();
-      const vector = await server.vectorStore.status();
       return {
         ok: true,
         db: "ok",
         dbDriver: server.config.db.driver,
-        vector,
         llm: server.config.llm.mode,
         demoMode: server.config.demoMode
       };

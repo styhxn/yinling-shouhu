@@ -12,7 +12,7 @@ process.chdir(apiDir);
 const [
   { loadConfig },
   { createDb },
-  { createPostgresClient, createSqliteClient },
+  { createMysqlClient, createSqliteClient },
   { createModelRouter },
   { loadOrCreateMasterKey },
   { runEvaluation }
@@ -45,8 +45,8 @@ const modules = moduleArg
   : undefined;
 
 const sql =
-  config.db.driver === "postgres"
-    ? createPostgresClient({
+  config.db.driver === "mysql"
+    ? createMysqlClient({
         connectionString: config.db.url,
         max: config.db.poolMax,
         ssl: config.db.ssl

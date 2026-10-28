@@ -4,17 +4,20 @@ import type { SqlClient } from "./sql.js";
 /** Idempotent demo data: 李奶奶、家属小李、两种药、一个位置点。 */
 export async function seedDemo(db: SqlClient, masterKey: Buffer) {
   const now = Date.now();
+  const ignoreExisting = db.driver === "mysql"
+    ? "ON DUPLICATE KEY UPDATE id = id"
+    : "ON CONFLICT (id) DO NOTHING";
   const elder = db.prepare(
     `INSERT INTO elders (id, display_name, birth_year, gender, cognitive_note_enc, created_at)
      VALUES (?, ?, ?, ?, ?, ?)
-     ON CONFLICT (id) DO NOTHING`
+     ${ignoreExisting}`
   );
   await elder.run("e_li", "李奶奶", 1948, "female", null, now);
 
   const user = db.prepare(
     `INSERT INTO users (id, role, display_name, elder_id, created_at)
      VALUES (?, ?, ?, ?, ?)
-     ON CONFLICT (id) DO NOTHING`
+     ${ignoreExisting}`
   );
   await user.run("u_elder", "elder", "李奶奶", "e_li", now);
   await user.run("u_family", "family", "小李", null, now);
@@ -24,7 +27,7 @@ export async function seedDemo(db: SqlClient, masterKey: Buffer) {
   const link = db.prepare(
     `INSERT INTO family_links (id, family_user_id, elder_id, relation, status, created_at)
      VALUES (?, ?, ?, ?, ?, ?)
-     ON CONFLICT (id) DO NOTHING`
+     ${ignoreExisting}`
   );
   await link.run("fl_1", "u_family", "e_li", "daughter", "active", now);
 
@@ -32,7 +35,7 @@ export async function seedDemo(db: SqlClient, masterKey: Buffer) {
     `INSERT INTO medications
       (id, elder_id, name, generic_name, spec, dosage, schedule_json, photo_upload_id, notes_enc, created_at, updated_at)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-     ON CONFLICT (id) DO NOTHING`
+     ${ignoreExisting}`
   );
   await med.run(
     "med_1",
@@ -64,7 +67,7 @@ export async function seedDemo(db: SqlClient, masterKey: Buffer) {
   const loc = db.prepare(
     `INSERT INTO location_points (id, elder_id, lat_enc, lng_enc, accuracy, source, ts)
      VALUES (?, ?, ?, ?, ?, ?, ?)
-     ON CONFLICT (id) DO NOTHING`
+     ${ignoreExisting}`
   );
   await loc.run(
     "loc_seed",
@@ -80,7 +83,7 @@ export async function seedDemo(db: SqlClient, masterKey: Buffer) {
     `INSERT INTO geofences
       (id, elder_id, name, shape_json, schedule_json, notify_on_json, active, created_at, updated_at)
      VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?)
-     ON CONFLICT (id) DO NOTHING`
+     ${ignoreExisting}`
   );
   await geofence.run(
     "gf_home",
@@ -98,7 +101,7 @@ export async function seedDemo(db: SqlClient, masterKey: Buffer) {
       (id, elder_id, title, time_range, place, people_json, tags_json, photo_ids_json,
        transcript_enc, summary, visibility, consent, status, created_at, updated_at)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'family', 1, 'active', ?, ?)
-     ON CONFLICT (id) DO NOTHING`
+     ${ignoreExisting}`
   );
   const demoMemories = [
     {

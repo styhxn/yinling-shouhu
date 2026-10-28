@@ -315,21 +315,6 @@ PRAGMA journal_mode = WAL;
     );
     CREATE INDEX IF NOT EXISTS idx_kb_chunks_doc ON kb_chunks(doc_id);
 
-    CREATE TABLE IF NOT EXISTS embeddings (
-      id TEXT PRIMARY KEY,
-      owner_type TEXT NOT NULL,
-      owner_id TEXT NOT NULL,
-      elder_id TEXT,
-      model TEXT NOT NULL,
-      dim INTEGER NOT NULL,
-      content TEXT NOT NULL,
-      metadata_json TEXT,
-      embedding_json TEXT NOT NULL,
-      updated_at INTEGER NOT NULL,
-      UNIQUE(owner_type, owner_id, model)
-    );
-    CREATE INDEX IF NOT EXISTS idx_embeddings_owner ON embeddings(owner_type, owner_id);
-
     CREATE TABLE IF NOT EXISTS eval_cases (
       id TEXT PRIMARY KEY,
       module TEXT NOT NULL,
@@ -350,7 +335,7 @@ PRAGMA journal_mode = WAL;
       elder_id TEXT NOT NULL,
       user_id TEXT NOT NULL,
       agent TEXT NOT NULL,
-      trigger TEXT NOT NULL,
+      trigger_type TEXT NOT NULL,
       goal TEXT NOT NULL,
       status TEXT NOT NULL,
       decision_json TEXT,

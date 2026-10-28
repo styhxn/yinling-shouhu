@@ -2,18 +2,21 @@ name: yinling-shouhu
 
 services:
   db:
-    image: pgvector/pgvector:pg16
+    image: mysql:8.0
+    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
     environment:
-      POSTGRES_DB: ${POSTGRES_DB:-yinling}
-      POSTGRES_USER: ${POSTGRES_USER:-yinling}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-this-password}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-yinling}
+      MYSQL_USER: ${MYSQL_USER:-yinling}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-change-this-password}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-change-this-root-password}
     volumes:
-      - pg-data:/var/lib/postgresql/data
+      - mysql-data:/var/lib/mysql
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-yinling} -d ${POSTGRES_DB:-yinling}"]
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -u root -p$$MYSQL_ROOT_PASSWORD --silent"]
       interval: 5s
       timeout: 5s
-      retries: 20
+      retries: 30
+      start_period: 20s
     restart: unless-stopped
 
   app:
@@ -27,8 +30,8 @@ services:
         condition: service_healthy
     environment:
       NODE_ENV: production
-      DB_DRIVER: postgres
-      DATABASE_URL: postgres://${POSTGRES_USER:-yinling}:${POSTGRES_PASSWORD:-change-this-password}@db:5432/${POSTGRES_DB:-yinling}
+      DB_DRIVER: mysql
+      DATABASE_URL: mysql://${MYSQL_USER:-yinling}:${MYSQL_PASSWORD:-change-this-password}@db:3306/${MYSQL_DATABASE:-yinling}
       DB_POOL_MAX: ${DB_POOL_MAX:-10}
       DB_SSL: "0"
       DEMO_MODE: ${DEMO_MODE:-1}
@@ -54,4 +57,4 @@ services:
 volumes:
   app-data:
   app-public:
-  pg-data:
+  mysql-data:

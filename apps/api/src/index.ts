@@ -16,7 +16,7 @@ try {
     {
       host: server.config.host,
       port: server.config.port,
-      db: server.config.dbPath,
+      db: server.config.db.driver === "mysql" ? "mysql" : server.config.dbPath,
       llm: server.config.llm.mode,
       demo: server.config.demoMode
     },

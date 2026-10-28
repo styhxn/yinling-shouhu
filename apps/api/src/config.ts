@@ -20,7 +20,7 @@ export type AppConfig = {
   dataDir: string;
   dbPath: string;
   db: {
-    driver: "sqlite" | "postgres";
+    driver: "sqlite" | "mysql";
     url: string;
     poolMax: number;
     ssl: boolean;
@@ -180,18 +180,22 @@ export function loadConfig(overrides: ConfigOverrides = {}): AppConfig {
     Array.from(new Set(configuredOrigins.length ? configuredOrigins : defaultOrigins));
   const rawDriver = env("DB_DRIVER").toLowerCase();
   const databaseUrl = env("DATABASE_URL");
+  if (["postgres", "postgresql", "pg"].includes(rawDriver) || /^postgres(ql)?:\/\//i.test(databaseUrl)) {
+    throw new Error("PostgreSQL is no longer supported; use DB_DRIVER=mysql or sqlite");
+  }
+  if (rawDriver && !["sqlite", "mysql", "mariadb"].includes(rawDriver)) {
+    throw new Error(`Unsupported DB_DRIVER: ${rawDriver}`);
+  }
   const dbDriver =
     overrides.db?.driver ??
-    (rawDriver === "postgres" || rawDriver === "postgresql" || rawDriver === "pg"
-      ? "postgres"
-      : rawDriver === "sqlite"
-        ? "sqlite"
-        : databaseUrl
-          ? "postgres"
-          : "sqlite");
+    (rawDriver === "sqlite"
+      ? "sqlite"
+      : rawDriver === "mysql" || rawDriver === "mariadb" || databaseUrl
+        ? "mysql"
+        : "sqlite");
   const dbUrl = overrides.db?.url ?? databaseUrl;
-  if (dbDriver === "postgres" && !dbUrl) {
-    throw new Error("DATABASE_URL is required when DB_DRIVER=postgres");
+  if (dbDriver === "mysql" && !dbUrl) {
+    throw new Error("DATABASE_URL is required when DB_DRIVER=mysql");
   }
 
   const rawCookieSecure = env("COOKIE_SECURE");

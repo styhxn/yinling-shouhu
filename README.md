@@ -3,7 +3,7 @@
 > 会倾听，也会守护的江苏长者 AI 陪伴系统。
 > 以 Agent 为“主脑”：页面是入口，AI 负责理解、计划、调工具、解释与主动守护。
 
-本仓库为“本地优先 + 可选云端”的前后端分离工程：`frontend/`（React + Vite，可独立交接）、`apps/api`（Fastify + TypeScript）、npm workspaces monorepo。现有能力包括适老化界面、Agent 工具调用、反诈鉴定与演练、记忆故事、用药照护、家属协同、MCP 工具与生产部署。存储支持双轨：SQLite 零配置本地/离线运行，PostgreSQL 16 + pgvector 用于生产与答辩。
+本仓库为“本地优先 + 可选云端”的前后端分离工程：`frontend/`（React + Vite，可独立交接）、`apps/api`（Fastify + TypeScript）、npm workspaces monorepo。现有能力包括适老化界面、Agent 工具调用、反诈鉴定与演练、记忆故事、用药照护、家属协同、MCP 工具与生产部署。存储支持双轨：SQLite 零配置本地/离线运行，MySQL 8 用于生产与答辩。
 
 ## 当前进度
 
@@ -26,9 +26,9 @@
   - 记忆画像从口述中提炼人物、地点、习惯、偏好与沟通注意点，进入聊天系统提示和简报。
   - 陪伴 / 守护 / 家属三类 Agent 使用不同提示词与工具子集；新增 Agent 轨迹评测（任务成功、工具覆盖、升级准确、轨迹完整）。
 - W7「工程存储」：
-  - 新增 `SqlClient` 驱动抽象，仓储层全部异步化，SQLite 与 PostgreSQL 共用一份迁移和业务代码。
-  - PostgreSQL 16 + pgvector 进入 Docker Compose，生产/答辩默认使用；反诈知识库支持向量语义检索，扩展不可用时自动回退内存打分。
-  - 新增 PGlite（WASM PostgreSQL）集成测试，覆盖共享迁移、演示种子与核心仓储；`docs/schema.sql` 与 `docs/schema.postgres.sql` 均由迁移代码生成。
+  - 新增 `SqlClient` 驱动抽象，仓储层全部异步化，SQLite 与 MySQL 8 共用一份迁移和业务代码。
+  - 生产/答辩使用 MySQL 8，`deploy.sh` 以 systemd 托管；反诈语义检索改为内存 embedding + 关键词融合，不再依赖数据库向量扩展。
+  - 新增 MySQL 集成测试，覆盖共享迁移、演示种子、核心仓储与重复执行；`docs/schema.sql` 与 `docs/schema.mysql.sql` 均由迁移代码生成。
 - 数字人静态资源来自 DH_live（MIT）；示例头像仅用于比赛演示，商业使用需遵循上游授权。
 - 待办：真实模型 Key 与在线演示环境、比赛视频/PDF、团队信息补全。
 
@@ -39,10 +39,10 @@
 - [接口契约](docs/接口契约.md)：前后端唯一接口基线（字段、SSE 事件、错误码、权限）。
 - [前端开发文档](docs/前端开发文档.md)：页面、组件、状态、流式渲染、适老化。
 - [后端开发文档](docs/后端开发文档.md)：数据层、Agent、RAG、安全、位置、用药、部署。
-- [部署与在线演示](docs/部署.md)：生产构建、Docker Compose、Nginx、数据库初始化、数据备份。
+- [部署与在线演示](docs/部署.md)：systemd + MySQL 一键部署、本地预演、Nginx、数据库初始化、数据备份。
 - [AI 评测报告](docs/评测报告.md)：反诈、故事生成与 Agent 轨迹的用例、指标定义和复现方式。
-- [SQLite 表结构](docs/schema.sql)：SQLite 建表 SQL（33 张表 + 21 个索引，由迁移代码生成，可手动执行）。
-- [PostgreSQL 表结构](docs/schema.postgres.sql)：PostgreSQL 16 + pgvector 建表 SQL（34 张表 + 21 个索引，含向量扩展）。
+- [SQLite 表结构](docs/schema.sql)：SQLite 建表 SQL（32 张表 + 20 个索引，由迁移代码生成，可手动执行）。
+- [MySQL 表结构](docs/schema.mysql.sql)：MySQL 8 建表 SQL（33 张表含 `schema_migrations` + 20 个索引）。
 - [MCP Server](apps/mcp-server/README.md)：把天气、用药、反诈、定位、围栏能力开放给外部 AI 助手。
 - [提交信息规范](docs/提交规范.md)：Conventional Commits + 中文改动详情模板。
 - [第三方开源声明](THIRD_PARTY_NOTICES.md)：DH_live / 数字人示例资源说明。
@@ -64,24 +64,22 @@ LLM_MOCK=1 DEMO_MODE=1 npm run dev -w apps/api
 
 演示登录：`POST /api/auth/demo-login`，body `{"role":"elder"}`。环境变量见 [apps/api/.env.example](apps/api/.env.example)。
 
-本地默认 SQLite，无需安装数据库。要使用 PostgreSQL 16 + pgvector，推荐直接启动 Compose（含数据库、健康检查与数据卷）：
+本地默认 SQLite，无需安装数据库。使用 MySQL 8 有两种方式：本机已安装 MySQL 时设置 `DB_DRIVER=mysql`、`DATABASE_URL=mysql://user:password@127.0.0.1:3306/yinling`；或直接启动 Compose（MySQL 8 + 应用）：
 
 ```bash
-# 根目录 .env 至少设置 SESSION_SECRET 与 POSTGRES_PASSWORD
+# 根目录 .env 至少设置 SESSION_SECRET 与 MYSQL_PASSWORD
 docker compose up -d --build
 ```
 
-也可在本机数据库上设置 `DB_DRIVER=postgres`、`DATABASE_URL=postgres://user:password@127.0.0.1:5432/yinling` 后启动后端。
-
 ### 服务器一键部署
 
-服务器安装 Docker 24+ 与 Compose v2 后，在仓库根目录执行：
+服务器（Alibaba Cloud Linux 3 / RHEL 8+ / Debian 12+，root）在仓库根目录执行：
 
 ```bash
 bash deploy.sh
 ```
 
-脚本会自动生成 `.env` 与安全密钥、按需备份、构建并启动 PostgreSQL 16 + pgvector，轮询 `/ready` 成功后输出访问地址。`bash deploy.sh --help` 可查看 `status`、`logs`、`backup`、`down` 等命令；详细说明见 [部署文档](docs/部署.md)。
+脚本会自动安装 Node 24 与 MySQL 8，生成配置与安全密钥、按需备份、构建并启动 `yinling.service`，轮询 `/ready` 成功后输出访问地址。`bash deploy.sh --help` 可查看 `status`、`logs`、`backup`、`restart`、`stop` 等命令；详细说明见 [部署文档](docs/部署.md)。
 
 ### 前端独立交接
 
@@ -103,7 +101,7 @@ npm run build
 NODE_ENV=production SESSION_SECRET=change-me DEMO_MODE=1 npm run start -w apps/api
 ```
 
-后端会同时托管 `frontend/dist` 并提供 SPA 回退。以上命令默认 SQLite；生产/答辩建议 `docker compose up -d --build`（PostgreSQL + pgvector），详见 [部署文档](docs/部署.md)。
+后端会同时托管 `frontend/dist` 并提供 SPA 回退。以上命令默认 SQLite；生产/答辩建议在服务器执行 `bash deploy.sh`（systemd + MySQL 8），详见 [部署文档](docs/部署.md)。
 
 ### MCP Server
 
