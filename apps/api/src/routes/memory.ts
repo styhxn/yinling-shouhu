@@ -1,6 +1,7 @@
 import type { FastifyPluginAsync, FastifyRequest } from "fastify";
 import { z } from "zod";
 import { canAccessElder, requireAuth, requireRole } from "../services/auth/rbac.js";
+import type { StoryFidelity } from "../store/db.js";
 
 const MemoryCreateSchema = z.object({
   elderId: z.string().min(1).max(80).optional(),
@@ -72,7 +73,7 @@ function storyBookHtml(input: {
   bookTitle: string;
   elderName: string;
   createdAt: number;
-  chapters: { title: string; content: string }[];
+  chapters: { title: string; content: string; fidelity: StoryFidelity | null }[];
 }) {
   const date = new Date(input.createdAt).toLocaleDateString("zh-CN", {
     year: "numeric",
@@ -87,10 +88,31 @@ function storyBookHtml(input: {
         .filter(Boolean)
         .map((line) => `<p>${escapeHtml(line)}</p>`)
         .join("\n");
+      const quotes = chapter.fidelity?.verifiedQuotes ?? [];
+      const quotesHtml = quotes.length
+        ? `<aside class="quotes">
+    <h3>口述原话</h3>
+    ${quotes
+      .map(
+        (quote) =>
+          `<blockquote>“${escapeHtml(quote.text)}”<cite>《${escapeHtml(quote.sourceTitle)}》</cite></blockquote>`
+      )
+      .join("\n    ")}
+  </aside>`
+        : "";
+      const warnings = chapter.fidelity?.warnings ?? [];
+      const warningsHtml = warnings.length
+        ? `<p class="warn">${warnings.map((warning) => escapeHtml(warning)).join(" ")}</p>`
+        : "";
+      const fidelityLine = chapter.fidelity
+        ? `依据 ${chapter.fidelity.sources.length} 段口述 · 原文引语 ${quotes.length} 处 · 用词重合度 ${chapter.fidelity.groundingPct}%`
+        : "根据长辈口述整理，家属可修改。";
       return `<section class="chapter">
   <header><span class="no">第 ${index + 1} 篇</span><h2>${escapeHtml(chapter.title)}</h2></header>
   ${paragraphs}
-  <footer>根据长辈口述整理，家属可修改。</footer>
+  ${quotesHtml}
+  ${warningsHtml}
+  <footer>根据长辈口述整理，家属可修改。<br /><span class="basis">${fidelityLine}</span></footer>
 </section>`;
     })
     .join("\n");
@@ -120,7 +142,13 @@ function storyBookHtml(input: {
   .chapter .no { color: #8C3B2E; font-size: 12px; letter-spacing: 0.25em; }
   .chapter h2 { margin: 10px 0 0; font-size: 30px; font-weight: 600; letter-spacing: 0.03em; }
   .chapter p { margin: 0 0 1.1em; font-size: 17px; line-height: 2; text-align: justify; }
-  .chapter footer { margin-top: 32px; color: #8A968F; font-size: 12px; }
+  .chapter footer { margin-top: 32px; color: #8A968F; font-size: 12px; line-height: 1.8; }
+  .chapter .basis { letter-spacing: 0.04em; }
+  .quotes { margin: 28px 0; padding: 18px 22px; background: #F2F5EF; border-left: 3px solid #5E7F71; }
+  .quotes h3 { margin: 0 0 10px; font-size: 14px; letter-spacing: 0.2em; color: #5E7F71; font-weight: 600; }
+  .quotes blockquote { margin: 0 0 10px; font-size: 15px; line-height: 1.9; color: #33423D; }
+  .quotes cite { display: block; margin-top: 4px; color: #8A968F; font-size: 12px; font-style: normal; }
+  .chapter .warn { margin: 18px 0 0; padding: 10px 12px; background: #FBF2EF; color: #8C3B2E; font-size: 12px; line-height: 1.7; }
   .end { padding: 56px 0 8px; text-align: center; color: #5E7F71; }
   .end .note { color: #8A968F; font-size: 12px; letter-spacing: 0.2em; }
   @page { size: A4; margin: 20mm 18mm; }
@@ -142,7 +170,7 @@ function storyBookHtml(input: {
     <h1>${escapeHtml(input.bookTitle)}</h1>
     <p class="name">${escapeHtml(input.elderName)} 口述</p>
     <p class="meta">整理于 ${escapeHtml(date)}</p>
-    <p class="note">本册由长辈口述、家人整理，AI 仅协助润色。文中事实请以家人核对为准，未公开的内容不会被分享。</p>
+    <p class="note">本册由长辈口述、家人整理，AI 仅协助润色。文中引语均逐字回查口述原文；其余润色内容请家人核对。各篇末尾附「口述原话」与用词重合度，便于溯源。</p>
   </section>
   ${chapters}
   <section class="end"><p>— 完 —</p><p class="note">银龄守护 · 家庭记忆</p></section>
@@ -268,7 +296,7 @@ export const memoryRoutes: FastifyPluginAsync = async (server) => {
       const user = req.user!;
       if (!user.elderId) return reply.code(403).send({ error: "forbidden" });
       try {
-        const result = server.interview.answer({
+        const result = await server.interview.answer({
           interviewId: params.data.id,
           elderId: user.elderId,
           text: body.data.text

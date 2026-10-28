@@ -102,6 +102,7 @@ export function migrate(db: DatabaseSync) {
       order_index INTEGER NOT NULL,
       status TEXT NOT NULL DEFAULT 'draft',
       family_notes_enc TEXT,
+      fidelity_json TEXT,
       created_at INTEGER NOT NULL,
       updated_at INTEGER NOT NULL
     );
@@ -361,5 +362,12 @@ export function migrate(db: DatabaseSync) {
     .all() as Array<{ name?: string }>;
   if (!medicationLogColumns.some((column) => column.name === "scheduled_time")) {
     db.exec("ALTER TABLE medication_logs ADD COLUMN scheduled_time TEXT");
+  }
+
+  const storyChapterColumns = db
+    .prepare("PRAGMA table_info(story_chapters)")
+    .all() as Array<{ name?: string }>;
+  if (!storyChapterColumns.some((column) => column.name === "fidelity_json")) {
+    db.exec("ALTER TABLE story_chapters ADD COLUMN fidelity_json TEXT");
   }
 }

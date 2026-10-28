@@ -297,6 +297,7 @@ CREATE TABLE IF NOT EXISTS story_chapters (
       order_index INTEGER NOT NULL,
       status TEXT NOT NULL DEFAULT 'draft',
       family_notes_enc TEXT,
+      fidelity_json TEXT,
       created_at INTEGER NOT NULL,
       updated_at INTEGER NOT NULL
     );

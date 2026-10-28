@@ -48,7 +48,7 @@ export async function createServer(options: CreateServerOptions = {}) {
   const location = createLocationService(db);
   const antiFraud = createAntiFraudService(modelRouter);
   const coolingOff = createCoolingOffService({ db, eventBus });
-  const interview = createInterviewService(db);
+  const interview = createInterviewService(db, modelRouter);
   const story = createStoryService(db, modelRouter);
   const toolRegistry = createToolRegistry({
     db,

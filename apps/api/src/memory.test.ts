@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createServer } from "./server.js";
-import { cookieFrom, testConfig } from "./testUtils.js";
+import { createStoryService } from "./services/memory/story.js";
+import { cookieFrom, StubModelRouter, testConfig } from "./testUtils.js";
 
 let server: Awaited<ReturnType<typeof createServer>>;
 let elderCookie: string;
@@ -45,6 +46,7 @@ describe("memory", () => {
     expect(started.maxTurns).toBe(5);
 
     let memory: any = null;
+    let adaptiveQuestions = 0;
     for (let i = 0; i < started.maxTurns; i += 1) {
       const answer = await server.inject({
         method: "POST",
@@ -54,12 +56,16 @@ describe("memory", () => {
       });
       expect(answer.statusCode).toBe(200);
       const body = answer.json() as any;
+      if (body.adaptive) adaptiveQuestions += 1;
       if (body.done) memory = body.memory;
     }
 
+    expect(adaptiveQuestions).toBeGreaterThan(0);
     expect(memory).toBeTruthy();
     expect(memory.transcript).toContain("问：");
     expect(memory.transcript).toContain("答：");
+    expect(memory.title).toContain("回忆");
+    expect(memory.summary.length).toBeGreaterThan(5);
 
     const list = await server.inject({
       method: "GET",
@@ -78,6 +84,10 @@ describe("memory", () => {
     expect(story.statusCode).toBe(200);
     const storyBody = story.json() as any;
     expect(storyBody.chapter.content.length).toBeGreaterThan(10);
+    expect(storyBody.chapter.fidelity.engine).toBe("rules+llm");
+    expect(storyBody.chapter.fidelity.groundingPct).toBeGreaterThan(0);
+    expect(storyBody.chapter.fidelity.verifiedQuotes.length).toBeGreaterThan(0);
+    expect(storyBody.chapter.fidelity.sources.length).toBeGreaterThan(0);
 
     const detail = await server.inject({
       method: "GET",
@@ -97,12 +107,63 @@ describe("memory", () => {
     expect(String(exported.headers["content-disposition"])).toContain("attachment");
     expect(exported.body).toContain("家庭记忆册");
     expect(exported.body).toContain("根据长辈口述整理");
+    expect(exported.body).toContain("口述原话");
+    expect(exported.body).toContain("用词重合度");
 
     const anonymous = await server.inject({
       method: "GET",
       url: "/api/memory/story/export"
     });
     expect(anonymous.statusCode).toBe(401);
+  });
+
+  it("dequotes story lines the elder never said", async () => {
+    const memory = server.db.memories.create({
+      elderId: "e_li",
+      title: "苏州河边的夏天",
+      summary: "小时候住在苏州河边，夏天和邻居下河捉鱼。",
+      transcript: "问：小时候住在哪里？\n答：我小时候住在苏州河边，夏天和邻居下河捉鱼。",
+      tags: ["童年"],
+      consent: true
+    });
+    const service = createStoryService(
+      server.db,
+      new StubModelRouter({
+        title: "苏州河边的夏天",
+        content:
+          "我小时候住在苏州河边。\n\n“我小时候住在苏州河边”\n\n“这是模型编出来的一句话”\n\n根据长辈口述整理，家属可修改。"
+      })
+    );
+
+    const { chapter } = await service.generate({
+      elderId: "e_li",
+      memoryIds: [memory.id]
+    });
+
+    expect(chapter.fidelity?.engine).toBe("rules+llm");
+    expect(
+      chapter.fidelity?.verifiedQuotes.some((quote) => quote.text.includes("苏州河边"))
+    ).toBe(true);
+    expect(chapter.fidelity?.removedQuotes).toContain("这是模型编出来的一句话");
+    expect(chapter.content).not.toContain("“这是模型编出来的一句话”");
+    expect(chapter.fidelity?.groundingPct).toBeGreaterThan(0);
+    expect(chapter.fidelity?.warnings.some((warning) => warning.includes("未在口述原文"))).toBe(
+      true
+    );
+  });
+
+  it("starts from a photo prompt when a picture is provided", async () => {
+    const res = await server.inject({
+      method: "POST",
+      url: "/api/memory/interview/start",
+      headers: { cookie: elderCookie },
+      payload: { topic: "家庭", photoId: "up_demo_photo" }
+    });
+    expect(res.statusCode).toBe(200);
+    const body = res.json() as any;
+    expect(body.photoPrompt).toBe(true);
+    expect(body.question).toContain("照片");
+    expect(body.topic).toBe("家庭");
   });
 
   it("lets family read the linked elder's memories but not another elder", async () => {

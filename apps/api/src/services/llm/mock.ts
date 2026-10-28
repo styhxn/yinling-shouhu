@@ -137,6 +137,99 @@ export class MockModelProvider implements ModelRouter {
       });
     }
 
+    if (req.task === "interview_followup") {
+      const input = lastUserJson(req.messages);
+      const transcript = Array.isArray(input.transcript)
+        ? (input.transcript as Array<Record<string, unknown>>)
+        : [];
+      const lastAnswer =
+        typeof transcript.at(-1)?.answer === "string"
+          ? String(transcript.at(-1)?.answer)
+          : "";
+      const place = lastAnswer.match(
+        /(?:住在|在)([\u4e00-\u9fa5]{2,6}(?:河边|村|镇|街|路|桥))/
+      )?.[1];
+      const templates = [
+        "那时候的屋子是什么样子的？",
+        "您还记得当时最开心的一件事吗？",
+        "这件事里还有谁在场？",
+        "后来还回去看过吗？"
+      ];
+      return req.schema.parse({
+        question: place
+          ? `${place}那时候是什么样子？您常和谁一起去？`
+          : templates[transcript.length % templates.length],
+        focus: place ? "place" : "detail"
+      });
+    }
+
+    if (req.task === "memory_distill") {
+      const input = lastUserJson(req.messages);
+      const transcript = Array.isArray(input.transcript)
+        ? (input.transcript as Array<Record<string, unknown>>)
+        : [];
+      const topic = typeof input.topic === "string" ? input.topic : "回忆";
+      const answers = transcript
+        .map((item) => (typeof item.answer === "string" ? item.answer : ""))
+        .filter(Boolean);
+      const text = answers.join(" ").replace(/第\s*\d+\s*段回忆[：:，,]?/g, "");
+      const place = text.match(
+        /(?:住在|在)([\u4e00-\u9fa5]{2,8}(?:河边|村|镇|街|路|桥|厂|学校))/
+      )?.[1];
+      const people = Array.from(
+        new Set(
+          text.match(/母亲|父亲|妈妈|爸爸|老伴|女儿|儿子|邻居|同事|老师|朋友|孙子|孙女/g) ??
+            []
+        )
+      );
+      const firstAnswer = answers[0];
+      const lastAnswer = answers.at(-1);
+      return req.schema.parse({
+        title: place ? `${place.slice(0, 16)}的回忆` : `${topic}的回忆`,
+        summary: (
+          firstAnswer && lastAnswer && firstAnswer !== lastAnswer
+            ? `${firstAnswer} ${lastAnswer}`
+            : firstAnswer ?? lastAnswer ?? `${topic}的一段回忆`
+        ).slice(0, 160),
+        timeRange: text.match(/小时候|年轻时|上学时|退休前|那几年|那年/)?.[0] ?? null,
+        place: place?.slice(0, 30) ?? null,
+        people: people.slice(0, 6),
+        tags: [topic, ...people.slice(0, 2)]
+      });
+    }
+
+    if (req.task === "story_chapter") {
+      const input = lastUserJson(req.messages);
+      const memories = Array.isArray(input.memories)
+        ? (input.memories as Array<Record<string, unknown>>)
+        : [];
+      const answers: string[] = [];
+      for (const memory of memories) {
+        const transcript = typeof memory.transcript === "string" ? memory.transcript : "";
+        for (const line of transcript.split(/\n+/)) {
+          if (!line.startsWith("答：")) continue;
+          const answer = line.replace(/^答：\s*/, "").trim();
+          if (answer) answers.push(answer);
+        }
+      }
+      const firstTitle =
+        typeof memories[0]?.title === "string" ? String(memories[0].title) : "一段回忆";
+      const summary =
+        typeof memories[0]?.summary === "string" ? String(memories[0].summary) : "";
+      const body = answers.length
+        ? answers
+            .map((answer, index) =>
+              index === 0 ? `那年，${answer.replace(/[。！？]$/, "")}。` : answer
+            )
+            .join("\n\n")
+        : summary || "这是一段家人记录的回忆。";
+      const quote = answers[0]?.slice(0, 24);
+      return req.schema.parse({
+        title: firstTitle,
+        content: `${body}\n\n${quote ? `“${quote}”\n\n` : ""}根据长辈口述整理，家属可修改。`
+      });
+    }
+
     if (req.task === "roleplay_turn") {
       const input = lastUserJson(req.messages);
       const scenario = ROLEPLAY_SCENARIOS.find((item) => item.id === input.scenarioId);

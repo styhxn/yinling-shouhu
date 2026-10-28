@@ -2,7 +2,7 @@ import React from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Icon } from "../components/Icon.js";
 import { api } from "../../lib/api.js";
-import type { MemoryItem } from "../../lib/types.js";
+import type { MemoryInsight, MemoryItem } from "../../lib/types.js";
 import { asrErrorZh, startRecognizeZhBuffered, type AsrStatus } from "../voice/asr.js";
 import { useToast } from "../state/toast.js";
 
@@ -18,22 +18,48 @@ export function MemoryInterviewPage() {
   const [maxTurns, setMaxTurns] = React.useState(5);
   const [answer, setAnswer] = React.useState("");
   const [memory, setMemory] = React.useState<MemoryItem | null>(null);
+  const [insight, setInsight] = React.useState<MemoryInsight | null>(null);
   const [busy, setBusy] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
   const [asrStatus, setAsrStatus] = React.useState<AsrStatus | null>(null);
+  const [photoFile, setPhotoFile] = React.useState<File | null>(null);
+  const [photoPreview, setPhotoPreview] = React.useState<string | null>(null);
+  const [photoPrompt, setPhotoPrompt] = React.useState(false);
+  const [adaptive, setAdaptive] = React.useState(false);
   const stopAsrRef = React.useRef<null | (() => void)>(null);
+
+  React.useEffect(() => {
+    if (!photoFile) {
+      setPhotoPreview(null);
+      return;
+    }
+    const url = URL.createObjectURL(photoFile);
+    setPhotoPreview(url);
+    return () => URL.revokeObjectURL(url);
+  }, [photoFile]);
 
   async function start() {
     setBusy(true);
     setError(null);
     setMemory(null);
+    setInsight(null);
     setAnswer("");
+    setAdaptive(false);
     try {
-      const result = await api.memory.startInterview({ topic });
+      let photoId: string | undefined;
+      if (photoFile) {
+        const uploaded = await api.uploads.image(photoFile, "memory");
+        photoId = uploaded.upload.id;
+      }
+      const result = await api.memory.startInterview({
+        topic,
+        ...(photoId ? { photoId } : {})
+      });
       setInterviewId(result.interviewId);
       setQuestion(result.question);
       setTurn(result.turn);
       setMaxTurns(result.maxTurns);
+      setPhotoPrompt(Boolean(result.photoPrompt));
     } catch (err) {
       setError(err instanceof Error ? err.message : "访谈启动失败");
     } finally {
@@ -50,10 +76,12 @@ export function MemoryInterviewPage() {
       setAnswer("");
       if (result.done && result.memory) {
         setMemory(result.memory);
+        setInsight(result.insight ?? null);
         setQuestion(null);
       } else {
         setQuestion(result.question);
         setTurn(result.turn ?? turn + 1);
+        setAdaptive(Boolean(result.adaptive));
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "保存失败");
@@ -117,6 +145,29 @@ export function MemoryInterviewPage() {
           </div>
           <h1>这段回忆已经记下了</h1>
           <p>《{memory.title}》已保存到您的故事时间轴。要不要现在整理成一篇故事？</p>
+          {photoPreview ? (
+            <img className="yl-successPhoto" src={photoPreview} alt="这段回忆附带的老照片" />
+          ) : null}
+          {insight ? (
+            <div className="yl-insightCard">
+              <div className="yl-insightHead">
+                <Icon name="sparkles" size="sm" />
+                <strong>{insight.engine === "rules+llm" ? "已自动整理" : "已按原话整理"}</strong>
+              </div>
+              <p>{insight.summary}</p>
+              <div className="yl-insightTags">
+                {Array.from(
+                  new Set(
+                    [insight.timeRange, insight.place, ...insight.people, ...insight.tags].filter(
+                      (item): item is string => Boolean(item)
+                    )
+                  )
+                ).map((item) => (
+                  <span key={item}>{item}</span>
+                ))}
+              </div>
+            </div>
+          ) : null}
           <div className="yl-inlineActions">
             <button type="button" className="btn btnPrimary" disabled={busy} onClick={() => void generateStory()}>
               <Icon name="sparkles" size="sm" />
@@ -157,10 +208,45 @@ export function MemoryInterviewPage() {
               </button>
             ))}
           </div>
+
+          <div className="yl-photoPicker">
+            {photoPreview ? (
+              <div className="yl-photoPreview">
+                <img src={photoPreview} alt="访谈照片预览" />
+                <div>
+                  <strong>从这张照片开始</strong>
+                  <p>我会先问照片里的地点和人物，再接着往下聊。</p>
+                </div>
+                <button type="button" className="btn btn--sm" onClick={() => setPhotoFile(null)}>
+                  移除
+                </button>
+              </div>
+            ) : (
+              <label className="yl-photoAdd">
+                <Icon name="camera" size="lg" />
+                <span>
+                  <strong>带一张老照片（可选）</strong>
+                  <small>看着照片，更容易想起当时的人和事</small>
+                </span>
+                <input
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  onChange={(e) => setPhotoFile(e.target.files?.[0] ?? null)}
+                />
+              </label>
+            )}
+          </div>
+
           <button type="button" className="btn btnPrimary" disabled={busy} onClick={() => void start()}>
             <Icon name="play" size="sm" />
             {busy ? "准备中…" : "开始访谈"}
           </button>
+          {error ? (
+            <div className="yl-errorBar">
+              <Icon name="alertCircle" size="sm" />
+              <span>{error}</span>
+            </div>
+          ) : null}
         </section>
       ) : (
         <section className="yl-panel yl-interviewPanel">
@@ -169,6 +255,21 @@ export function MemoryInterviewPage() {
             <div className="yl-progressTrack">
               <div className="yl-progressBar" style={{ width: `${Math.min(100, (turn / maxTurns) * 100)}%` }} />
             </div>
+          </div>
+
+          <div className="yl-interviewMeta">
+            {photoPrompt ? (
+              <span className="yl-badge">
+                <Icon name="camera" size="sm" />
+                从照片开始
+              </span>
+            ) : null}
+            {adaptive ? (
+              <span className="yl-badge yl-badge--accent">
+                <Icon name="sparkles" size="sm" />
+                接着您刚才说的追问
+              </span>
+            ) : null}
           </div>
 
           <div className="yl-interviewQuestion">

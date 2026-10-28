@@ -34,6 +34,17 @@ export type MemoryItem = {
   updatedAt: number;
 };
 
+export type StoryFidelity = {
+  engine: "rules" | "rules+llm";
+  model: string;
+  groundingPct: number;
+  level: "high" | "medium" | "low";
+  verifiedQuotes: { text: string; sourceMemoryId: string; sourceTitle: string }[];
+  removedQuotes: string[];
+  sources: { id: string; title: string }[];
+  warnings: string[];
+};
+
 export type StoryChapter = {
   id: string;
   bookId: string;
@@ -44,6 +55,7 @@ export type StoryChapter = {
   orderIndex: number;
   status: string;
   familyNotes: string | null;
+  fidelity: StoryFidelity | null;
   createdAt: number;
   updatedAt: number;
 };
@@ -156,9 +168,21 @@ export type PendingConfirmation = {
   expiresAt: number;
 };
 
+export type MemoryInsight = {
+  title: string;
+  summary: string;
+  timeRange: string | null;
+  place: string | null;
+  people: string[];
+  tags: string[];
+  engine: "rules" | "rules+llm";
+};
+
 export type InterviewStart = {
   ok: boolean;
   interviewId: string;
+  topic?: string;
+  photoPrompt?: boolean;
   question: string;
   turn: number;
   maxTurns: number;
@@ -170,7 +194,10 @@ export type InterviewAnswer = {
   question: string | null;
   turn?: number;
   maxTurns?: number;
+  adaptive?: boolean;
+  focus?: string;
   memory?: MemoryItem;
+  insight?: MemoryInsight;
 };
 
 export type LocationPoint = {

@@ -163,6 +163,17 @@ export type DbStoryBook = {
   createdAt: number;
 };
 
+export type StoryFidelity = {
+  engine: "rules" | "rules+llm";
+  model: string;
+  groundingPct: number;
+  level: "high" | "medium" | "low";
+  verifiedQuotes: { text: string; sourceMemoryId: string; sourceTitle: string }[];
+  removedQuotes: string[];
+  sources: { id: string; title: string }[];
+  warnings: string[];
+};
+
 export type DbStoryChapter = {
   id: string;
   bookId: string;
@@ -173,6 +184,7 @@ export type DbStoryChapter = {
   orderIndex: number;
   status: string;
   familyNotes: string | null;
+  fidelity: StoryFidelity | null;
   createdAt: number;
   updatedAt: number;
 };
@@ -845,6 +857,7 @@ export function createDb(dbPath: string, options: CreateDbOptions) {
       orderIndex: Number(row.order_index),
       status: String(row.status),
       familyNotes: dec<string>(row.family_notes_enc),
+      fidelity: parseJson<StoryFidelity | null>(row.fidelity_json, null),
       createdAt: Number(row.created_at),
       updatedAt: Number(row.updated_at)
     };
@@ -1122,14 +1135,15 @@ export function createDb(dbPath: string, options: CreateDbOptions) {
       content: string;
       orderIndex: number;
       status?: string;
+      fidelity?: StoryFidelity | null;
     }): DbStoryChapter {
       const id = `ch_${randomUUID()}`;
       const now = Date.now();
       raw
         .prepare(
           `INSERT INTO story_chapters
-            (id, book_id, title, memory_ids_json, content, audio_url, order_index, status, family_notes_enc, created_at, updated_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+            (id, book_id, title, memory_ids_json, content, audio_url, order_index, status, family_notes_enc, fidelity_json, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
         )
         .run(
           id,
@@ -1141,6 +1155,7 @@ export function createDb(dbPath: string, options: CreateDbOptions) {
           input.orderIndex,
           input.status ?? "draft",
           null,
+          input.fidelity ? JSON.stringify(input.fidelity) : null,
           now,
           now
         );

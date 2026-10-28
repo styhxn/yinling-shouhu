@@ -83,6 +83,41 @@ export function StoryChapterPage() {
         ))}
       </article>
 
+      {chapter.fidelity ? (
+        <aside className={`yl-fidelity yl-fidelity--${chapter.fidelity.level}`}>
+          <div className="yl-fidelityHead">
+            <Icon name="shieldCheck" size="sm" />
+            <strong>口述依据</strong>
+            <span>
+              {chapter.fidelity.engine === "rules+llm" ? "AI 整理 · 原文校验" : "按原话整理"}
+            </span>
+          </div>
+          <div className="yl-fidelityStats">
+            <span>用词重合度 {chapter.fidelity.groundingPct}%</span>
+            <span>原文引语 {chapter.fidelity.verifiedQuotes.length} 处</span>
+            <span>来源 {chapter.fidelity.sources.length} 段口述</span>
+          </div>
+          {chapter.fidelity.verifiedQuotes.length > 0 ? (
+            <div className="yl-fidelityQuotes">
+              {chapter.fidelity.verifiedQuotes.map((quote, index) => (
+                <blockquote key={`${quote.sourceMemoryId}_${index}`}>
+                  “{quote.text}”
+                  <cite>《{quote.sourceTitle}》</cite>
+                </blockquote>
+              ))}
+            </div>
+          ) : null}
+          {chapter.fidelity.warnings.length > 0 ? (
+            <ul className="yl-fidelityWarnings">
+              {chapter.fidelity.warnings.map((warning) => (
+                <li key={warning}>{warning}</li>
+              ))}
+            </ul>
+          ) : null}
+          <p className="yl-fidelityNote">引语已逐字回查原始口述；润色部分请家人核对后再分享。</p>
+        </aside>
+      ) : null}
+
       <div className="yl-storyActions">
         <button
           type="button"
