@@ -73,6 +73,16 @@ docker compose up -d --build
 
 也可在本机数据库上设置 `DB_DRIVER=postgres`、`DATABASE_URL=postgres://user:password@127.0.0.1:5432/yinling` 后启动后端。
 
+### 服务器一键部署
+
+服务器安装 Docker 24+ 与 Compose v2 后，在仓库根目录执行：
+
+```bash
+bash deploy.sh
+```
+
+脚本会自动生成 `.env` 与安全密钥、按需备份、构建并启动 PostgreSQL 16 + pgvector，轮询 `/ready` 成功后输出访问地址。`bash deploy.sh --help` 可查看 `status`、`logs`、`backup`、`down` 等命令；详细说明见 [部署文档](docs/部署.md)。
+
 ### 前端独立交接
 
 `frontend/` 已内置契约类型，不依赖仓库内其他 workspace，可单独复制或压缩后：

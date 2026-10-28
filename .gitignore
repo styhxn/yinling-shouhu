@@ -13,9 +13,10 @@ apps/api/data/
 apps/api/public/uploads/
 *.key
 
-# 临时文件
+# 临时文件与部署备份
 tmp_*.json
 .shots/
+backups/
 
 # Python / 数字人训练环境（保留 web_demo/static）
 .venv/
