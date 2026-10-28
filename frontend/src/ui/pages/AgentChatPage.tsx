@@ -1,4 +1,5 @@
 import React from "react";
+import { Link } from "react-router-dom";
 import { Icon } from "../components/Icon.js";
 import { streamAgent } from "../../lib/sse.js";
 import { asrErrorZh, startRecognizeZhBuffered, type AsrStatus } from "../voice/asr.js";
@@ -10,6 +11,7 @@ const TOOL_LABELS: Record<string, string> = {
   get_weather: "查询天气",
   get_health_records: "读取健康记录",
   get_medications: "查看用药",
+  search_memories: "检索老人口述",
   check_scam: "反诈鉴定",
   start_cooling_off: "启动转账冷静期",
   get_location: "查询位置"
@@ -89,6 +91,38 @@ function MessageBubble({ message }: { message: ChatMessage }) {
             <Icon name="alertTriangle" size="sm" />
             <span>这条信息风险很高，先不要转账。</span>
             <a href="tel:96110" className="yl-linkBtn">拨打 96110</a>
+          </div>
+        )}
+        {!isUser && message.citations && message.citations.length > 0 && (
+          <div className="yl-citations">
+            <span className="yl-citationsLabel">依据</span>
+            {message.citations.map((citation, index) =>
+              citation.type === "memory" ? (
+                <Link
+                  key={`${citation.id ?? citation.title}_${index}`}
+                  to="/elder/story"
+                  className="yl-citationChip"
+                >
+                  <Icon name="bookOpen" size="sm" />
+                  {citation.title}
+                </Link>
+              ) : citation.url ? (
+                <a
+                  key={`${citation.url}_${index}`}
+                  href={citation.url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="yl-citationChip"
+                >
+                  <Icon name="link" size="sm" />
+                  {citation.title}
+                </a>
+              ) : (
+                <span key={`${citation.title}_${index}`} className="yl-citationChip">
+                  {citation.title}
+                </span>
+              )
+            )}
           </div>
         )}
         <div className="yl-chatMeta">
@@ -252,7 +286,11 @@ export function AgentChatPage() {
         break;
       case "done":
         setSessionId(data.sessionId ?? sessionRef.current);
-        updateLastAssistant((message) => ({ ...message, riskLevel: data.riskLevel }));
+        updateLastAssistant((message) => ({
+          ...message,
+          riskLevel: data.riskLevel,
+          citations: Array.isArray(data.citations) ? data.citations : []
+        }));
         setStatus("idle");
         break;
       case "error":

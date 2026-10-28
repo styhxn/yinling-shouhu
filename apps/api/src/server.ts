@@ -58,7 +58,8 @@ export async function createServer(options: CreateServerOptions = {}) {
     weather,
     location,
     antiFraud,
-    coolingOff
+    coolingOff,
+    modelRouter
   });
   const agent = createAgentRunner({ db, store, config, modelRouter, toolRegistry, eventBus });
 

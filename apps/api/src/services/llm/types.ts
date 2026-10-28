@@ -49,6 +49,8 @@ export type ChatJSONRequest<T> = {
   temperature?: number;
   maxTokens?: number;
   timeoutMs?: number;
+  /** 仅用于 Mock 与观测：标记结构化任务类型。 */
+  task?: string;
 };
 
 export type VisionJSONRequest<T> = {

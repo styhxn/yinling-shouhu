@@ -7,6 +7,8 @@ import type {
   ToolCall,
   VisionJSONRequest
 } from "./types.js";
+import { analyzeScam } from "../safety/scam.js";
+import { ROLEPLAY_SCENARIOS } from "../safety/roleplay.js";
 
 function chunks(text: string, size = 8): string[] {
   if (!text) return [];
@@ -23,6 +25,17 @@ function lastUserText(messages: ChatMessage[]): string {
   return "";
 }
 
+function lastUserJson(messages: ChatMessage[]): Record<string, unknown> {
+  try {
+    const parsed = JSON.parse(lastUserText(messages));
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed)
+      ? (parsed as Record<string, unknown>)
+      : {};
+  } catch {
+    return {};
+  }
+}
+
 function pickTool(text: string): ToolCall | null {
   if (/转账|汇款|安全账户|验证码|共享屏幕|银行卡/.test(text)) {
     return {
@@ -36,6 +49,9 @@ function pickTool(text: string): ToolCall | null {
   }
   if (/吃药|用药|药盒|服药/.test(text)) {
     return { id: "call_meds", name: "get_medications", args: {} };
+  }
+  if (/小时候|记得|故事|回忆|童年|家乡|工作|老伴|以前/.test(text)) {
+    return { id: "call_memories", name: "search_memories", args: { query: text.slice(0, 80) } };
   }
   if (/骗子|诈骗|短信|截图|链接|客服/.test(text)) {
     return {
@@ -101,6 +117,38 @@ export class MockModelProvider implements ModelRouter {
   }
 
   async chatJSON<T>(req: ChatJSONRequest<T>): Promise<T> {
+    if (req.task === "scam_analysis") {
+      const input = lastUserJson(req.messages);
+      const text = typeof input.text === "string" ? input.text : "";
+      const url = typeof input.url === "string" ? input.url : "";
+      const inputType = input.inputType === "url" ? "url" : "text";
+      const result = analyzeScam({ inputType, text, url });
+      const first = result.redFlags[0];
+      return req.schema.parse({
+        riskLevel: result.riskLevel,
+        scamType: result.scamType,
+        confidence: result.confidence,
+        summary: first
+          ? `规则匹配到“${first.quote}”：${first.reason}`
+          : "未发现明确诈骗话术，但仍建议通过官方渠道核实。",
+        redFlags: result.redFlags,
+        actions: result.actions,
+        questionsToAsk: result.questionsToAsk
+      });
+    }
+
+    if (req.task === "roleplay_turn") {
+      const input = lastUserJson(req.messages);
+      const scenario = ROLEPLAY_SCENARIOS.find((item) => item.id === input.scenarioId);
+      const turn = typeof input.turn === "number" ? Math.max(1, Math.floor(input.turn)) : 1;
+      const index = Math.min(turn - 1, (scenario?.turns.length ?? 1) - 1);
+      return req.schema.parse({
+        reply: scenario?.turns[index] ?? "机会只有这一次，你再考虑一下。",
+        tactic: scenario?.tactics[index] ?? "施压",
+        intensity: Math.min(3, Math.max(1, turn))
+      });
+    }
+
     return req.schema.parse({});
   }
 

@@ -1712,9 +1712,41 @@ body {
   font-size: 11px;
 }
 
+.ys-dimensionEvidence {
+  display: block;
+  margin-top: 4px;
+  color: var(--ys-ink-soft);
+  font-style: italic;
+}
+
+.ys-reportSummary {
+  margin: 6px 0 0;
+  color: var(--ys-muted);
+  font-size: 13px;
+  line-height: 1.7;
+  max-width: 46ch;
+}
+
+.ys-reportTactics {
+  display: flex;
+  gap: 10px;
+  align-items: baseline;
+  margin: 12px 0 0;
+  color: var(--ys-ink-soft);
+  font-size: 13px;
+}
+
+.ys-reportTactics span {
+  padding: 2px 8px;
+  border: 1px solid var(--ys-line);
+  background: var(--ys-paper);
+  color: var(--ys-muted);
+  font-size: 11px;
+}
+
 .ys-reportLists {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 20px;
   padding-top: 14px;
   border-top: 1px solid var(--ys-line);
@@ -1787,6 +1819,10 @@ body {
   }
 
   .ys-reportGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .ys-reportLists {
     grid-template-columns: 1fr;
   }
 

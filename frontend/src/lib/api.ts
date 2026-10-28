@@ -269,6 +269,7 @@ export const api = {
         ok: boolean;
         done: boolean;
         reply: string;
+        tactic?: string;
         turn?: number;
         maxTurns?: number;
         report?: RoleplayReport;

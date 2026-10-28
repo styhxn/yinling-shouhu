@@ -6,10 +6,10 @@ import type { createEventBus } from "../eventBus.js";
 import type { LocationService } from "../location/location.js";
 import type { AntiFraudService } from "../safety/antiFraud.js";
 import type { CoolingOffService } from "../safety/coolingOff.js";
-import { analyzeScam } from "../safety/scam.js";
+import { analyzeScamHybrid } from "../safety/scamAI.js";
 import type { createStore } from "../store.js";
 import type { WeatherService } from "../weather.js";
-import type { ToolSchema } from "../llm/types.js";
+import type { ModelRouter, ToolSchema } from "../llm/types.js";
 
 export type ToolRisk = "read" | "write" | "high";
 
@@ -47,6 +47,7 @@ export type ToolDeps = {
   location: LocationService;
   antiFraud: AntiFraudService;
   coolingOff: CoolingOffService;
+  modelRouter: ModelRouter;
 };
 
 export type ToolRegistry = {
@@ -139,6 +140,89 @@ export function createToolRegistry(deps: ToolDeps): ToolRegistry {
       }
     },
     {
+      name: "search_memories",
+      description:
+        "检索老人自己口述过的记忆（童年、家乡、工作、家人等）。回答过去经历相关问题前必须先检索，只引用检索结果，不要编造。",
+      parameters: z.object({
+        query: z.string().max(100).optional(),
+        limit: z.number().int().min(1).max(5).optional()
+      }),
+      jsonSchema: {
+        type: "object",
+        properties: {
+          query: { type: "string", description: "检索关键词，例如 童年、苏州、工作、老伴" },
+          limit: { type: "number", description: "返回条数，默认 3" }
+        }
+      },
+      risk: "read",
+      roles: ["elder", "family"],
+      requiresConfirmation: false,
+      async handler(args, ctx) {
+        const elderId = requireElder(ctx);
+        const query: string = typeof args.query === "string" ? args.query.trim() : "";
+        const limit: number = typeof args.limit === "number" ? args.limit : 3;
+        const items = deps.db.memories.listByElder(elderId);
+        const compact = query.replace(/\s+/g, "").toLowerCase();
+        const terms = new Set<string>();
+        if (compact.length <= 8) terms.add(compact);
+        for (let index = 0; index < compact.length - 1; index += 1) {
+          terms.add(compact.slice(index, index + 2));
+        }
+
+        const scored = items.map((memory) => {
+          const text = [
+            memory.title,
+            memory.summary ?? "",
+            memory.place ?? "",
+            memory.timeRange ?? "",
+            memory.people.join(" "),
+            memory.tags.join(" "),
+            memory.transcript
+          ]
+            .join("\n")
+            .toLowerCase();
+          const termList = Array.from(terms);
+          const score = termList.reduce((sum, term) => sum + (text.includes(term) ? 1 : 0), 0);
+          return { memory, score };
+        });
+
+        const picked = (terms.size ? scored.filter((item) => item.score > 0) : scored)
+          .sort((a, b) => b.score - a.score || b.memory.createdAt - a.memory.createdAt)
+          .slice(0, limit);
+
+        if (!picked.length) {
+          return {
+            summary: "没有检索到相关记忆。可以邀请老人先讲一段，或换一个关键词。",
+            data: { items: [], citations: [] }
+          };
+        }
+
+        const lines = picked.map(({ memory }, index) => {
+          const snippet = (memory.summary ?? memory.transcript).replace(/\s+/g, " ").slice(0, 80);
+          return `${index + 1}. ${memory.title}：${snippet}`;
+        });
+        return {
+          summary: `找到 ${picked.length} 段相关记忆：\n${lines.join("\n")}`,
+          data: {
+            items: picked.map(({ memory }) => ({
+              id: memory.id,
+              title: memory.title,
+              summary: memory.summary,
+              timeRange: memory.timeRange,
+              place: memory.place,
+              people: memory.people,
+              tags: memory.tags
+            })),
+            citations: picked.map(({ memory }) => ({
+              title: memory.title,
+              type: "memory",
+              id: memory.id
+            }))
+          }
+        };
+      }
+    },
+    {
       name: "check_scam",
       description:
         "分析一段文字、短信或链接是否存在诈骗风险。只做模式分析，不访问链接内容；不要用于替代警方判断。",
@@ -160,24 +244,19 @@ export function createToolRegistry(deps: ToolDeps): ToolRegistry {
       roles: ["elder", "family", "institution", "admin"],
       requiresConfirmation: false,
       async handler(args, ctx) {
-        const result = analyzeScam({
-          inputType: args.inputType,
-          ...(typeof args.text === "string" ? { text: args.text } : {}),
-          ...(typeof args.url === "string" ? { url: args.url } : {})
-        });
         const query =
           args.inputType === "url"
             ? String(args.url ?? "")
             : String(args.text ?? "");
         const hits = query ? await deps.antiFraud.search(query, 2) : [];
-        const seen = new Set<string>();
-        const sources = [...result.sources, ...hits.map((hit) => hit.source)].filter((source) => {
-          const key = `${source.title}|${source.url}`;
-          if (seen.has(key)) return false;
-          seen.add(key);
-          return true;
+        const result = await analyzeScamHybrid({
+          inputType: args.inputType,
+          ...(typeof args.text === "string" ? { text: args.text } : {}),
+          ...(typeof args.url === "string" ? { url: args.url } : {}),
+          modelRouter: deps.modelRouter,
+          knowledge: hits
         });
-        const enriched = { ...result, sources };
+        const enriched = { ...result };
 
         deps.db.scamChecks.insert({
           elderId: ctx.elderId ?? ctx.user.userId,
@@ -187,7 +266,8 @@ export function createToolRegistry(deps: ToolDeps): ToolRegistry {
           riskLevel: enriched.riskLevel,
           scamType: enriched.scamType,
           confidence: enriched.confidence,
-          result: enriched
+          result: enriched,
+          model: enriched.model
         });
 
         const flags = enriched.redFlags
@@ -199,6 +279,7 @@ export function createToolRegistry(deps: ToolDeps): ToolRegistry {
         return {
           summary:
             `风险等级：${enriched.riskLevel}；类型：${enriched.scamType}；置信度：${enriched.confidence}\n` +
+            (enriched.explanation ? `判断：${enriched.explanation}\n` : "") +
             (flags ? `可疑点：\n${flags}\n` : "") +
             `建议：${enriched.actions.join("；")}` +
             related +

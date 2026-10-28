@@ -120,6 +120,7 @@ export type DbScamCheck = {
   scamType: string;
   confidence: number;
   result: unknown;
+  model?: string;
 };
 
 export type DbUpload = {
@@ -251,6 +252,7 @@ export type RoleplayMessage = {
   role: "scammer" | "elder";
   text: string;
   ts: number;
+  tactic?: string;
 };
 
 export type DbRoleplaySession = {
@@ -780,7 +782,7 @@ export function createDb(dbPath: string, options: CreateDbOptions) {
           input.scamType,
           input.confidence,
           JSON.stringify(input.result),
-          "rules",
+          input.model ?? "rules",
           Date.now()
         );
     }

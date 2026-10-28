@@ -9,7 +9,19 @@ const dhStaticRoot = path.resolve(
   __dirname,
   process.env.DH_LIVE_STATIC_DIR ?? "../DH_live-main/DH_live-main/web_demo/static"
 );
-const apiTarget = process.env.VITE_PROXY_TARGET ?? "http://127.0.0.1:3100";
+function siblingApiPort(): number | null {
+  try {
+    const envPath = path.resolve(__dirname, "../apps/api/.env");
+    if (!fs.existsSync(envPath)) return null;
+    const match = fs.readFileSync(envPath, "utf8").match(/^\s*PORT\s*=\s*(\d+)/m);
+    return match ? Number(match[1]) : null;
+  } catch {
+    return null;
+  }
+}
+
+const apiTarget =
+  process.env.VITE_PROXY_TARGET ?? `http://127.0.0.1:${siblingApiPort() ?? 3100}`;
 const wsTarget = apiTarget.replace(/^http/, "ws");
 const dhMountPrefix = "/dh-live";
 

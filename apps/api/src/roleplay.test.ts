@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createServer } from "./server.js";
-import { cookieFrom, testConfig } from "./testUtils.js";
+import { createRoleplayService } from "./services/safety/roleplay.js";
+import { cookieFrom, StubModelRouter, testConfig } from "./testUtils.js";
 
 let server: Awaited<ReturnType<typeof createServer>>;
 let cookie: string;
@@ -68,6 +69,33 @@ describe("anti-fraud roleplay", () => {
     expect(report.total).toBeGreaterThan(60);
     expect(report.redFlags.length).toBeGreaterThan(0);
     expect(report.disclaimer).toContain("模拟演练");
+    expect(report.summary.length).toBeGreaterThan(10);
+    expect(report.tacticSummary).toContain("信息隔离");
+    expect(report.nextSteps).toHaveLength(3);
+    for (const dimension of report.dimensions as Array<{ evidence: string }>) {
+      expect(dimension.evidence.length).toBeGreaterThan(0);
+    }
+  });
+
+  it("falls back to scripted lines when the model outputs a link", async () => {
+    const service = createRoleplayService(
+      server.db,
+      new StubModelRouter({
+        reply: "打开 https://evil.example 输入银行卡号和密码。",
+        tactic: "诱导链接",
+        intensity: 3
+      })
+    );
+    const started = service.start("e_li", "fake_police");
+    const result = await service.turn(started.sessionId, "e_li", "我不太明白，你再说一遍。");
+
+    expect(result.done).toBe(false);
+    expect(result.reply).not.toContain("http");
+    expect(result.reply).toContain("安全账户");
+
+    const session = server.db.roleplaySessions.get(started.sessionId);
+    const scammer = session?.messages.filter((message) => message.role === "scammer").at(-1);
+    expect(scammer?.text).not.toContain("http");
   });
 
   it("can end a scenario early", async () => {

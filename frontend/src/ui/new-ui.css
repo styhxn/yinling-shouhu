@@ -833,6 +833,38 @@
   font-size: 0.82rem;
 }
 
+.yl-citations {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+
+.yl-citationsLabel {
+  color: var(--muted, #64748b);
+  font-size: 0.7rem;
+  letter-spacing: 0.06em;
+}
+
+.yl-citationChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 9px;
+  border-radius: 99px;
+  border: 1px solid #e2e8f0;
+  background: #f8fafc;
+  color: #334155;
+  font-size: 0.74rem;
+  text-decoration: none;
+}
+
+a.yl-citationChip:hover {
+  border-color: #94a3b8;
+  background: #f1f5f9;
+}
+
 .yl-composer {
   display: flex;
   align-items: center;
@@ -1286,6 +1318,52 @@
 .yl-confidence {
   color: var(--muted, #64748b);
   font-size: 0.78rem;
+}
+
+.yl-engineLine {
+  margin: 8px 0 0;
+  color: var(--muted, #64748b);
+  font-size: 0.75rem;
+  letter-spacing: 0.02em;
+}
+
+.yl-aiSummary {
+  margin-top: 18px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid #dbeafe;
+  background: #f8fbff;
+}
+
+.yl-aiSummary p {
+  margin: 4px 0 0;
+  color: #1e40af;
+  line-height: 1.7;
+  font-size: 0.88rem;
+}
+
+.yl-sources {
+  margin-top: 18px;
+}
+
+.yl-sourceLinks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.yl-sourceLinks a {
+  padding: 4px 10px;
+  border-radius: 99px;
+  border: 1px solid #e2e8f0;
+  color: #334155;
+  font-size: 0.78rem;
+  text-decoration: none;
+}
+
+.yl-sourceLinks a:hover {
+  border-color: #94a3b8;
 }
 
 .yl-extractedText,

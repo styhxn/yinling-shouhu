@@ -3,7 +3,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { z } from "zod";
 import { canAccessElder, requireAuth, requireRole } from "../services/auth/rbac.js";
-import { analyzeScam } from "../services/safety/scam.js";
+import { analyzeScamHybrid } from "../services/safety/scamAI.js";
 import { analyzeScamImage } from "../services/safety/scamImage.js";
 
 const ScamCheckSchema = z
@@ -101,7 +101,8 @@ export const safetyRoutes: FastifyPluginAsync = async (server) => {
         riskLevel: enriched.riskLevel,
         scamType: enriched.scamType,
         confidence: enriched.confidence,
-        result: enriched
+        result: enriched,
+        model: server.modelRouter.mode
       });
       return { ok: true, result: enriched, related: hits };
     }
@@ -114,12 +115,14 @@ export const safetyRoutes: FastifyPluginAsync = async (server) => {
       return reply.code(400).send({ error: "invalid_body", message: "内容不能为空" });
     }
 
-    const result = analyzeScam({
+    const hits = await server.antiFraud.search(query, 3);
+    const result = await analyzeScamHybrid({
       inputType: parsed.data.inputType,
       ...(parsed.data.text ? { text: parsed.data.text } : {}),
-      ...(parsed.data.url ? { url: parsed.data.url } : {})
+      ...(parsed.data.url ? { url: parsed.data.url } : {}),
+      modelRouter: server.modelRouter,
+      knowledge: hits
     });
-    const hits = await server.antiFraud.search(query, 2);
     const enriched = {
       ...result,
       sources: dedupeSources([...result.sources, ...hits.map((hit) => hit.source)])
@@ -132,7 +135,8 @@ export const safetyRoutes: FastifyPluginAsync = async (server) => {
       riskLevel: enriched.riskLevel,
       scamType: enriched.scamType,
       confidence: enriched.confidence,
-      result: enriched
+      result: enriched,
+      model: server.modelRouter.mode
     });
     return { ok: true, result: enriched, related: hits };
   });

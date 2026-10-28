@@ -9,7 +9,7 @@ const TurnSchema = z.object({ text: z.string().min(1).max(1000) });
 const IdParamsSchema = z.object({ id: z.string().min(1).max(80) });
 
 export const roleplayRoutes: FastifyPluginAsync = async (server) => {
-  const roleplay = createRoleplayService(server.db);
+  const roleplay = createRoleplayService(server.db, server.modelRouter);
 
   server.get("/scenarios", { preHandler: requireAuth }, async () => {
     return { items: roleplay.scenarios() };
@@ -34,7 +34,7 @@ export const roleplayRoutes: FastifyPluginAsync = async (server) => {
     const elderId = resolveElderId(req);
     if (!elderId) return reply.code(403).send({ error: "forbidden" });
     try {
-      return { ok: true, ...roleplay.turn(params.data.id, elderId, body.data.text.trim()) };
+      return { ok: true, ...(await roleplay.turn(params.data.id, elderId, body.data.text.trim())) };
     } catch (err) {
       const code = err instanceof Error ? err.message : "failed";
       if (code === "not_found") return reply.code(404).send({ error: "not_found" });

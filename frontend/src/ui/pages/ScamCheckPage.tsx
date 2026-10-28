@@ -271,6 +271,22 @@ export function ScamCheckPage() {
             <span className="yl-confidence">置信度 {Math.round(result.confidence * 100)}%</span>
           </div>
 
+          <p className="yl-engineLine">
+            {result.engine === "rules+llm"
+              ? "规则 + AI 联合分析"
+              : result.engine === "vision"
+                ? "图片识别 + 规则分析"
+                : "规则引擎分析"}
+            {result.model ? ` · ${result.model}` : ""}
+          </p>
+
+          {result.explanation ? (
+            <div className="yl-aiSummary">
+              <div className="yl-sectionTitle">判断依据</div>
+              <p>{result.explanation}</p>
+            </div>
+          ) : null}
+
           {result.extractedText ? (
             <div className="yl-extractedText">
               <div className="yl-sectionTitle">识别到的内容</div>
@@ -324,6 +340,19 @@ export function ScamCheckPage() {
                   <p>{hit.summary}</p>
                 </div>
               ))}
+            </div>
+          )}
+
+          {result.sources.length > 0 && (
+            <div className="yl-sources">
+              <div className="yl-sectionTitle">核实用渠道</div>
+              <div className="yl-sourceLinks">
+                {result.sources.map((source) => (
+                  <a key={source.url} href={source.url} target="_blank" rel="noreferrer">
+                    {source.title}
+                  </a>
+                ))}
+              </div>
             </div>
           )}
 

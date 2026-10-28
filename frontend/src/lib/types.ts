@@ -67,6 +67,9 @@ export type ScamResult = {
   sources: { title: string; url: string }[];
   disclaimer: string;
   extractedText?: string;
+  explanation?: string;
+  engine?: "rules" | "rules+llm" | "vision";
+  model?: string;
 };
 
 export type AntiFraudHit = {
@@ -127,11 +130,19 @@ export type ToolEvent = {
   status: "running" | "done" | "error";
 };
 
+export type Citation = {
+  title: string;
+  url?: string;
+  type?: string;
+  id?: string;
+};
+
 export type ChatMessage = {
   id: string;
   role: "user" | "assistant";
   content: string;
   toolEvents: ToolEvent[];
+  citations?: Citation[];
   riskLevel?: "low" | "medium" | "high";
   time: string;
   error?: boolean;
@@ -268,15 +279,19 @@ export type RoleplayMessage = {
   role: "scammer" | "elder";
   text: string;
   ts: number;
+  tactic?: string;
 };
 
 export type RoleplayReport = {
   scenario: { id: string; title: string };
   total: number;
   level: string;
-  dimensions: { name: string; score: number; comment: string }[];
+  summary: string;
+  tacticSummary: string;
+  dimensions: { name: string; score: number; comment: string; evidence: string }[];
   redFlags: string[];
   advice: string[];
+  nextSteps: string[];
   transcript: RoleplayMessage[];
   disclaimer: string;
 };

@@ -15,6 +15,9 @@ export type ScamResult = {
   sources: { title: string; url: string }[];
   disclaimer: string;
   extractedText?: string;
+  explanation?: string;
+  engine?: "rules" | "rules+llm" | "vision";
+  model?: string;
 };
 
 type Rule = {

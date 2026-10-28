@@ -77,6 +77,35 @@ describe("agent", () => {
   });
 
 
+  it("cites the elder's own memories when answering about the past", async () => {
+    const memory = server.db.memories.create({
+      elderId: "e_li",
+      title: "河边捉鱼的夏天",
+      summary: "小时候在苏州河边和邻居小伙伴捉鱼，回家晚了被母亲念叨。",
+      transcript: "问：小时候住在哪里？答：住在苏州河边，夏天常去捉鱼。",
+      place: "苏州",
+      tags: ["童年", "苏州"],
+      consent: true
+    });
+
+    const res = await server.inject({
+      method: "POST",
+      url: "/api/agent/chat",
+      headers: { cookie, accept: "text/event-stream" },
+      payload: { message: "你还记得我小时候在苏州河边捉鱼的事吗？" }
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.body).toContain("search_memories");
+    expect(res.body).toContain("河边捉鱼的夏天");
+    const done = parseSse(res.body, "done")[0] as {
+      citations: Array<{ title: string; type?: string; id?: string }>;
+    };
+    expect(
+      done.citations.some((citation) => citation.id === memory.id && citation.type === "memory")
+    ).toBe(true);
+  });
+
   it("serves the legacy /qa/ask endpoint through the router", async () => {
     const res = await server.inject({
       method: "POST",

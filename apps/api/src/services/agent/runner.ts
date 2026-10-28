@@ -102,6 +102,44 @@ function confirmationSummary(tool: string, args: unknown): string {
   return "这一步涉及高风险操作，需要您确认。";
 }
 
+type Citation = { title: string; url?: string; type?: string; id?: string };
+
+function extractCitations(data: unknown): Citation[] {
+  if (!data || typeof data !== "object") return [];
+  const record = data as Record<string, unknown>;
+  const list = Array.isArray(record.citations)
+    ? record.citations
+    : Array.isArray(record.sources)
+      ? record.sources
+      : [];
+  const out: Citation[] = [];
+  for (const item of list) {
+    if (!item || typeof item !== "object") continue;
+    const source = item as Record<string, unknown>;
+    if (typeof source.title !== "string" || !source.title.trim()) continue;
+    out.push({
+      title: source.title.slice(0, 120),
+      ...(typeof source.url === "string" ? { url: source.url.slice(0, 300) } : {}),
+      ...(typeof source.type === "string" ? { type: source.type.slice(0, 20) } : {}),
+      ...(typeof source.id === "string" ? { id: source.id.slice(0, 80) } : {})
+    });
+  }
+  return out;
+}
+
+function mergeCitations(current: Citation[], incoming: Citation[]): Citation[] {
+  const seen = new Set(
+    current.map((item) => `${item.url ?? ""}|${item.type ?? ""}|${item.id ?? ""}|${item.title}`)
+  );
+  for (const item of incoming) {
+    const key = `${item.url ?? ""}|${item.type ?? ""}|${item.id ?? ""}|${item.title}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    current.push(item);
+  }
+  return current.slice(0, 8);
+}
+
 function errorMessage(err: unknown): string {
   if (err instanceof ModelError) return err.message;
   if (err instanceof Error) return err.message;
@@ -181,10 +219,12 @@ export function createAgentRunner(deps: AgentRunnerDeps): AgentRunner {
     ctx: ToolContext;
     signal?: AbortSignal;
     initialRisk?: "low" | "medium" | "high";
+    initialCitations?: Citation[];
   }): AsyncGenerator<AgentEvent> {
     const { messages, session, ctx, signal } = input;
     let riskLevel: "low" | "medium" | "high" = input.initialRisk ?? "low";
     let lastUsage: Usage | undefined;
+    const citations: Citation[] = [...(input.initialCitations ?? [])];
 
     for (let step = 0; step < 4; step += 1) {
       const toolSchemas = deps.toolRegistry.schemas(ctx.user.role);
@@ -224,7 +264,7 @@ export function createAgentRunner(deps: AgentRunnerDeps): AgentRunner {
           type: "done",
           sessionId: session.id,
           riskLevel,
-          citations: [],
+          citations,
           ...(lastUsage ? { usage: lastUsage } : {})
         };
         return;
@@ -293,6 +333,7 @@ export function createAgentRunner(deps: AgentRunnerDeps): AgentRunner {
         }
 
         const result = await executeTool(call, ctx);
+        mergeCitations(citations, extractCitations(result.data));
         messages.push({
           role: "tool",
           tool_call_id: call.id,
@@ -317,7 +358,7 @@ export function createAgentRunner(deps: AgentRunnerDeps): AgentRunner {
     for (const piece of chunkText(fallback)) yield { type: "token", text: piece };
     messages.push({ role: "assistant", content: fallback });
     saveSession(session, messages);
-    yield { type: "done", sessionId: session.id, riskLevel, citations: [] };
+    yield { type: "done", sessionId: session.id, riskLevel, citations };
   }
 
   async function* resumeConfirmation(
@@ -368,6 +409,7 @@ export function createAgentRunner(deps: AgentRunnerDeps): AgentRunner {
     yield { type: "tool_call", id: callId, name: call.name, args: redactArgs(call.args), risk: tool.risk };
 
     const result = await executeTool(call, ctx);
+    const approvedCitations = extractCitations(result.data);
     messages.push({
       role: "tool",
       tool_call_id: callId,
@@ -387,7 +429,8 @@ export function createAgentRunner(deps: AgentRunnerDeps): AgentRunner {
       session,
       ctx,
       ...(input.signal ? { signal: input.signal } : {}),
-      initialRisk: "high"
+      initialRisk: "high",
+      initialCitations: approvedCitations
     });
   }
 

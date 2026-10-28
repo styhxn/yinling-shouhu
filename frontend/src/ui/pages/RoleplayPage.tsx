@@ -5,7 +5,7 @@ import { api } from "../../lib/api.js";
 import type { RoleplayReport, RoleplayScenario } from "../../lib/types.js";
 import { useToast } from "../state/toast.js";
 
-type RpMessage = { role: "scammer" | "elder"; text: string };
+type RpMessage = { role: "scammer" | "elder"; text: string; tactic?: string };
 
 export function RoleplayPage() {
   const toast = useToast();
@@ -75,7 +75,10 @@ export function RoleplayPage() {
       if (res.done && res.report) {
         setReport(res.report);
       } else {
-        setMessages((prev) => [...prev, { role: "scammer", text: res.reply }]);
+        setMessages((prev) => [
+          ...prev,
+          { role: "scammer", text: res.reply, ...(res.tactic ? { tactic: res.tactic } : {}) }
+        ]);
         setTurn(res.turn ?? turn + 1);
       }
     } catch (err) {
@@ -151,12 +154,18 @@ export function RoleplayPage() {
               <span className="ys-kicker">演练复盘</span>
               <h2>{report.level}</h2>
               <p>{report.scenario.title}</p>
+              <p className="ys-reportSummary">{report.summary}</p>
             </div>
             <div className="ys-scoreNumber">
               <strong>{report.total}</strong>
               <small>综合分</small>
             </div>
           </div>
+
+          <p className="ys-reportTactics">
+            <span>对方手法</span>
+            {report.tacticSummary}
+          </p>
 
           <div className="ys-dimensionGrid">
             {report.dimensions.map((item) => (
@@ -169,6 +178,7 @@ export function RoleplayPage() {
                   <div className="ys-dimensionFill" style={{ width: `${item.score}%` }} />
                 </div>
                 <small>{item.comment}</small>
+                <small className="ys-dimensionEvidence">依据：{item.evidence}</small>
               </div>
             ))}
           </div>
@@ -184,6 +194,12 @@ export function RoleplayPage() {
               <h3>下次可以这样做</h3>
               <ul>
                 {report.advice.map((item) => <li key={item}>{item}</li>)}
+              </ul>
+            </div>
+            <div>
+              <h3>下一步行动</h3>
+              <ul>
+                {report.nextSteps.map((item) => <li key={item}>{item}</li>)}
               </ul>
             </div>
           </div>
@@ -210,7 +226,10 @@ export function RoleplayPage() {
                 key={`${message.role}_${index}`}
                 className={`ys-rpMsg ${message.role === "elder" ? "ys-rpMsg--elder" : "ys-rpMsg--scammer"}`}
               >
-                <span className="ys-rpWho">{message.role === "elder" ? "我" : "模拟对方"}</span>
+                <span className="ys-rpWho">
+                  {message.role === "elder" ? "我" : "模拟对方"}
+                  {message.tactic ? ` · ${message.tactic}` : ""}
+                </span>
                 <p>{message.text}</p>
               </div>
             ))}
