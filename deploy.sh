@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# 银龄守护 · 一键部署（systemd + MySQL 8 + Node 24）
+# 银龄守护 · 一键部署（systemd + MySQL 8 + Node 22.5+，推荐 24）
 # 适用：Alibaba Cloud Linux 3 / RHEL 8+ / Debian 12+，root 执行
 set -Eeuo pipefail
 
@@ -18,6 +18,7 @@ MYSQL_SERVICE=""
 MYSQL_FLAVOR="mysql"
 MYSQL_FRESH=0
 ROOT_MODE=""
+MYSQL_ROOT_TCP=0
 MYSQL_TEMP_PASS=""
 NODE_BIN=""
 PKG_MANAGER=""
@@ -56,6 +57,7 @@ usage() {
   MYSQL_DATABASE=yinling
   MYSQL_USER=yinling
   MYSQL_PASSWORD=...                 # 只允许字母、数字和 ._~-
+  MYSQL_ROOT_PASSWORD=...            # 可选；已有 MySQL 且 root 有密码时，终端会提示输入，不会写入配置
   DEEPSEEK_API_KEY=... QWEN_API_KEY=... ARK_API_KEY=... AMAP_WEB_KEY=...
   DEMO_MODE=1                        # 正式环境改 0 关闭演示账号与种子数据
   INSTALL_DIR=/opt/yinling-shouhu
@@ -142,11 +144,27 @@ is_valid_master_key() {
   [[ "$bytes" -eq 32 ]]
 }
 
+is_private_ipv4() {
+  local ip="$1"
+  [[ "$ip" =~ ^10\. ]] && return 0
+  [[ "$ip" =~ ^192\.168\. ]] && return 0
+  [[ "$ip" =~ ^172\.(1[6-9]|2[0-9]|3[0-1])\. ]] && return 0
+  [[ "$ip" == "127.0.0.1" ]] && return 0
+  return 1
+}
+
 detect_base_url() {
   local port="${1:-3100}"
   local host=""
   if command -v curl >/dev/null 2>&1; then
-    host="$(curl -fsS --max-time 4 https://api.ipify.org 2>/dev/null || true)"
+    host="$(curl -fsS --max-time 4 https://api.ipify.org 2>/dev/null | tr -d '[:space:]' || true)"
+    # 阿里云 ECS 元数据服务：无外网或 ipify 不可达时仍能拿到公网 IP
+    if [[ -z "$host" ]]; then
+      host="$(curl -fsS --max-time 2 http://100.100.100.200/latest/meta-data/eipv4 2>/dev/null | tr -d '[:space:]' || true)"
+    fi
+    if [[ -z "$host" ]]; then
+      host="$(curl -fsS --max-time 2 http://100.100.100.200/latest/meta-data/public-ipv4 2>/dev/null | tr -d '[:space:]' || true)"
+    fi
   fi
   if [[ -z "$host" ]] && command -v hostname >/dev/null 2>&1; then
     host="$(hostname -I 2>/dev/null | awk '{print $1}' || true)"
@@ -376,38 +394,86 @@ EOF
   wait_mysql || die "MySQL 重启失败，请检查 $file 与 journalctl -u $MYSQL_SERVICE"
 }
 
-mysql_root() {
-  case "$ROOT_MODE" in
-    password) MYSQL_PWD="$MYSQL_ROOT_PASSWORD" mysql -uroot "$@" ;;
-    temp) MYSQL_PWD="$MYSQL_TEMP_PASS" mysql -uroot "$@" ;;
-    *) env -u MYSQL_PWD mysql -uroot "$@" ;;
-  esac
+mysql_root_try() {
+  local pass="$1"
+  local tcp="$2"
+  local args=(-uroot)
+  (( tcp == 1 )) && args+=(-h127.0.0.1)
+  if [[ -z "$pass" ]]; then
+    env -u MYSQL_PWD mysql "${args[@]}" -e 'SELECT 1' >/dev/null 2>&1
+  else
+    MYSQL_PWD="$pass" mysql "${args[@]}" -e 'SELECT 1' >/dev/null 2>&1
+  fi
 }
 
-detect_mysql_root() {
-  if [[ -n "${MYSQL_ROOT_PASSWORD:-}" ]]; then
-    if MYSQL_PWD="$MYSQL_ROOT_PASSWORD" mysql -uroot -e 'SELECT 1' >/dev/null 2>&1; then
-      ROOT_MODE="password"
-      return 0
-    fi
-  fi
-  if env -u MYSQL_PWD mysql -uroot -e 'SELECT 1' >/dev/null 2>&1; then
-    ROOT_MODE="empty"
+try_mysql_root_password() {
+  local pass="$1"
+  if mysql_root_try "$pass" 0; then
+    MYSQL_ROOT_TCP=0
     return 0
   fi
-  local temp=""
-  temp="$(grep -hoE 'temporary password[^:]*: .*' /var/log/mysqld.log 2>/dev/null | tail -1 | awk '{print $NF}' || true)"
-  if [[ -n "$temp" ]] && MYSQL_PWD="$temp" mysql -uroot -e 'SELECT 1' >/dev/null 2>&1; then
-    MYSQL_TEMP_PASS="$temp"
-    ROOT_MODE="temp"
-    warn "使用 MySQL 初始化临时密码完成建库；请尽快执行 mysql_secure_installation"
+  if mysql_root_try "$pass" 1; then
+    MYSQL_ROOT_TCP=1
     return 0
   fi
   return 1
 }
 
+mysql_root() {
+  local args=(-uroot)
+  (( MYSQL_ROOT_TCP == 1 )) && args+=(-h127.0.0.1)
+  case "$ROOT_MODE" in
+    password) MYSQL_PWD="$MYSQL_ROOT_PASSWORD" mysql "${args[@]}" "$@" ;;
+    temp) MYSQL_PWD="$MYSQL_TEMP_PASS" mysql "${args[@]}" "$@" ;;
+    *) env -u MYSQL_PWD mysql "${args[@]}" "$@" ;;
+  esac
+}
+
+detect_mysql_root() {
+  command -v mysql >/dev/null 2>&1 || die "未找到 mysql 客户端；请先安装（dnf install -y mysql）"
+  if [[ -n "${MYSQL_ROOT_PASSWORD:-}" ]]; then
+    if try_mysql_root_password "$MYSQL_ROOT_PASSWORD"; then
+      ROOT_MODE="password"
+      return 0
+    fi
+    warn "环境变量 MYSQL_ROOT_PASSWORD 验证失败"
+  fi
+  if try_mysql_root_password ""; then
+    ROOT_MODE="empty"
+    return 0
+  fi
+  local temp=""
+  temp="$(grep -hoE 'temporary password[^:]*: .*' /var/log/mysqld.log 2>/dev/null | tail -1 | awk '{print $NF}' || true)"
+  if [[ -n "$temp" ]] && try_mysql_root_password "$temp"; then
+    MYSQL_TEMP_PASS="$temp"
+    ROOT_MODE="temp"
+    warn "使用 MySQL 初始化临时密码完成建库；请尽快执行 mysql_secure_installation"
+    return 0
+  fi
+
+  if [[ -t 0 ]]; then
+    local attempt input
+    for attempt in 1 2 3; do
+      printf '[deploy] 请输入 MySQL root 密码（输入不回显，直接回车跳过）: ' >&2
+      if ! IFS= read -r -s -p '' input; then
+        printf '\n' >&2
+        return 1
+      fi
+      printf '\n' >&2
+      [[ -n "$input" ]] || return 1
+      if try_mysql_root_password "$input"; then
+        MYSQL_ROOT_PASSWORD="$input"
+        ROOT_MODE="password"
+        return 0
+      fi
+      warn "MySQL root 密码不正确，请重试（$attempt/3）"
+    done
+  fi
+  return 1
+}
+
 ensure_mysql_db() {
-  detect_mysql_root || die "无法以 root 登录 MySQL。请设置 MYSQL_ROOT_PASSWORD=... 后重试，或先执行 mysql_secure_installation"
+  detect_mysql_root || die "无法以 root 登录 MySQL；请确认 root 密码，或在非交互环境设置 MYSQL_ROOT_PASSWORD=... 后重试"
   local db="$MYSQL_DATABASE"
   local user="$MYSQL_USER"
   local pass="$MYSQL_PASSWORD"
@@ -493,15 +559,24 @@ EOF
     log "已生成 MYSQL_PASSWORD"
   fi
 
-  local base_url
+  local base_url base_host=""
   if [[ -n "${APP_BASE_URL:-}" ]]; then
     base_url="$APP_BASE_URL"
   else
     base_url="$(get_env APP_BASE_URL)"
+    if [[ "$base_url" =~ ^https?://([^/:]+) ]]; then
+      base_host="${BASH_REMATCH[1]}"
+    fi
     case "$base_url" in
       ""|*localhost*|*127.0.0.1*)
         base_url="$(detect_base_url "$port")"
         log "已推断访问地址: $base_url（如有域名可在 $ENV_FILE 修改 APP_BASE_URL）"
+        ;;
+      *)
+        if [[ -n "$base_host" ]] && is_private_ipv4 "$base_host"; then
+          base_url="$(detect_base_url "$port")"
+          log "配置文件中的 $base_host 是内网地址，已改为: $base_url"
+        fi
         ;;
     esac
   fi
@@ -750,7 +825,7 @@ print_summary() {
   printf '  配置文件: %s（600）\n' "$ENV_FILE"
   printf '  数据目录: %s\n' "$DATA_ROOT"
   printf '  备份目录: %s（保留最近 5 份）\n' "$BACKUP_DIR"
-  printf '  数据库: %s / 库 %s / 用户 %s（仅本机 127.0.0.1）\n' "$flavor_label" "$MYSQL_DATABASE" "$MYSQL_USER"
+  printf '  数据库: %s / 库 %s / 用户 %s（应用连接 127.0.0.1）\n' "$flavor_label" "$MYSQL_DATABASE" "$MYSQL_USER"
   if [[ -n "$LAST_BACKUP" ]]; then
     printf '  本次备份: %s\n' "$LAST_BACKUP"
   fi

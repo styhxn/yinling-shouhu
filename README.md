@@ -79,7 +79,7 @@ docker compose up -d --build
 bash deploy.sh
 ```
 
-脚本会自动安装 Node 24 与 MySQL 8，生成配置与安全密钥、按需备份、构建并启动 `yinling.service`，轮询 `/ready` 成功后输出访问地址。`bash deploy.sh --help` 可查看 `status`、`logs`、`backup`、`restart`、`stop` 等命令；详细说明见 [部署文档](docs/部署.md)。
+脚本会自动校验 Node（低于 22.5 时安装 Node 24）与 MySQL 8，生成配置与安全密钥、按需备份、构建并启动 `yinling.service`，轮询 `/ready` 成功后输出访问地址。`bash deploy.sh --help` 可查看 `status`、`logs`、`backup`、`restart`、`stop` 等命令；详细说明见 [部署文档](docs/部署.md)。
 
 ### 前端独立交接
 
