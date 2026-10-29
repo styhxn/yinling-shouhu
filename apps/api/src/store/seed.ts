@@ -25,11 +25,13 @@ export async function seedDemo(db: SqlClient, masterKey: Buffer) {
   await user.run("u_admin", "admin", "管理员", null, now);
 
   const link = db.prepare(
-    `INSERT INTO family_links (id, family_user_id, elder_id, relation, status, created_at)
-     VALUES (?, ?, ?, ?, ?, ?)
+    `INSERT INTO family_links (id, family_user_id, elder_id, relation, status, phone, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?)
      ${ignoreExisting}`
   );
-  await link.run("fl_1", "u_family", "e_li", "daughter", "active", now);
+  await link.run("fl_1", "u_family", "e_li", "daughter", "active", "13800001234", now);
+  // 演示库每次启动都会 seed：为历史已存在的家属链接补上联系电话
+  await db.exec("UPDATE family_links SET phone = '13800001234' WHERE id = 'fl_1' AND phone IS NULL");
 
   const med = db.prepare(
     `INSERT INTO medications

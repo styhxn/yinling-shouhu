@@ -27,6 +27,18 @@ export type DbFamilyLink = {
   elderId: string;
   relation: string | null;
   status: string;
+  phone: string | null;
+};
+
+export type DbFamilyMessage = {
+  id: string;
+  elderId: string;
+  familyUserId: string;
+  fromRole: Role;
+  content: string;
+  kind: string;
+  read: boolean;
+  createdAt: number;
 };
 
 export type DbSession = {
@@ -448,8 +460,57 @@ export async function createDb(sql: SqlClient, options: CreateDbOptions) {
         familyUserId: String(r.family_user_id),
         elderId: String(r.elder_id),
         relation: r.relation ? String(r.relation) : null,
-        status: String(r.status)
+        status: String(r.status),
+        phone: r.phone ? String(r.phone) : null
       }));
+    }
+  };
+
+  const familyLinks = {
+    async listByElder(elderId: string): Promise<DbFamilyLink[]> {
+      const rows = await sql
+        .prepare("SELECT * FROM family_links WHERE elder_id = ? AND status = 'active'")
+        .all(elderId) as any[];
+      return rows.map((r) => ({
+        id: String(r.id),
+        familyUserId: String(r.family_user_id),
+        elderId: String(r.elder_id),
+        relation: r.relation ? String(r.relation) : null,
+        status: String(r.status),
+        phone: r.phone ? String(r.phone) : null
+      }));
+    },
+    async setPhone(id: string, phone: string | null): Promise<void> {
+      await sql.prepare("UPDATE family_links SET phone = ? WHERE id = ?").run(phone, id);
+    }
+  };
+
+  const familyMessages = {
+    async insert(input: {
+      elderId: string;
+      familyUserId: string;
+      fromRole: Role;
+      content: string;
+      kind?: string;
+    }): Promise<DbFamilyMessage> {
+      const id = randomUUID();
+      const now = Date.now();
+      const kind = input.kind ?? "general";
+      await sql
+        .prepare(
+          "INSERT INTO family_messages (id, elder_id, family_user_id, from_role, content, kind, read, created_at) VALUES (?, ?, ?, ?, ?, ?, 0, ?)"
+        )
+        .run(id, input.elderId, input.familyUserId, input.fromRole, input.content, kind, now);
+      return {
+        id,
+        elderId: input.elderId,
+        familyUserId: input.familyUserId,
+        fromRole: input.fromRole,
+        content: input.content,
+        kind,
+        read: false,
+        createdAt: now
+      };
     }
   };
 
@@ -1907,6 +1968,8 @@ export async function createDb(sql: SqlClient, options: CreateDbOptions) {
     confirmations,
     coolingOffs,
     familyConfirms,
+    familyLinks,
+    familyMessages,
     medications,
     locations,
     toolLogs,

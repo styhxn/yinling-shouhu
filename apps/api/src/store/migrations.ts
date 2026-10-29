@@ -28,10 +28,24 @@ export const SCHEMA_SQL = `
       elder_id TEXT NOT NULL,
       relation TEXT,
       status TEXT NOT NULL DEFAULT 'active',
+      phone TEXT,
       created_at INTEGER NOT NULL
     );
     CREATE INDEX IF NOT EXISTS idx_family_links_user ON family_links(family_user_id);
     CREATE INDEX IF NOT EXISTS idx_family_links_elder ON family_links(elder_id);
+
+    CREATE TABLE IF NOT EXISTS family_messages (
+      id TEXT PRIMARY KEY,
+      elder_id TEXT NOT NULL,
+      family_user_id TEXT NOT NULL,
+      from_role TEXT NOT NULL,
+      content TEXT NOT NULL,
+      kind TEXT NOT NULL DEFAULT 'general',
+      read INTEGER NOT NULL DEFAULT 0,
+      created_at INTEGER NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_family_messages_family ON family_messages(family_user_id, created_at DESC);
+    CREATE INDEX IF NOT EXISTS idx_family_messages_elder ON family_messages(elder_id, created_at DESC);
 
     CREATE TABLE IF NOT EXISTS profiles (
       elder_id TEXT PRIMARY KEY,
@@ -417,9 +431,23 @@ export const MYSQL_SCHEMA_SQL = `
       elder_id VARCHAR(64) NOT NULL,
       relation VARCHAR(64),
       status VARCHAR(32) NOT NULL DEFAULT 'active',
+      phone VARCHAR(64),
       created_at BIGINT NOT NULL,
       KEY idx_family_links_user (family_user_id),
       KEY idx_family_links_elder (elder_id)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+    CREATE TABLE IF NOT EXISTS family_messages (
+      id VARCHAR(64) PRIMARY KEY,
+      elder_id VARCHAR(64) NOT NULL,
+      family_user_id VARCHAR(64) NOT NULL,
+      from_role VARCHAR(32) NOT NULL,
+      content LONGTEXT NOT NULL,
+      kind VARCHAR(32) NOT NULL DEFAULT 'general',
+      read TINYINT NOT NULL DEFAULT 0,
+      created_at BIGINT NOT NULL,
+      KEY idx_family_messages_family (family_user_id, created_at DESC),
+      KEY idx_family_messages_elder (elder_id, created_at DESC)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
     CREATE TABLE IF NOT EXISTS profiles (
@@ -824,6 +852,13 @@ async function sqliteMigrate(db: SqlClient) {
   ) {
     await db.exec("ALTER TABLE agent_traces RENAME COLUMN trigger TO trigger_type");
   }
+
+  const familyLinkColumns = await db
+    .prepare("PRAGMA table_info(family_links)")
+    .all<{ name?: string }>();
+  if (!familyLinkColumns.some((column) => column.name === "phone")) {
+    await db.exec("ALTER TABLE family_links ADD COLUMN phone TEXT");
+  }
 }
 
 async function mysqlHasColumn(db: SqlClient, table: string, column: string) {
@@ -856,6 +891,9 @@ async function mysqlMigrate(db: SqlClient) {
     (await mysqlHasColumn(db, "agent_traces", "trigger"))
   ) {
     await db.exec("ALTER TABLE agent_traces RENAME COLUMN `trigger` TO trigger_type");
+  }
+  if (!(await mysqlHasColumn(db, "family_links", "phone"))) {
+    await db.exec("ALTER TABLE family_links ADD COLUMN phone VARCHAR(64)");
   }
 
   await db.exec(

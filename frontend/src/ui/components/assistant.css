@@ -70,6 +70,13 @@
   animation: yl-jasmineLeaf 4.5s ease-in-out infinite;
 }
 
+/* 眨眼 */
+.yl-jasmineEyes {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: yl-jasmineBlink 4.6s ease-in-out infinite;
+}
+
 /* 水波涟漪 */
 .yl-jasmineRipples {
   transform-origin: 60px 104px;
@@ -215,6 +222,10 @@
 @keyframes yl-jasmineTwinkle {
   0%, 100% { transform: scale(0.7); opacity: 0.5; }
   50% { transform: scale(1.15); opacity: 1; }
+}
+@keyframes yl-jasmineBlink {
+  0%, 88%, 100% { transform: scaleY(1); }
+  91%, 95% { transform: scaleY(0.08); }
 }
 @keyframes yl-jasmineHintIn {
   from { opacity: 0; transform: translateY(-50%) translateX(8px); }

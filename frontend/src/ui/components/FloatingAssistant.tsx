@@ -118,10 +118,12 @@ function JasmineMascot() {
 
       {/* 脸：大眼睛 + 腮红 + 微笑 */}
       <g className="yl-jasmineFace">
-        <ellipse cx="52" cy="59" rx="3.6" ry="4.6" fill="#4a3b52" />
-        <ellipse cx="68" cy="59" rx="3.6" ry="4.6" fill="#4a3b52" />
-        <circle cx="53.2" cy="57.4" r="1.3" fill="#ffffff" />
-        <circle cx="69.2" cy="57.4" r="1.3" fill="#ffffff" />
+        <g className="yl-jasmineEyes">
+          <ellipse cx="52" cy="59" rx="3.6" ry="4.6" fill="#4a3b52" />
+          <ellipse cx="68" cy="59" rx="3.6" ry="4.6" fill="#4a3b52" />
+          <circle cx="53.2" cy="57.4" r="1.3" fill="#ffffff" />
+          <circle cx="69.2" cy="57.4" r="1.3" fill="#ffffff" />
+        </g>
         <ellipse cx="46.5" cy="66" rx="4" ry="2.4" fill="#ffb3c4" opacity="0.85" />
         <ellipse cx="73.5" cy="66" rx="4" ry="2.4" fill="#ffb3c4" opacity="0.85" />
         <path

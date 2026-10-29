@@ -1,0 +1,277 @@
+/* =============================================================================
+ * 长辈贴心小帮手（首页功能模块）
+ * ========================================================================== */
+.ys-featureSection {
+  margin: 30px 0 8px;
+}
+.ys-featureTitle {
+  margin: 0 0 4px;
+  font-size: 1.5rem;
+}
+.ys-featureSub {
+  margin: 0 0 16px;
+  color: var(--muted, #64748b);
+}
+
+.ys-featureGrid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
+}
+@media (max-width: 720px) {
+  .ys-featureGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.ys-featureCard {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 18px;
+  background: var(--surface, #fff);
+  border: 1px solid var(--border, #e2e8f0);
+  border-radius: 18px;
+  box-shadow: var(--shadow-sm, 0 1px 2px rgba(15, 23, 42, 0.06));
+}
+.ys-featureCard--sos {
+  background: linear-gradient(135deg, #fff5f5, #ffe9e9);
+  border-color: #f3c2c2;
+}
+.ys-featureCard--contacts {
+  background: linear-gradient(135deg, #f0f9ff, #e0f2fe);
+  border-color: #bae6fd;
+}
+.ys-featureCard--contacts .ys-featureIcon {
+  background: #e0f2fe;
+  color: #0369a1;
+}
+.ys-featureIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 46px;
+  height: 46px;
+  border-radius: 12px;
+  background: var(--primary-50, #eef2ff);
+  color: var(--primary-700, #4338ca);
+}
+.ys-featureCard--sos .ys-featureIcon {
+  background: #fee2e2;
+  color: #dc2626;
+}
+.ys-featureCard h3 {
+  margin: 2px 0 0;
+  font-size: 1.15rem;
+}
+.ys-featureCard > p {
+  margin: 0;
+  color: var(--muted, #64748b);
+  font-size: 0.92rem;
+}
+.ys-featureAction {
+  align-self: flex-start;
+  margin-top: 4px;
+}
+
+/* 健康记录表单 */
+.ys-healthForm {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.ys-healthForm label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+  min-width: 72px;
+  font-size: 0.8rem;
+  color: var(--muted, #64748b);
+}
+.ys-healthForm .input {
+  width: 100%;
+}
+.ys-healthList {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.ys-healthList li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border-radius: 10px;
+  background: var(--gray-50, #f8fafc);
+  font-size: 0.85rem;
+}
+.ys-healthList li span:nth-child(2),
+.ys-healthList li span:nth-child(3) {
+  min-width: 46px;
+  text-align: center;
+}
+.ys-tag {
+  margin-left: auto;
+  padding: 2px 10px;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  background: #e2e8f0;
+  color: #334155;
+}
+.ys-tag.is-high {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+.ys-tag.is-low {
+  background: #e0f2fe;
+  color: #0369a1;
+}
+.ys-tag.is-ok {
+  background: #dcfce7;
+  color: #15803d;
+}
+
+/* 联系家属 / 常用电话弹窗 */
+.ys-contactModal {
+  max-width: 460px;
+  text-align: left;
+}
+/* 弹窗头部：图标 + 标题 */
+.ys-modalHead {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 6px;
+}
+.ys-modalHead h2 {
+  margin: 0;
+  font-size: 1.25rem;
+}
+.ys-modalHeadIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  color: #fff;
+  flex: none;
+}
+/* 发消息弹窗：暖橙强调 */
+.ys-msgModal .ys-modalHeadIcon {
+  background: linear-gradient(135deg, #f97316, #fb7185);
+}
+/* 联系人弹窗：青蓝强调 */
+.ys-phoneModal .ys-modalHeadIcon {
+  background: linear-gradient(135deg, #0ea5e9, #14b8a6);
+}
+.ys-contactHint {
+  margin: 0 0 8px;
+  color: var(--muted, #64748b);
+  font-size: 0.86rem;
+  line-height: 1.5;
+}
+/* 弹窗底部「关掉」按钮与上方内容留出间距 */
+.ys-contactModal > .btn:last-child {
+  margin-top: 18px;
+}
+.ys-contactSub {
+  margin: 16px 0 8px;
+  font-size: 1.05rem;
+}
+.ys-msgInput {
+  width: 100%;
+  resize: vertical;
+  font-size: 0.95rem;
+  line-height: 1.5;
+}
+.ys-contactEmpty {
+  margin: 6px 0;
+  color: var(--muted, #64748b);
+}
+.ys-contactList {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.ys-contactItem {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: var(--gray-50, #f8fafc);
+  border: 1px solid var(--border, #e2e8f0);
+}
+.ys-contactItemMain {
+  display: flex;
+  flex-direction: column;
+}
+.ys-contactItemMain small {
+  color: var(--muted, #64748b);
+}
+
+/* 电话列表（家属电话 / 附近医院药店） */
+.ys-phoneList {
+  list-style: none;
+  margin: 4px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.ys-phoneItem {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: var(--gray-50, #f8fafc);
+  border: 1px solid var(--border, #e2e8f0);
+}
+.ys-phoneItem > div {
+  display: flex;
+  flex-direction: column;
+}
+.ys-phoneItem strong {
+  font-size: 0.95rem;
+}
+.ys-phoneItem small {
+  color: var(--muted, #64748b);
+  font-size: 0.8rem;
+}
+.ys-phoneNum {
+  margin-left: auto;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  font-variant-numeric: tabular-nums;
+}
+.ys-phoneNone {
+  margin-left: auto;
+  color: var(--muted, #64748b);
+  font-size: 0.85rem;
+}
+.ys-phoneEmpty {
+  color: var(--muted, #64748b);
+}
+.ys-copyBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--primary-600, #4f46e5);
+  background: #fff;
+  color: var(--primary-700, #4338ca);
+  font-size: 0.82rem;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.ys-copyBtn:hover {
+  background: var(--primary-50, #eef2ff);
+}

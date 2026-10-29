@@ -329,6 +329,19 @@ export const api = {
       return httpJson<{ ok: boolean; report: WeeklyReport }>(
         `/family/report/weekly${query({ elderId })}`
       );
+    },
+    members() {
+      return httpJson<{
+        ok: boolean;
+        members: { familyUserId: string; displayName: string; relation: string | null; phone: string | null }[];
+      }>(`/family/members`);
+    },
+    sendMessage(input: { familyUserId: string; content: string; kind?: string }) {
+      return httpJson<{ ok: boolean; messageId: string }>(`/family/message`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(input)
+      });
     }
   },
 

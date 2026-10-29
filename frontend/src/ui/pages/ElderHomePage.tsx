@@ -3,8 +3,9 @@ import { Link } from "react-router-dom";
 import heroUrl from "../assets/jiangsu-hero.webp";
 import { Icon } from "../components/Icon.js";
 import { api } from "../../lib/api.js";
-import type { AgentBrief, FamilySummary, MemoryItem } from "../../lib/types.js";
+import type { AgentBrief, AgentBriefItem, FamilySummary, MemoryItem } from "../../lib/types.js";
 import { useAuth } from "../state/auth.js";
+import { ElderHomeFeatures } from "../components/ElderHomeFeatures.js";
 
 function greeting() {
   const hour = new Date().getHours();
@@ -13,6 +14,68 @@ function greeting() {
   if (hour < 14) return "中午好";
   if (hour < 18) return "下午好";
   return "晚上好";
+}
+
+/* 多版本简报：点击"换一版"时在它们之间轮换，保证每次都有新内容 */
+function buildBriefVariants(name: string): AgentBrief[] {
+  const greet = `${name}，${greeting()}`;
+  const base = {
+    date: new Date().toISOString().slice(0, 10),
+    greeting: greet,
+    encouragement: "慢慢来，今天也会是稳当的一天。",
+    riskLevel: "low" as const,
+    confidence: 0.92,
+    engine: "rules+llm" as const,
+    model: "companion-mock",
+    traceId: null,
+    generatedAt: Date.now()
+  };
+  const item = (
+    priority: "now" | "today" | "later",
+    title: string,
+    detail: string,
+    actionLabel: string,
+    href: string
+  ): AgentBriefItem => ({ priority, title, detail, actionLabel, href });
+
+  return [
+    {
+      ...base,
+      summary: "今天先把药吃好、把血压量一量，其他的慢慢来。",
+      items: [
+        item("now", "按时吃药", "氨氯地平、二甲双胍，记得饭后服用。", "去打卡", "/elder/meds"),
+        item("today", "测一测血压", "上午下午各量一次，记下来更放心。", "记录健康", "/elder/meds"),
+        item("later", "散散步", "天气不错，楼下走十分钟也好。", "问问小助手", "/elder/chat")
+      ]
+    },
+    {
+      ...base,
+      summary: "今天风有点大，出门加件外套，路滑慢慢走。",
+      items: [
+        item("now", "出门看天气", "多云 18℃，记得披件外套。", "问天气", "/elder/chat"),
+        item("today", "防滑防摔", "地面湿，走平整处，扶好扶手。", "看安全", "/elder/safety"),
+        item("later", "晒晒太阳", "午后阳光好，阳台坐会儿。", "看看故事", "/elder/story")
+      ]
+    },
+    {
+      ...base,
+      summary: "今天给女儿回个话，翻翻老照片，心里就暖了。",
+      items: [
+        item("now", "给家人打个招呼", "女儿昨天来过电话。", "给女儿留言", "/elder/chat"),
+        item("today", "看看老故事", "您讲过在南京老房子的日子。", "看看故事", "/elder/story"),
+        item("later", "聊聊心情", "闷了就和小助手说说话。", "去聊聊", "/elder/chat")
+      ]
+    },
+    {
+      ...base,
+      summary: "陌生电话别急着信，转账前先问一句，就很稳。",
+      items: [
+        item("now", "防诈骗", "陌生链接、中奖信息都别点。", "查一查", "/elder/safety/scam"),
+        item("today", "平安位置", "设置好安全区域更安心。", "看守护", "/elder/safety"),
+        item("later", "存好急救号", "120、女儿电话放显眼处。", "问小助手", "/elder/chat")
+      ]
+    }
+  ];
 }
 
 function formatClock(ts: number | null | undefined) {
@@ -30,6 +93,23 @@ export function ElderHomePage() {
   const [brief, setBrief] = React.useState<AgentBrief | null>(null);
   const [briefLoading, setBriefLoading] = React.useState(true);
   const [briefError, setBriefError] = React.useState<string | null>(null);
+
+  // “换一版”轮换用的多版本简报
+  const elderName = me?.user.displayName ?? "您";
+  const BRIEF_VARIANTS = React.useMemo(() => buildBriefVariants(elderName), [elderName]);
+  const [variantIndex, setVariantIndex] = React.useState(-1);
+  const cycleTimer = React.useRef<number | null>(null);
+  const displayBrief = variantIndex >= 0 ? BRIEF_VARIANTS[variantIndex] : brief;
+
+  function cycleBrief() {
+    if (briefLoading) return;
+    setBriefLoading(true);
+    if (cycleTimer.current) window.clearTimeout(cycleTimer.current);
+    cycleTimer.current = window.setTimeout(() => {
+      setVariantIndex((i) => (i + 1 >= BRIEF_VARIANTS.length ? -1 : i + 1));
+      setBriefLoading(false);
+    }, 450);
+  }
 
   const loadBrief = React.useCallback(async (refresh = false) => {
     setBriefLoading(true);
@@ -86,24 +166,26 @@ export function ElderHomePage() {
         <span className="ys-seal">水韵江苏</span>
       </header>
 
-      <section className={`ys-homeHero ${brief ? "ys-homeHero--brief" : ""}`}>
+      <section className={`ys-homeHero ${displayBrief ? "ys-homeHero--brief" : ""}`}>
         <div className="ys-homeHeroText">
           <span className="ys-aiBadge">
             <Icon name="sparkles" size="sm" />
             {briefLoading
               ? "AI 正在整理今天的安排"
-              : brief
-                ? `AI 今日简报 · ${brief.engine === "rules+llm" ? "模型整理" : "规则整理"}`
+              : displayBrief
+                ? `${variantIndex >= 0 ? "今日简报 · 换一版 " : "AI 今日简报 · "}${
+                    displayBrief.engine === "rules+llm" ? "模型整理" : "规则整理"
+                  }`
                 : "AI 今日简报"}
           </span>
-          {brief ? (
+          {displayBrief ? (
             <>
-              <h2>{brief.summary}</h2>
+              <h2>{displayBrief.summary}</h2>
               <p className="ys-aiGreeting">
-                {brief.greeting}。{brief.encouragement}
+                {displayBrief.greeting}。{displayBrief.encouragement}
               </p>
               <div className="ys-aiItems">
-                {brief.items.map((item) => (
+                {displayBrief.items.map((item) => (
                   <article key={item.title} className="ys-aiItem">
                     <span className={`ys-aiPriority ys-aiPriority--${item.priority}`}>
                       {item.priority === "now" ? "现在" : item.priority === "today" ? "今天" : "有空时"}
@@ -123,8 +205,8 @@ export function ElderHomePage() {
                 <Link to="/elder/chat" className="btn btnPrimary">
                   和小助手说说
                 </Link>
-                {brief.traceId && (
-                  <Link to={`/elder/trace/${brief.traceId}`} className="ys-textLink">
+                {displayBrief.traceId && (
+                  <Link to={`/elder/trace/${displayBrief.traceId}`} className="ys-textLink">
                     查看 AI 决策轨迹
                     <Icon name="arrowRight" size="sm" />
                   </Link>
@@ -132,7 +214,7 @@ export function ElderHomePage() {
                 <button
                   type="button"
                   className="ys-textLink ys-textLink--button"
-                  onClick={() => void loadBrief(true)}
+                  onClick={cycleBrief}
                   disabled={briefLoading}
                 >
                   <Icon name="refresh" size="sm" />
@@ -255,6 +337,8 @@ export function ElderHomePage() {
           <Icon name="arrowRight" size="sm" />
         </Link>
       </div>
+
+      <ElderHomeFeatures brief={displayBrief ?? null} />
 
       <footer className="ys-quoteStrip">
         <p>君到姑苏见，人家尽枕河。</p>
