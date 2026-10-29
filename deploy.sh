@@ -473,10 +473,16 @@ detect_mysql_root() {
 }
 
 ensure_mysql_db() {
-  detect_mysql_root || die "无法以 root 登录 MySQL；请确认 root 密码，或在非交互环境设置 MYSQL_ROOT_PASSWORD=... 后重试"
   local db="$MYSQL_DATABASE"
   local user="$MYSQL_USER"
   local pass="$MYSQL_PASSWORD"
+
+  if MYSQL_PWD="$pass" mysql -h127.0.0.1 -P3306 -u"$user" -e 'SELECT 1' "$db" >/dev/null 2>&1; then
+    log "应用数据库账号已可用，跳过 root 建库"
+    return 0
+  fi
+
+  detect_mysql_root || die "无法以 root 登录 MySQL；请确认 root 密码，或在非交互环境设置 MYSQL_ROOT_PASSWORD=... 后重试"
 
   mysql_root <<SQL
 CREATE DATABASE IF NOT EXISTS \`$db\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
@@ -635,7 +641,26 @@ set_database_url() {
   set_env DATABASE_URL "$url"
 }
 
+container_port_mapping() {
+  local tool output
+  for tool in podman docker; do
+    command -v "$tool" >/dev/null 2>&1 || continue
+    output="$("$tool" ps --format '{{.Names}} {{.Ports}}' 2>/dev/null || true)"
+    [[ -n "$output" ]] || continue
+    if printf '%s\n' "$output" | grep -Eq "(^|[^0-9])${APP_PORT}([^0-9]|$)"; then
+      printf '%s\n' "$output" | grep -E "(^|[^0-9])${APP_PORT}([^0-9]|$)" | head -1
+      return 0
+    fi
+  done
+  return 1
+}
+
 check_port() {
+  local mapping
+  mapping="$(container_port_mapping || true)"
+  if [[ -n "$mapping" ]]; then
+    die "端口 ${APP_PORT} 已被容器占用：$mapping；请改 $ENV_FILE 中的 APP_PORT 后重试"
+  fi
   command -v ss >/dev/null 2>&1 || return 0
   ss -ltn 2>/dev/null | awk '{print $4}' | grep -Eq "[:.]${APP_PORT}$" || return 0
   if systemctl is-active --quiet "$SERVICE_NAME" 2>/dev/null; then
