@@ -519,6 +519,13 @@ EOF
     sed -i 's/\r$//' "$ENV_FILE"
   fi
 
+  local override_key
+  for override_key in APP_PORT MYSQL_DATABASE MYSQL_USER MYSQL_PASSWORD DEMO_MODE; do
+    if [[ -n "${!override_key:-}" ]]; then
+      set_env "$override_key" "${!override_key}"
+    fi
+  done
+
   put_default APP_PORT 3100
   local port
   port="$(get_env APP_PORT)"
