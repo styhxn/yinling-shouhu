@@ -3,6 +3,7 @@ import { Link, NavLink, Outlet, useNavigate } from "react-router-dom";
 import { Icon } from "../components/Icon.js";
 import { useAuth } from "../state/auth.js";
 import { RealtimeBadge } from "../state/realtime.js";
+import { FloatingAssistant } from "../components/FloatingAssistant.js";
 
 function Brand({ home }: { home: string }) {
   return (
@@ -76,16 +77,13 @@ export function ElderLayout() {
           <NavItem to="/elder/meds" icon="pill">健康</NavItem>
           <NavItem to="/elder/safety" icon="shieldCheck">守护</NavItem>
         </nav>
-        <Link to="/elder/chat" className="ys-assistantLink">
-          <Icon name="message" size="sm" />
-          小助手
-        </Link>
         <RealtimeBadge />
         <Identity label="长者端" />
       </header>
       <main className="yl-main" id="main" tabIndex={-1}>
         <Outlet />
       </main>
+      <FloatingAssistant />
     </div>
   );
 }

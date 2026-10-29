@@ -215,6 +215,13 @@
 .yl-iconBtn:hover {
   background: var(--gray-100, #f1f5f9);
 }
+.yl-iconBtn.is-muted {
+  color: var(--danger-600, #dc2626);
+  background: var(--danger-50, #fef2f2);
+}
+.yl-iconBtn.is-muted:hover {
+  background: var(--danger-100, #fee2e2);
+}
 
 /* ---------- 角色选择 ---------- */
 .yl-rolePage {

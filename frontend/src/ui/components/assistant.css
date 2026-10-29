@@ -1,0 +1,260 @@
+/* =============================================================================
+ * 水韵江苏 · 悬浮小助手（茉莉拟人形象）
+ * ========================================================================== */
+
+.yl-jasmineFab {
+  position: fixed;
+  z-index: 1301;
+  padding: 0;
+  border: none;
+  background: transparent;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  outline: none;
+  filter: drop-shadow(0 8px 16px rgba(47, 175, 126, 0.28));
+}
+.yl-jasmineFab:active {
+  cursor: grabbing;
+}
+.yl-jasmineFab:focus-visible {
+  outline: 3px solid var(--primary-400, #818cf8);
+  outline-offset: 4px;
+  border-radius: 50%;
+}
+
+/* 外圈光环（呼吸） */
+.yl-jasmineFab__ring {
+  position: absolute;
+  inset: -6px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 50% 45%, rgba(255, 255, 255, 0.9), rgba(191, 233, 245, 0.35) 70%, transparent 72%);
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.7), 0 6px 18px rgba(127, 201, 227, 0.4);
+  animation: yl-jasmineBreathe 3.4s ease-in-out infinite;
+}
+
+/* 形象容器：悬浮轻晃 */
+.yl-jasmineFab__mascot {
+  position: absolute;
+  inset: 0;
+  display: block;
+  animation: yl-jasmineBob 3.2s ease-in-out infinite;
+}
+.yl-jasmineFab.is-open .yl-jasmineFab__mascot {
+  animation-play-state: paused;
+}
+
+.yl-jasmineSvg {
+  width: 100%;
+  height: 100%;
+  display: block;
+  overflow: visible;
+}
+
+/* 柔光呼吸 */
+.yl-jasmineHalo {
+  transform-origin: 60px 58px;
+  animation: yl-jasmineHaloPulse 3.4s ease-in-out infinite;
+}
+
+/* 花瓣轻微开合 */
+.yl-jasminePetals {
+  transform-origin: 60px 60px;
+  animation: yl-jasmineSway 5s ease-in-out infinite;
+}
+
+/* 叶片轻摆 */
+.yl-jasmineLeaf {
+  transform-origin: 60px 100px;
+  animation: yl-jasmineLeaf 4.5s ease-in-out infinite;
+}
+
+/* 水波涟漪 */
+.yl-jasmineRipples {
+  transform-origin: 60px 104px;
+}
+.yl-jasmineRipple {
+  opacity: 0;
+  transform-origin: 60px 104px;
+  animation: yl-jasmineRipple 3.6s ease-out infinite;
+}
+.yl-jasmineRipple--2 {
+  animation-delay: 1.8s;
+}
+
+/* 露珠轻晃 */
+.yl-jasmineDrop {
+  transform-origin: 86px 38px;
+  animation: yl-jasmineDrop 4s ease-in-out infinite;
+}
+
+/* 星光闪烁 */
+.yl-jasmineSparkle {
+  transform-origin: center;
+  animation: yl-jasmineTwinkle 2.6s ease-in-out infinite;
+}
+.yl-jasmineSparkle--b {
+  animation-delay: 1.3s;
+}
+
+/* 问候气泡 */
+.yl-jasmineHint {
+  position: absolute;
+  right: calc(100% + 12px);
+  top: 50%;
+  transform: translateY(-50%);
+  width: max-content;
+  max-width: 200px;
+  padding: 10px 14px;
+  border-radius: 14px 14px 14px 4px;
+  background: var(--surface, #fff);
+  color: var(--text, #0f172a);
+  font-size: 13px;
+  line-height: 1.5;
+  font-weight: 500;
+  box-shadow: var(--shadow-md);
+  border: 1px solid var(--border, #e2e8f0);
+  animation: yl-jasmineHintIn 240ms var(--ease-standard, ease) both;
+  pointer-events: none;
+}
+
+/* 居中遮罩层 */
+.yl-jasmineOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1300;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: rgba(15, 23, 42, 0.34);
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+  animation: yl-jasmineOverlayIn 200ms ease both;
+}
+
+/* 居中聊天卡片：占据页面中心、完整显示 */
+.yl-jasmineCard {
+  position: relative;
+  z-index: 1302;
+  display: flex;
+  flex-direction: column;
+  width: min(440px, 94vw);
+  height: min(78vh, 720px);
+  max-height: calc(100vh - 32px);
+  background: var(--surface, #fff);
+  border: 1px solid var(--border, #e2e8f0);
+  border-radius: 22px;
+  box-shadow: var(--shadow-lg);
+  overflow: hidden;
+  animation: yl-jasmineCardIn 220ms var(--ease-emphasized, ease) both;
+}
+
+/* ChatPanel 在悬浮态需要撑满卡片 */
+.yl-chatPanel {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  gap: 12px;
+  min-height: 0;
+}
+.yl-chatPanel--page {
+  height: 100%;
+}
+
+/* 悬浮态：卡片内增加内边距，内容不贴边 */
+.yl-chatPanel--float {
+  padding: 16px 18px 14px;
+}
+/* 悬浮态去掉消息列表自带边框/底色，避免与卡片出现双重边框 */
+.yl-chatPanel--float .yl-chatList {
+  border: none;
+  background: transparent;
+  border-radius: 0;
+  padding: 12px 2px;
+}
+
+.yl-chatHeaderActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+/* ---------------- 动画关键帧 ---------------- */
+@keyframes yl-jasmineBob {
+  0%, 100% { transform: translateY(0) rotate(-1.5deg); }
+  50% { transform: translateY(-5px) rotate(1.5deg); }
+}
+@keyframes yl-jasmineBreathe {
+  0%, 100% { transform: scale(1); opacity: 0.9; }
+  50% { transform: scale(1.06); opacity: 1; }
+}
+@keyframes yl-jasmineHaloPulse {
+  0%, 100% { transform: scale(1); opacity: 0.85; }
+  50% { transform: scale(1.12); opacity: 1; }
+}
+@keyframes yl-jasmineSway {
+  0%, 100% { transform: rotate(-2deg); }
+  50% { transform: rotate(2deg); }
+}
+@keyframes yl-jasmineLeaf {
+  0%, 100% { transform: rotate(-3deg); }
+  50% { transform: rotate(3deg); }
+}
+@keyframes yl-jasmineRipple {
+  0% { transform: scale(0.5); opacity: 0.7; }
+  80% { opacity: 0; }
+  100% { transform: scale(1.4); opacity: 0; }
+}
+@keyframes yl-jasmineDrop {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  50% { transform: translateY(1.5px) rotate(-4deg); }
+}
+@keyframes yl-jasmineTwinkle {
+  0%, 100% { transform: scale(0.7); opacity: 0.5; }
+  50% { transform: scale(1.15); opacity: 1; }
+}
+@keyframes yl-jasmineHintIn {
+  from { opacity: 0; transform: translateY(-50%) translateX(8px); }
+  to { opacity: 1; transform: translateY(-50%) translateX(0); }
+}
+@keyframes yl-jasmineCardIn {
+  from { opacity: 0; transform: translateY(10px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes yl-jasmineOverlayIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* ---------------- 适老化（长辈模式） ---------------- */
+.mode-elder .yl-jasmineHint {
+  font-size: 15px;
+  max-width: 240px;
+}
+.mode-elder .yl-jasmineCard {
+  border-radius: 26px;
+}
+
+/* ---------------- 移动端 ---------------- */
+@media (max-width: 640px) {
+  .yl-jasmineHint {
+    right: auto;
+    left: 50%;
+    top: calc(100% + 10px);
+    transform: translateX(-50%);
+    max-width: 220px;
+  }
+  @keyframes yl-jasmineHintIn {
+    from { opacity: 0; transform: translateX(-50%) translateY(-6px); }
+    to { opacity: 1; transform: translateX(-50%) translateY(0); }
+  }
+  .yl-jasmineCard {
+    width: calc(100vw - 16px) !important;
+    height: calc(100vh - 16px) !important;
+    max-height: none;
+    border-radius: 18px;
+  }
+}
