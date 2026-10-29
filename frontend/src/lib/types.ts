@@ -102,6 +102,17 @@ export type FamilyConfirm = {
   createdAt: number;
 };
 
+export type FamilyMessage = {
+  id: string;
+  elderId: string;
+  elderName: string;
+  fromRole: Role;
+  content: string;
+  kind: string;
+  read: boolean;
+  createdAt: number;
+};
+
 export type CoolingOff = {
   id: string;
   elderId: string;

@@ -1371,6 +1371,61 @@ body {
   font-size: 13px;
 }
 
+/* ---------- 来自老人的消息 ---------- */
+.ys-messageList {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.ys-messageCard {
+  padding: 14px 16px;
+  border: 1px solid #e5cfc8;
+  background: #fbf6f3;
+}
+
+.ys-messageCard--unread {
+  border-color: var(--ys-seal, #b4452f);
+  background: #fff7f2;
+}
+
+.ys-messageTop {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.ys-messageFrom {
+  color: var(--ys-ink);
+  font-weight: 600;
+  font-size: 13px;
+}
+
+.ys-messageBadge {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 8px;
+  border-radius: 99px;
+  background: var(--ys-seal, #b4452f);
+  color: #fff;
+  font-size: 11px;
+}
+
+.ys-messageTime {
+  margin-left: auto;
+  color: var(--ys-muted);
+  font-size: 11px;
+}
+
+.ys-messageContent {
+  margin: 6px 0 0;
+  color: var(--ys-ink-soft);
+  line-height: 1.7;
+  font-size: 14px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
 /* ---------- 旧页面组件的水韵化覆盖 ---------- */
 .yl-pageHeader {
   border-bottom: 1px solid var(--ys-line);

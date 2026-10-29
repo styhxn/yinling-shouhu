@@ -5,6 +5,7 @@ import { api } from "../../lib/api.js";
 import type {
   AgentBrief,
   FamilyConfirm,
+  FamilyMessage,
   FamilySummary,
   SafetyAlert,
   WeeklyReport
@@ -65,6 +66,7 @@ export function FamilyDashboardPage() {
   const [report, setReport] = React.useState<WeeklyReport | null>(null);
   const [brief, setBrief] = React.useState<AgentBrief | null>(null);
   const [items, setItems] = React.useState<FamilyConfirm[]>([]);
+  const [messages, setMessages] = React.useState<FamilyMessage[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
   const [busyId, setBusyId] = React.useState<string | null>(null);
@@ -82,14 +84,16 @@ export function FamilyDashboardPage() {
       setError(null);
     }
     try {
-      const [summaryRes, reportRes, pendingRes] = await Promise.all([
+      const [summaryRes, reportRes, pendingRes, messagesRes] = await Promise.all([
         api.family.summary(elderId),
         api.family.weeklyReport(elderId),
-        api.safety.pendingConfirms(elderId)
+        api.safety.pendingConfirms(elderId),
+        api.family.messages()
       ]);
       setSummary(summaryRes.summary);
       setReport(reportRes.report);
       setItems(pendingRes.items);
+      setMessages(messagesRes.items);
       void api.agent
         .brief({ elderId })
         .then((res) => setBrief(res.brief))
@@ -113,6 +117,7 @@ export function FamilyDashboardPage() {
       "safety.alert.updated",
       "family.confirm.requested",
       "family.confirm.responded",
+      "family.message",
       "location.updated",
       "emergency.triggered"
     ]);
@@ -272,6 +277,30 @@ export function FamilyDashboardPage() {
                   查看 AI 决策依据
                 </Link>
               )}
+            </section>
+          )}
+
+          {messages.length > 0 && (
+            <section className="ys-panel">
+              <div className="ys-sectionTitle">
+                <Icon name="message" size="sm" />
+                来自老人的消息
+              </div>
+              <div className="ys-messageList">
+                {messages.map((m) => (
+                  <article
+                    key={m.id}
+                    className={`ys-messageCard ${m.read ? "" : "ys-messageCard--unread"}`}
+                  >
+                    <div className="ys-messageTop">
+                      <span className="ys-messageFrom">{m.elderName}</span>
+                      {!m.read && <span className="ys-messageBadge">新</span>}
+                      <span className="ys-messageTime">{formatTime(m.createdAt)}</span>
+                    </div>
+                    <p className="ys-messageContent">{m.content}</p>
+                  </article>
+                ))}
+              </div>
             </section>
           )}
 

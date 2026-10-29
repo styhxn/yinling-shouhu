@@ -33,7 +33,8 @@ export type AppEvent =
   | { type: "safety.alert.updated"; ts: number; payload: { alert: SafetyAlertSnapshot } }
   | { type: "location.updated"; ts: number; payload: { elderId: string; point: LocationSnapshot } }
   | { type: "family.confirm.requested"; ts: number; payload: { confirm: unknown } }
-  | { type: "family.confirm.responded"; ts: number; payload: { confirm: unknown } };
+  | { type: "family.confirm.responded"; ts: number; payload: { confirm: unknown } }
+  | { type: "family.message"; ts: number; payload: { elderId: string; familyUserId: string; messageId: string } };
 
 export type PrivacySettings = {
   cameraEnabled: boolean;

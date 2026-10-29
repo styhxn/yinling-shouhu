@@ -1,7 +1,7 @@
 import type { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
 import { resolveElderId } from "../services/auth/elder.js";
-import { requireAuth } from "../services/auth/rbac.js";
+import { requireAuth, requireRole } from "../services/auth/rbac.js";
 import { createFamilyService } from "../services/family/family.js";
 
 const QuerySchema = z.object({ elderId: z.string().max(80).optional() });
@@ -83,5 +83,36 @@ export const familyRoutes: FastifyPluginAsync = async (server) => {
       payload: { elderId, familyUserId: link.familyUserId, messageId: message.id }
     });
     return { ok: true, messageId: message.id };
+  });
+
+  // 家属读取老人发来的站内消息（按当前家属账号聚合，含老人姓名；未读自动标记已读）
+  server.get("/messages", { preHandler: requireRole("family") }, async (req, reply) => {
+    const familyUserId = req.user!.userId;
+    const items = await server.db.familyMessages.listByFamily(familyUserId);
+    const elderIds = [...new Set(items.map((item) => item.elderId))];
+    const names = new Map<string, string>();
+    await Promise.all(
+      elderIds.map(async (id) => {
+        const elder = await server.db.elders.getById(id);
+        if (elder) names.set(id, elder.displayName);
+      })
+    );
+    const unreadIds = items.filter((item) => !item.read).map((item) => item.id);
+    if (unreadIds.length > 0) {
+      await server.db.familyMessages.markRead(familyUserId, unreadIds);
+    }
+    return {
+      ok: true,
+      items: items.map((item) => ({
+        id: item.id,
+        elderId: item.elderId,
+        elderName: names.get(item.elderId) ?? "家人",
+        fromRole: item.fromRole,
+        content: item.content,
+        kind: item.kind,
+        read: item.read,
+        createdAt: item.createdAt
+      }))
+    };
   });
 };

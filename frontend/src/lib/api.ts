@@ -6,6 +6,7 @@ import type {
   AntiFraudHit,
   CoolingOff,
   FamilyConfirm,
+  FamilyMessage,
   FamilySummary,
   Geofence,
   InterviewAnswer,
@@ -342,6 +343,9 @@ export const api = {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(input)
       });
+    },
+    messages() {
+      return httpJson<{ ok: boolean; items: FamilyMessage[] }>(`/family/messages`);
     }
   },
 

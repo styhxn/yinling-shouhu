@@ -6,6 +6,7 @@ import { streamAgent } from "../../lib/sse.js";
 import { asrErrorZh, startRecognizeZhBuffered, type AsrStatus } from "../voice/asr.js";
 import { speakNow, stopSpeaking } from "../voice/tts.js";
 import { useToast } from "../state/toast.js";
+import { useAuth } from "../state/auth.js";
 import type { ChatMessage, PendingConfirmation, ToolEvent } from "../../lib/types.js";
 
 const TOOL_LABELS: Record<string, string> = {
@@ -66,6 +67,8 @@ function ToolChip({ tool }: { tool: ToolEvent }) {
 
 function MessageBubble({ message, muted }: { message: ChatMessage; muted: boolean }) {
   const isUser = message.role === "user";
+  const { me } = useAuth();
+  const isFamily = me?.user.role === "family";
   return (
     <div className={`yl-chatMsg ${isUser ? "yl-chatMsg--user" : "yl-chatMsg--bot"}`}>
       <div className="yl-chatAvatar">
@@ -100,14 +103,24 @@ function MessageBubble({ message, muted }: { message: ChatMessage; muted: boolea
             <span className="yl-citationsLabel">依据</span>
             {message.citations.map((citation, index) =>
               citation.type === "memory" ? (
-                <Link
-                  key={`${citation.id ?? citation.title}_${index}`}
-                  to="/elder/story"
-                  className="yl-citationChip"
-                >
-                  <Icon name="bookOpen" size="sm" />
-                  {citation.title}
-                </Link>
+                isFamily ? (
+                  <span
+                    key={`${citation.id ?? citation.title}_${index}`}
+                    className="yl-citationChip yl-citationChip--static"
+                  >
+                    <Icon name="bookOpen" size="sm" />
+                    {citation.title}
+                  </span>
+                ) : (
+                  <Link
+                    key={`${citation.id ?? citation.title}_${index}`}
+                    to="/elder/story"
+                    className="yl-citationChip"
+                  >
+                    <Icon name="bookOpen" size="sm" />
+                    {citation.title}
+                  </Link>
+                )
               ) : citation.url ? (
                 <a
                   key={`${citation.url}_${index}`}
@@ -128,7 +141,7 @@ function MessageBubble({ message, muted }: { message: ChatMessage; muted: boolea
           </div>
         )}
         {!isUser && message.traceId && (
-          <Link to={`/elder/trace/${message.traceId}`} className="yl-traceLink">
+          <Link to={`${isFamily ? "/family" : "/elder"}/trace/${message.traceId}`} className="yl-traceLink">
             <Icon name="sparkles" size="sm" />
             查看 AI 决策轨迹
           </Link>

@@ -99,6 +99,15 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
             detail: event.payload.reason
           });
           break;
+        case "family.message":
+          if (role === "family") {
+            toast.push({
+              kind: "normal",
+              title: "家人给您发了消息",
+              detail: "已收到老人的留言，下方可查看。"
+            });
+          }
+          break;
         default:
           break;
       }

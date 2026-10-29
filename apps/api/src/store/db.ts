@@ -511,6 +511,33 @@ export async function createDb(sql: SqlClient, options: CreateDbOptions) {
         read: false,
         createdAt: now
       };
+    },
+    async listByFamily(familyUserId: string, limit = 50): Promise<DbFamilyMessage[]> {
+      const rows = (await sql
+        .prepare(
+          "SELECT id, elder_id, family_user_id, from_role, content, kind, read, created_at FROM family_messages WHERE family_user_id = ? ORDER BY created_at DESC LIMIT ?"
+        )
+        .all(familyUserId, limit)) as Record<string, unknown>[];
+      return rows.map((r) => ({
+        id: String(r.id),
+        elderId: String(r.elder_id),
+        familyUserId: String(r.family_user_id),
+        fromRole: r.from_role as Role,
+        content: String(r.content),
+        kind: String(r.kind),
+        read: Number(r.read) > 0,
+        createdAt: Number(r.created_at)
+      }));
+    },
+    async markRead(familyUserId: string, ids: string[]): Promise<number> {
+      if (ids.length === 0) return 0;
+      const placeholders = ids.map(() => "?").join(",");
+      const result = await sql
+        .prepare(
+          `UPDATE family_messages SET read = 1 WHERE family_user_id = ? AND id IN (${placeholders})`
+        )
+        .run(familyUserId, ...ids);
+      return result.changes;
     }
   };
 

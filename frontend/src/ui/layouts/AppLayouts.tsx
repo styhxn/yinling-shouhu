@@ -105,6 +105,7 @@ export function FamilyLayout() {
       <main className="yl-main" id="main" tabIndex={-1}>
         <Outlet />
       </main>
+      <FloatingAssistant />
     </div>
   );
 }
