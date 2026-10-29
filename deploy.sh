@@ -726,7 +726,7 @@ start_service() {
 }
 
 probe_ready() {
-  curl -fsS --max-time 3 "http://127.0.0.1:${APP_PORT}/ready" >/dev/null 2>&1
+  curl --noproxy '*' -fsS --max-time 3 "http://127.0.0.1:${APP_PORT}/ready" >/dev/null 2>&1
 }
 
 wait_ready() {
@@ -748,7 +748,7 @@ wait_ready() {
 }
 
 show_ready() {
-  curl -fsS "http://127.0.0.1:${APP_PORT}/ready"
+  curl --noproxy '*' -fsS "http://127.0.0.1:${APP_PORT}/ready"
 }
 
 open_firewall() {
@@ -880,7 +880,10 @@ do_deploy() {
   start_service
 
   if ! wait_ready; then
-    warn "服务未在 180 秒内就绪，最近日志如下："
+    warn "服务未在 180 秒内就绪，本机 /ready 响应如下："
+    curl --noproxy '*' -i --max-time 3 "http://127.0.0.1:${APP_PORT}/ready" || true
+    printf '\n'
+    warn "最近日志如下："
     systemctl --no-pager -l status "$SERVICE_NAME" || true
     journalctl -u "$SERVICE_NAME" -n 120 --no-pager || true
     die "部署失败；修复后重新执行 bash deploy.sh"
