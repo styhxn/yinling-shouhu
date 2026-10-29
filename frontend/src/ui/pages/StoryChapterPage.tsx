@@ -54,7 +54,7 @@ export function StoryChapterPage() {
 
   if (error) {
     return (
-      <div className="yl-page">
+      <div className="yl-page ys-storyPage">
         <div className="yl-errorBar"><Icon name="alertCircle" size="sm" /><span>{error}</span></div>
         <Link to="/elder/story" className="btn">返回时间轴</Link>
       </div>
@@ -68,7 +68,7 @@ export function StoryChapterPage() {
   const paragraphs = chapter.content.split(/\n+/).filter(Boolean);
 
   return (
-    <div className="yl-page">
+    <div className="yl-page ys-storyPage">
       <section className="yl-pageHeader">
         <div>
           <div className="yl-eyebrow">{book?.title ?? "我的人生故事"}</div>

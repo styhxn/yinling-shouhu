@@ -2206,6 +2206,120 @@ body {
   text-decoration: none;
 }
 
+/* ---------- 进入页面时的入场动画（左右进场 + 淡入） ---------- */
+@keyframes ys-rise-left {
+  from {
+    opacity: 0;
+    transform: translateX(-56px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes ys-rise-right {
+  from {
+    opacity: 0;
+    transform: translateX(56px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes ys-fall-down {
+  from {
+    opacity: 0;
+    transform: translateY(-48px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* 各页面根容器的直接子区块：依次从左右两侧滑入并淡入 */
+.yl-page > *,
+.ys-home > *,
+.ys-rolePage > * {
+  animation-duration: 0.95s;
+  animation-timing-function: cubic-bezier(0.22, 0.61, 0.36, 1);
+  animation-fill-mode: both;
+  will-change: transform, opacity;
+}
+
+.yl-page,
+.ys-home,
+.ys-rolePage {
+  overflow-x: clip;
+}
+
+.yl-page > *:nth-child(odd),
+.ys-home > *:nth-child(odd),
+.ys-rolePage > *:nth-child(odd) {
+  animation-name: ys-rise-left;
+}
+
+.yl-page > *:nth-child(even),
+.ys-home > *:nth-child(even),
+.ys-rolePage > *:nth-child(even) {
+  animation-name: ys-rise-right;
+}
+
+/* 入场动画的交错延时 */
+.yl-page > *:nth-child(1),
+.ys-home > *:nth-child(1),
+.ys-rolePage > *:nth-child(1) { animation-delay: 0.12s; }
+.yl-page > *:nth-child(2),
+.ys-home > *:nth-child(2),
+.ys-rolePage > *:nth-child(2) { animation-delay: 0.30s; }
+.yl-page > *:nth-child(3),
+.ys-home > *:nth-child(3),
+.ys-rolePage > *:nth-child(3) { animation-delay: 0.48s; }
+.yl-page > *:nth-child(4),
+.ys-home > *:nth-child(4),
+.ys-rolePage > *:nth-child(4) { animation-delay: 0.66s; }
+.yl-page > *:nth-child(5),
+.ys-home > *:nth-child(5),
+.ys-rolePage > *:nth-child(5) { animation-delay: 0.84s; }
+.yl-page > *:nth-child(6),
+.ys-home > *:nth-child(6),
+.ys-rolePage > *:nth-child(6) { animation-delay: 1.02s; }
+.yl-page > *:nth-child(7),
+.ys-home > *:nth-child(7),
+.ys-rolePage > *:nth-child(7) { animation-delay: 1.20s; }
+.yl-page > *:nth-child(8),
+.ys-home > *:nth-child(8),
+.ys-rolePage > *:nth-child(8) { animation-delay: 1.38s; }
+.yl-page > *:nth-child(n + 9),
+.ys-home > *:nth-child(n + 9),
+.ys-rolePage > *:nth-child(n + 9) { animation-delay: 1.56s; }
+
+/* 守护页：改为自上而下的进场（覆盖默认的左右滑入） */
+.ys-safetyPage > *,
+.ys-safetyPage > *:nth-child(odd),
+.ys-safetyPage > *:nth-child(even) {
+  animation-name: ys-fall-down;
+}
+
+/* 故事页：同样改为自上而下的进场 */
+.ys-storyPage > *,
+.ys-storyPage > *:nth-child(odd),
+.ys-storyPage > *:nth-child(even) {
+  animation-name: ys-fall-down;
+}
+
+/* 尊重用户的“减少动态效果”偏好 */
+@media (prefers-reduced-motion: reduce) {
+  .yl-page > *,
+  .ys-home > *,
+  .ys-rolePage > * {
+    animation: none !important;
+  }
+}
+
 .ys-textLink--button {
   border: 0;
   background: transparent;

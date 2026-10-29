@@ -65,7 +65,7 @@ export function MemoryListPage() {
   }
 
   return (
-    <div className="yl-page">
+    <div className="yl-page ys-storyPage">
       <section className="yl-pageHeader">
         <div>
           <h1>我的故事</h1>
