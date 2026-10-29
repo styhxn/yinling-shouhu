@@ -695,6 +695,69 @@ sync_source() {
     "$SOURCE_DIR"/ "$INSTALL_DIR"/
 }
 
+native_pkg_ok() {
+  local name="$1"
+  local version="$2"
+  local file="node_modules/${name}/package.json"
+  [[ -n "$version" && -f "$file" ]] || return 1
+  [[ "$(node -p "require('./${file}').version" 2>/dev/null)" == "$version" ]]
+}
+
+ensure_native_deps() {
+  [[ "$(uname -s)" == "Linux" ]] || return 0
+
+  local rollup_pkg esbuild_pkg sharp_pkg libvips_pkg
+  case "$(uname -m)" in
+    x86_64|amd64)
+      rollup_pkg="@rollup/rollup-linux-x64-gnu"
+      esbuild_pkg="@esbuild/linux-x64"
+      sharp_pkg="@img/sharp-linux-x64"
+      libvips_pkg="@img/sharp-libvips-linux-x64"
+      ;;
+    aarch64|arm64)
+      rollup_pkg="@rollup/rollup-linux-arm64-gnu"
+      esbuild_pkg="@esbuild/linux-arm64"
+      sharp_pkg="@img/sharp-linux-arm64"
+      libvips_pkg="@img/sharp-libvips-linux-arm64"
+      ;;
+    *)
+      return 0
+      ;;
+  esac
+
+  local rollup_ver esbuild_ver sharp_ver libvips_ver
+  rollup_ver="$(node -p "require('rollup/package.json').optionalDependencies['$rollup_pkg'] || ''" 2>/dev/null || true)"
+  esbuild_ver="$(node -e "const p=require('path');const v=require.resolve('vite/package.json');const e=require.resolve('esbuild/package.json',{paths:[p.dirname(v)]});console.log(require(e).version)" 2>/dev/null || true)"
+  sharp_ver="$(node -p "require('sharp/package.json').optionalDependencies['$sharp_pkg'] || ''" 2>/dev/null || true)"
+  libvips_ver="$(node -p "require('sharp/package.json').optionalDependencies['$libvips_pkg'] || ''" 2>/dev/null || true)"
+
+  local missing=()
+  if [[ -n "$rollup_ver" ]] && ! native_pkg_ok "$rollup_pkg" "$rollup_ver"; then
+    missing+=("$rollup_pkg@$rollup_ver")
+  fi
+  if [[ -n "$esbuild_ver" ]]; then
+    if ! native_pkg_ok "$esbuild_pkg" "$esbuild_ver" \
+      && ! native_pkg_ok "vite/node_modules/esbuild/node_modules/$esbuild_pkg" "$esbuild_ver"; then
+      missing+=("$esbuild_pkg@$esbuild_ver")
+    fi
+  fi
+  if [[ -n "$sharp_ver" ]] && ! native_pkg_ok "$sharp_pkg" "$sharp_ver"; then
+    missing+=("$sharp_pkg@$sharp_ver")
+  fi
+  if [[ -n "$libvips_ver" ]] && ! native_pkg_ok "$libvips_pkg" "$libvips_ver"; then
+    missing+=("$libvips_pkg@$libvips_ver")
+  fi
+
+  (( ${#missing[@]} > 0 )) || return 0
+
+  log "补齐 Linux 原生依赖：${missing[*]}"
+  npm install --no-save --no-package-lock --no-audit --no-fund --registry "$NPM_REGISTRY" "${missing[@]}" \
+    || die "Linux 原生依赖安装失败"
+
+  node -e "require('rollup'); require('sharp'); const p=require('path'); const v=require.resolve('vite/package.json'); require(require.resolve('esbuild',{paths:[p.dirname(v)]}));" >/dev/null 2>&1 \
+    || die "Linux 原生依赖补齐后仍无法加载 rollup/sharp/esbuild"
+}
+
 build_app() {
   cd "$INSTALL_DIR"
   export PATH="/usr/local/bin:$PATH"
@@ -705,6 +768,8 @@ build_app() {
   log "安装 npm 依赖（首次约 2-5 分钟）..."
   npm ci --include=dev --no-audit --no-fund --registry "$NPM_REGISTRY" \
     || die "npm ci 失败；可设置 NPM_REGISTRY 后重试"
+
+  ensure_native_deps
 
   log "构建共享包与 API ..."
   npm run build:packages || die "共享包构建失败"
