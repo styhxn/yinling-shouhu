@@ -8,6 +8,7 @@ import type {
   FamilyConfirm,
   FamilyMessage,
   FamilySummary,
+  ElderMessage,
   Geofence,
   InterviewAnswer,
   InterviewStart,
@@ -346,6 +347,19 @@ export const api = {
     },
     messages() {
       return httpJson<{ ok: boolean; items: FamilyMessage[] }>(`/family/messages`);
+    },
+    sendToElder(input: { elderId: string; content: string; kind?: string }) {
+      return httpJson<{ ok: boolean; messageId: string }>(`/elder/message`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(input)
+      });
+    }
+  },
+
+  elderMessages: {
+    list() {
+      return httpJson<{ ok: boolean; items: ElderMessage[] }>(`/elder/messages`);
     }
   },
 

@@ -97,7 +97,10 @@ export const familyRoutes: FastifyPluginAsync = async (server) => {
         if (elder) names.set(id, elder.displayName);
       })
     );
-    const unreadIds = items.filter((item) => !item.read).map((item) => item.id);
+    // 仅把“老人发来”的未读标记为已读（家属自己发出的不算未读）
+    const unreadIds = items
+      .filter((item) => !item.read && item.fromRole === "elder")
+      .map((item) => item.id);
     if (unreadIds.length > 0) {
       await server.db.familyMessages.markRead(familyUserId, unreadIds);
     }
@@ -107,6 +110,69 @@ export const familyRoutes: FastifyPluginAsync = async (server) => {
         id: item.id,
         elderId: item.elderId,
         elderName: names.get(item.elderId) ?? "家人",
+        fromRole: item.fromRole,
+        content: item.content,
+        kind: item.kind,
+        read: item.read,
+        createdAt: item.createdAt
+      }))
+    };
+  });
+
+  // 家属给绑定的老人发送站内消息（反向：家属 -> 老人）
+  server.post("/elder/message", { preHandler: requireRole("family") }, async (req, reply) => {
+    const parsed = z
+      .object({
+        elderId: z.string().min(1).max(80),
+        content: z.string().min(1).max(500),
+        kind: z.string().max(32).optional()
+      })
+      .safeParse(req.body);
+    if (!parsed.success) return reply.code(400).send({ error: "invalid_body" });
+    const familyUserId = req.user!.userId;
+    const links = await server.db.users.listFamilyLinks(familyUserId);
+    if (!links.some((link) => link.elderId === parsed.data.elderId)) {
+      return reply.code(403).send({ error: "forbidden" });
+    }
+    const message = await server.db.familyMessages.insert({
+      elderId: parsed.data.elderId,
+      familyUserId,
+      fromRole: "family",
+      content: parsed.data.content,
+      kind: parsed.data.kind ?? "general"
+    });
+    server.eventBus.publish({
+      type: "elder.message",
+      ts: message.createdAt,
+      payload: { elderId: message.elderId, familyUserId, messageId: message.id }
+    });
+    return { ok: true, messageId: message.id };
+  });
+
+  // 老人读取家属发来的站内消息（按当前老人聚合，含家属姓名；未读自动标记已读）
+  server.get("/elder/messages", { preHandler: requireRole("elder") }, async (req, reply) => {
+    const elderId = req.user!.elderId!;
+    const items = await server.db.familyMessages.listByElder(elderId);
+    const links = await server.db.users.listFamilyLinks(elderId);
+    const names = new Map<string, string>();
+    await Promise.all(
+      links.map(async (link) => {
+        const user = await server.db.users.getById(link.familyUserId);
+        if (user) names.set(link.familyUserId, user.displayName);
+      })
+    );
+    const unreadIds = items
+      .filter((item) => !item.read && item.fromRole === "family")
+      .map((item) => item.id);
+    if (unreadIds.length > 0) {
+      await server.db.familyMessages.markReadElder(elderId, unreadIds);
+    }
+    return {
+      ok: true,
+      items: items.map((item) => ({
+        id: item.id,
+        elderId: item.elderId,
+        familyName: names.get(item.familyUserId) ?? "家属",
         fromRole: item.fromRole,
         content: item.content,
         kind: item.kind,

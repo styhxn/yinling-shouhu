@@ -113,6 +113,17 @@ export type FamilyMessage = {
   createdAt: number;
 };
 
+export type ElderMessage = {
+  id: string;
+  elderId: string;
+  familyName: string;
+  fromRole: Role;
+  content: string;
+  kind: string;
+  read: boolean;
+  createdAt: number;
+};
+
 export type CoolingOff = {
   id: string;
   elderId: string;

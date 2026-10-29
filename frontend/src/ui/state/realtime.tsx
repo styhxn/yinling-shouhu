@@ -103,8 +103,17 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
           if (role === "family") {
             toast.push({
               kind: "normal",
-              title: "家人给您发了消息",
+              title: "长辈给您发了消息",
               detail: "已收到老人的留言，下方可查看。"
+            });
+          }
+          break;
+        case "elder.message":
+          if (role === "elder") {
+            toast.push({
+              kind: "normal",
+              title: "家属给您发了消息",
+              detail: "已收到家属的留言，下方可查看。"
             });
           }
           break;

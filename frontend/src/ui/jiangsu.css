@@ -1426,6 +1426,25 @@ body {
   word-break: break-word;
 }
 
+.ys-messageCard--mine {
+  align-self: flex-end;
+  background: #eef6f0;
+  border-color: #cfe3d8;
+  max-width: 88%;
+}
+
+.ys-replyBox {
+  display: flex;
+  gap: 10px;
+  margin-top: 14px;
+  align-items: flex-end;
+}
+
+.ys-replyBox .ys-msgInput {
+  flex: 1;
+  resize: vertical;
+}
+
 /* ---------- 旧页面组件的水韵化覆盖 ---------- */
 .yl-pageHeader {
   border-bottom: 1px solid var(--ys-line);

@@ -1,9 +1,10 @@
 import React from "react";
 import { Icon } from "./Icon.js";
 import { useToast } from "../state/toast.js";
+import { useRealtime } from "../state/realtime.js";
 import { speakNow } from "../voice/tts.js";
 import { api } from "../../lib/api.js";
-import type { AgentBrief } from "../../lib/types.js";
+import type { AgentBrief, ElderMessage } from "../../lib/types.js";
 import "./elderFeatures.css";
 
 /* 健康记录存在本机，不上传 */
@@ -51,6 +52,16 @@ function relationLabel(r: string | null): string {
   return RELATION_LABELS[r] ?? r;
 }
 
+function formatTime(ts: number | null | undefined): string {
+  if (!ts) return "暂无";
+  return new Date(ts).toLocaleString("zh-CN", {
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit"
+  });
+}
+
 /* 附近医院 / 药店 / 公园（演示数据，仅展示电话，网页无法直接拨号） */
 const NEARBY = [
   { name: "玄武社区卫生服务中心", dist: "距您约 800 米", tag: "看病开药", phone: "02587654321" },
@@ -83,6 +94,39 @@ export function ElderHomeFeatures({ brief }: { brief?: AgentBrief | null }) {
   const [glucose, setGlucose] = React.useState("");
   const [waterOn, setWaterOn] = React.useState(false);
   const waterTimer = React.useRef<number | null>(null);
+
+  const { lastEvent } = useRealtime();
+  const [inbox, setInbox] = React.useState<ElderMessage[]>([]);
+  const [inboxLoading, setInboxLoading] = React.useState(true);
+
+  React.useEffect(() => {
+    let alive = true;
+    setInboxLoading(true);
+    api
+      .elderMessages
+      .list()
+      .then((res) => {
+        if (alive && res.ok) setInbox(res.items);
+      })
+      .catch(() => undefined)
+      .finally(() => {
+        if (alive) setInboxLoading(false);
+      });
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  React.useEffect(() => {
+    if (!lastEvent || lastEvent.type !== "elder.message") return;
+    api
+      .elderMessages
+      .list()
+      .then((res) => {
+        if (res.ok) setInbox(res.items);
+      })
+      .catch(() => undefined);
+  }, [lastEvent]);
 
   React.useEffect(() => {
     let alive = true;
@@ -364,6 +408,43 @@ export function ElderHomeFeatures({ brief }: { brief?: AgentBrief | null }) {
           </button>
         </div>
       </div>
+
+      {/* 家属的留言（收件箱）：展示家属发来的站内消息 */}
+      <section className="ys-featureSection" aria-label="家属的留言">
+        <h2 className="ys-featureTitle">家属的留言</h2>
+        <p className="ys-featureSub">家人给您发的消息都在这里，新的会标“新”。</p>
+        {inboxLoading ? (
+          <p className="ys-mutedText">正在读取留言…</p>
+        ) : inbox.length === 0 ? (
+          <div className="ys-emptyBlock ys-emptyBlock--inline">
+            <Icon name="message" size="lg" />
+            <strong>还没有留言</strong>
+            <p>家人发消息给您后，会显示在这里。</p>
+          </div>
+        ) : (
+          <div className="ys-messageList">
+            {inbox.map((m) => (
+              <article
+                key={m.id}
+                className={`ys-messageCard ${
+                  m.fromRole === "elder" ? "ys-messageCard--mine" : ""
+                } ${!m.read && m.fromRole === "family" ? "ys-messageCard--unread" : ""}`}
+              >
+                <div className="ys-messageTop">
+                  <span className="ys-messageFrom">
+                    {m.fromRole === "family" ? m.familyName : "我"}
+                  </span>
+                  {!m.read && m.fromRole === "family" && (
+                    <span className="ys-messageBadge">新</span>
+                  )}
+                  <span className="ys-messageTime">{formatTime(m.createdAt)}</span>
+                </div>
+                <p className="ys-messageContent">{m.content}</p>
+              </article>
+            ))}
+          </div>
+        )}
+      </section>
 
       {/* 弹窗一：给家属发消息 */}
       {msgOpen && (

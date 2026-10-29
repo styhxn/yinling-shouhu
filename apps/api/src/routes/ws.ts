@@ -20,6 +20,10 @@ export function eventElderId(event: AppEvent): string | null {
     const confirm = (event.payload as { confirm?: { elderId?: unknown } }).confirm;
     return typeof confirm?.elderId === "string" ? confirm.elderId : null;
   }
+  if (event.type === "family.message" || event.type === "elder.message") {
+    const elderId = (event.payload as { elderId?: unknown }).elderId;
+    return typeof elderId === "string" ? elderId : null;
+  }
   return null;
 }
 

@@ -67,6 +67,8 @@ export function FamilyDashboardPage() {
   const [brief, setBrief] = React.useState<AgentBrief | null>(null);
   const [items, setItems] = React.useState<FamilyConfirm[]>([]);
   const [messages, setMessages] = React.useState<FamilyMessage[]>([]);
+  const [replyText, setReplyText] = React.useState("");
+  const [sending, setSending] = React.useState(false);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
   const [busyId, setBusyId] = React.useState<string | null>(null);
@@ -188,6 +190,26 @@ export function FamilyDashboardPage() {
     }
   }
 
+  async function sendToElder() {
+    const text = replyText.trim();
+    if (!text || sending || !elderId) return;
+    setSending(true);
+    try {
+      const res = await api.family.sendToElder({ elderId, content: text });
+      if (res.ok) {
+        setReplyText("");
+        toast.push({ kind: "ok", title: "已发送给老人", detail: "消息已送到老人的账号。" });
+        void load(true);
+      } else {
+        toast.push({ kind: "danger", title: "发送失败", detail: "请稍后再试一次。" });
+      }
+    } catch {
+      toast.push({ kind: "danger", title: "发送失败", detail: "请稍后再试一次。" });
+    } finally {
+      setSending(false);
+    }
+  }
+
   if (!elderId) {
     return (
       <div className="yl-page">
@@ -280,29 +302,60 @@ export function FamilyDashboardPage() {
             </section>
           )}
 
-          {messages.length > 0 && (
-            <section className="ys-panel">
-              <div className="ys-sectionTitle">
-                <Icon name="message" size="sm" />
-                来自老人的消息
+          <section className="ys-panel">
+            <div className="ys-sectionTitle">
+              <Icon name="message" size="sm" />
+              与老人的消息
+            </div>
+            {messages.length === 0 ? (
+              <div className="ys-emptyBlock ys-emptyBlock--inline">
+                <Icon name="message" size="lg" />
+                <strong>还没有消息</strong>
+                <p>给老人发条消息，TA 登录就能看到。</p>
               </div>
+            ) : (
               <div className="ys-messageList">
                 {messages.map((m) => (
                   <article
                     key={m.id}
-                    className={`ys-messageCard ${m.read ? "" : "ys-messageCard--unread"}`}
+                    className={`ys-messageCard ${m.fromRole === "family" ? "ys-messageCard--mine" : ""} ${
+                      !m.read && m.fromRole === "elder" ? "ys-messageCard--unread" : ""
+                    }`}
                   >
                     <div className="ys-messageTop">
-                      <span className="ys-messageFrom">{m.elderName}</span>
-                      {!m.read && <span className="ys-messageBadge">新</span>}
+                      <span className="ys-messageFrom">
+                        {m.fromRole === "elder" ? m.elderName : "我"}
+                      </span>
+                      {!m.read && m.fromRole === "elder" && (
+                        <span className="ys-messageBadge">新</span>
+                      )}
                       <span className="ys-messageTime">{formatTime(m.createdAt)}</span>
                     </div>
                     <p className="ys-messageContent">{m.content}</p>
                   </article>
                 ))}
               </div>
-            </section>
-          )}
+            )}
+            <div className="ys-replyBox">
+              <textarea
+                className="input ys-msgInput"
+                value={replyText}
+                maxLength={500}
+                rows={2}
+                placeholder="给老人回句话…"
+                onChange={(e) => setReplyText(e.target.value)}
+                aria-label="给老人发消息"
+              />
+              <button
+                type="button"
+                className="btn ys-featureAction"
+                disabled={!replyText.trim() || sending}
+                onClick={() => void sendToElder()}
+              >
+                {sending ? "发送中…" : "发送"}
+              </button>
+            </div>
+          </section>
 
           {summary && summary.alerts.items.length > 0 ? (
             <section className="ys-panel">
