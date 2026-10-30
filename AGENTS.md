@@ -6,7 +6,7 @@
 
 ## 1. 项目是什么
 
-银龄守护：面向江苏长者的 AI 陪伴与守护系统。前端 React，后端 Fastify，AI 主路径包括 Agent 工具调用、反诈研判、记忆访谈、故事生成、主动简报与家属协同。
+银龄守护：面向江苏长辈的 AI 陪伴与守护系统。前端 React，后端 Fastify，AI 主路径包括 Agent 工具调用、反诈研判、记忆访谈、故事生成、主动简报与家人协同。
 
 - `frontend/`：React 18 + Vite 6 + TypeScript，可独立交接
 - `apps/api/`：Fastify 5 + TypeScript + zod，API、SSE、WebSocket、静态托管
@@ -65,7 +65,7 @@ git diff
 
 # 4. 只添加自己改的文件，不要 git add .
 git add frontend/src/...
-git commit -m "feat(web): 调整长者首页用药卡片"
+git commit -m "feat(web): 调整长辈首页用药卡片"
 
 # 5. 推分支并开 PR
 git push -u origin feat/web-medication-card
@@ -133,7 +133,7 @@ AI 助手在本仓库工作时必须遵守：
 4. **模型调用统一走 `ModelRouter`**：不要在路由或服务里直接 new 某个厂商 SDK；没有 Key 时必须能回退 Mock。
 5. **AI 结果必须可解释、可降级**：反诈引用必须逐字命中原文；故事引语必须校验；医疗不做诊断；高风险动作走确认门。
 6. **数据与隐私**：敏感字段用现有加密服务；不把访谈原文、坐标、电话、密钥写进日志；不提交 `.env`、`master.key`、`data/`、`uploads/`。
-7. **权限**：新接口必须检查登录态与老人归属；遵守 elder/family/institution/admin 的 RBAC 边界。
+7. **权限**：新接口必须检查登录态与长辈归属；遵守 elder/family/institution/admin 的 RBAC 边界。
 8. **前端适老化**：保持大字号、大按钮、足够对比度与中文文案；不要为了“好看”缩小触控区域或引入低对比配色。
 9. **数据库兼容**：任何 SQL 都要同时考虑 SQLite 与 MySQL；不要引入 PostgreSQL/pgvector。
 10. **不跑破坏性命令**：不执行 `git reset --hard`、`git clean -fd`、`git push --force`、生产库 DDL、服务器服务停止等操作；确需执行先向负责人确认。
