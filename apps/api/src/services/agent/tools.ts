@@ -10,6 +10,10 @@ import { analyzeScamHybrid } from "../safety/scamAI.js";
 import type { createStore } from "../store.js";
 import type { WeatherService } from "../weather.js";
 import type { ModelRouter, ToolSchema } from "../llm/types.js";
+import type { DietService } from "../diet/diet.js";
+import { dietPlanSummary, foodSafetySummary } from "../diet/rules.js";
+import { buildMedicationSafety } from "../medication/interactions.js";
+import type { HelpHomeService } from "../safety/helpHome.js";
 
 export type ToolRisk = "read" | "write" | "high";
 
@@ -48,6 +52,8 @@ export type ToolDeps = {
   antiFraud: AntiFraudService;
   coolingOff: CoolingOffService;
   modelRouter: ModelRouter;
+  diet: DietService;
+  helpHome: HelpHomeService;
 };
 
 export type ToolRegistry = {
@@ -100,7 +106,7 @@ export function createToolRegistry(deps: ToolDeps): ToolRegistry {
     },
     {
       name: "get_health_records",
-      description: "读取老人近期的步数、睡眠、活动、心情等记录，用于健康建议。",
+      description: "读取长辈近期的步数、睡眠、活动、心情等记录，用于健康建议。",
       parameters: z.object({}),
       jsonSchema: { type: "object", properties: {} },
       risk: "read",
@@ -124,7 +130,7 @@ export function createToolRegistry(deps: ToolDeps): ToolRegistry {
     },
     {
       name: "get_medications",
-      description: "读取老人当前的用药计划和服药时间。",
+      description: "读取长辈当前的用药计划和服药时间。",
       parameters: z.object({}),
       jsonSchema: { type: "object", properties: {} },
       risk: "read",
@@ -140,9 +146,111 @@ export function createToolRegistry(deps: ToolDeps): ToolRegistry {
       }
     },
     {
+      name: "get_medication_safety",
+      description:
+        "检查长辈当前用药与食物、其他药物之间的冲突，并给出漏服处理建议。回答吃药、忌口、漏服相关问题前先调用。",
+      parameters: z.object({}),
+      jsonSchema: { type: "object", properties: {} },
+      risk: "read",
+      roles: ["elder", "family"],
+      requiresConfirmation: false,
+      async handler(_args, ctx) {
+        const elderId = requireElder(ctx);
+        const items = await deps.db.medications.listByElder(elderId);
+        const safety = buildMedicationSafety(
+          items.map((med) => ({ name: med.name, genericName: med.genericName }))
+        );
+        const lines = safety.warnings.slice(0, 4).map((warning) => `${warning.title}：${warning.detail}`);
+        return {
+          summary: lines.length ? lines.join("\n") : "常用药之间暂未发现明确冲突，仍需按医嘱服用。",
+          data: {
+            ...safety,
+            citations: safety.warnings.map((warning) => warning.source)
+          }
+        };
+      }
+    },
+    {
+      name: "get_diet_plan",
+      description:
+        "生成长辈今天的早、中、晚三餐建议，结合慢病、用药忌口和记忆偏好。回答今天吃什么、怎么吃时调用。",
+      parameters: z.object({}),
+      jsonSchema: { type: "object", properties: {} },
+      risk: "read",
+      roles: ["elder", "family"],
+      requiresConfirmation: false,
+      async handler(_args, ctx) {
+        const elderId = requireElder(ctx);
+        const plan = await deps.diet.dailyPlan(elderId);
+        return {
+          summary: dietPlanSummary(plan),
+          data: { plan, citations: plan.sources }
+        };
+      }
+    },
+    {
+      name: "check_food",
+      description:
+        "判断一种食物长辈能不能吃，结合高血压、糖尿病等慢病和正在服用的药物，给出少量/避免/替代做法。回答我能吃某样东西吗时调用。",
+      parameters: z.object({ food: z.string().min(1).max(80) }),
+      jsonSchema: {
+        type: "object",
+        properties: {
+          food: { type: "string", description: "食物或菜名，例如 红烧肉、咸菜、葡萄柚" }
+        },
+        required: ["food"]
+      },
+      risk: "read",
+      roles: ["elder", "family"],
+      requiresConfirmation: false,
+      async handler(args, ctx) {
+        const elderId = requireElder(ctx);
+        const result = await deps.diet.checkFood(elderId, String(args.food));
+        return {
+          summary: foodSafetySummary(result),
+          data: { result, citations: result.sources }
+        };
+      }
+    },
+    {
+      name: "help_me_get_home",
+      description:
+        "长辈找不到家时使用：读取最后位置和家庭地址，估算方向和距离，立即通知家人并生成回家指引。",
+      parameters: z.object({
+        lat: z.number().min(-90).max(90).optional(),
+        lng: z.number().min(-180).max(180).optional()
+      }),
+      jsonSchema: {
+        type: "object",
+        properties: {
+          lat: { type: "number", description: "当前位置纬度，可选" },
+          lng: { type: "number", description: "当前位置经度，可选" }
+        }
+      },
+      risk: "write",
+      roles: ["elder", "family"],
+      requiresConfirmation: false,
+      async handler(args, ctx) {
+        const elderId = requireElder(ctx);
+        const point =
+          typeof args.lat === "number" && typeof args.lng === "number"
+            ? { lat: args.lat, lng: args.lng }
+            : undefined;
+        const result = await deps.helpHome.requestHelp({
+          elderId,
+          userId: ctx.user.userId,
+          ...(point ? { point } : {})
+        });
+        return {
+          summary: `${result.card.spoken}\n${result.card.steps.join("\n")}`,
+          data: { card: result.card, alertId: result.alertId, citations: [] }
+        };
+      }
+    },
+    {
       name: "search_memories",
       description:
-        "检索老人自己口述过的记忆（童年、家乡、工作、家人等）。回答过去经历相关问题前必须先检索，只引用检索结果，不要编造。",
+        "检索长辈自己口述过的记忆（童年、家乡、工作、家人等）。回答过去经历相关问题前必须先检索，只引用检索结果，不要编造。",
       parameters: z.object({
         query: z.string().max(100).optional(),
         limit: z.number().int().min(1).max(5).optional()
@@ -192,7 +300,7 @@ export function createToolRegistry(deps: ToolDeps): ToolRegistry {
 
         if (!picked.length) {
           return {
-            summary: "没有检索到相关记忆。可以邀请老人先讲一段，或换一个关键词。",
+            summary: "没有检索到相关记忆。可以邀请长辈先讲一段，或换一个关键词。",
             data: { items: [], citations: [] }
           };
         }
@@ -225,7 +333,7 @@ export function createToolRegistry(deps: ToolDeps): ToolRegistry {
     {
       name: "get_memory_profile",
       description:
-        "读取老人的记忆画像（常提到的人、地点、习惯、偏好、沟通注意点），用于个性化陪伴和简报。",
+        "读取长辈的记忆画像（常提到的人、地点、习惯、偏好、沟通注意点），用于个性化陪伴和简报。",
       parameters: z.object({}),
       jsonSchema: { type: "object", properties: {} },
       risk: "read",
@@ -318,7 +426,7 @@ export function createToolRegistry(deps: ToolDeps): ToolRegistry {
     {
       name: "start_cooling_off",
       description:
-        "当老人准备转账且存在高风险时，启动 60 秒冷静期并请求家属确认。不会执行真实转账。",
+        "当长辈准备转账且存在高风险时，启动 60 秒冷静期并请求家人确认。不会执行真实转账。",
       parameters: z.object({
         amount: z.number().positive().optional(),
         counterparty: z.string().max(100).optional(),
@@ -338,7 +446,26 @@ export function createToolRegistry(deps: ToolDeps): ToolRegistry {
       risk: "high",
       roles: ["elder"],
       requiresConfirmation: true,
-      async prepare(args, ctx) {
+      async prepare(args) {
+        // 冷静期与家人通知是真实副作用，必须等长辈在确认框点“确认”后再创建。
+        return {
+          args,
+          summary:
+            "检测到转账风险。确认后我会启动 60 秒冷静期并通知家人，不会执行真实转账；如对方催促、让你保密或共享屏幕，请立即停止。"
+        };
+      },
+      async handler(args, ctx) {
+        if (typeof args.coolingOffId === "string" && typeof args.familyConfirmId === "string") {
+          return {
+            summary:
+              "冷静期已经启动，并已通知家人确认。请先不要转账；如对方催促、让你保密或共享屏幕，立即停止。",
+            data: {
+              coolingOffId: args.coolingOffId,
+              familyConfirmId: args.familyConfirmId,
+              expiresAt: typeof args.expiresAt === "number" ? args.expiresAt : null
+            }
+          };
+        }
         const elderId = requireElder(ctx);
         const created = await deps.coolingOff.start({
           elderId,
@@ -348,36 +475,19 @@ export function createToolRegistry(deps: ToolDeps): ToolRegistry {
           ...(typeof args.reason === "string" ? { reason: args.reason } : {})
         });
         return {
-          args: {
-            ...args,
-            familyConfirmId: created.familyConfirm.id,
-            coolingOffId: created.coolingOff.id,
-            expiresAt: created.coolingOff.expiresAt
-          },
           summary:
-            "检测到转账风险，已通知家属确认。请先不要转账；如对方催促、让你保密或共享屏幕，立即停止。",
+            "已启动 60 秒冷静期，并通知家人确认。请先不要转账；如对方催促、让你保密或共享屏幕，立即停止。",
           data: {
             coolingOffId: created.coolingOff.id,
             familyConfirmId: created.familyConfirm.id,
             expiresAt: created.coolingOff.expiresAt
-          }
-        };
-      },
-      async handler(args) {
-        return {
-          summary:
-            "已启动 60 秒冷静期，并通知家属确认。请先不要转账；如对方催促、让你保密或共享屏幕，立即停止。",
-          data: {
-            coolingOffId: typeof args.coolingOffId === "string" ? args.coolingOffId : null,
-            familyConfirmId: typeof args.familyConfirmId === "string" ? args.familyConfirmId : null,
-            expiresAt: typeof args.expiresAt === "number" ? args.expiresAt : null
           }
         };
       }
     },
     {
       name: "get_location",
-      description: "读取老人最后上报的位置，用于回答“在哪/还没回来”等问题。",
+      description: "读取长辈最后上报的位置，用于回答“在哪/还没回来”等问题。",
       parameters: z.object({}),
       jsonSchema: { type: "object", properties: {} },
       risk: "read",
@@ -387,7 +497,7 @@ export function createToolRegistry(deps: ToolDeps): ToolRegistry {
         const elderId = requireElder(ctx);
         const latest = await deps.location.latest(elderId);
         if (!latest) {
-          return { summary: "还没有收到位置信息。可以先打电话确认，或让家属开启位置共享。" };
+          return { summary: "还没有收到位置信息。可以先打电话确认，或让家人开启位置共享。" };
         }
         return {
           summary: `最后位置：${latest.text}（精度约 ${latest.point.accuracy ?? "未知"} 米）`,

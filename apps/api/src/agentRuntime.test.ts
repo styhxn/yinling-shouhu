@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createServer } from "./server.js";
+import { guardBriefClaims, guardEscalation, safeAction } from "./services/agent/runtime.js";
 import { cookieFrom, testConfig } from "./testUtils.js";
 
 let server: Awaited<ReturnType<typeof createServer>>;
@@ -24,6 +25,70 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await server.close();
+});
+
+describe("escalation policy", () => {
+  it("keeps family first for geofence, help-home and cooling-off alerts", () => {
+    const alert = (alertType: string) => ({
+      kind: "alert" as const,
+      context: { alertType, alertLevel: "critical" }
+    });
+    expect(guardEscalation(alert("geofence.exit"), "emergency")).toBe("family");
+    expect(guardEscalation(alert("help_home"), "emergency")).toBe("family");
+    expect(guardEscalation(alert("cooling_off"), "emergency")).toBe("family");
+    expect(guardEscalation(alert("fall.detected"), "emergency")).toBe("emergency");
+    expect(guardEscalation(alert("geofence.exit"), "family")).toBe("family");
+    expect(
+      guardEscalation({ kind: "brief", context: {} }, "emergency")
+    ).toBe("emergency");
+  });
+
+  it("does not let a brief claim medication was taken without evidence", () => {
+    const payload = {
+      summary: "上午的药已经吃过了，下午好好休息。",
+      riskLevel: "low",
+      confidence: 0.9,
+      needsConfirmation: false,
+      escalation: "none",
+      facts: ["用药计划：氨氯地平 08:00"],
+      actions: [],
+      briefItems: [
+        { title: "已服用降压药", detail: "今天早上已经吃过。", priority: "now" },
+        { title: "天气", detail: "南京多云。", priority: "today" }
+      ],
+      explanation: "根据计划推断。"
+    } as any;
+    const guarded = guardBriefClaims({ kind: "brief" }, payload, ["用药计划：氨氯地平 08:00"]);
+    expect(guarded.summary).not.toContain("已经吃过");
+    expect(guarded.summary).toContain("今天按计划吃药");
+    expect(guarded.summary).toContain("下午好好休息");
+    expect((guarded.briefItems ?? []).some((item: any) => item.title.includes("已服用"))).toBe(false);
+    expect(guarded.briefItems?.length).toBe(2);
+    expect((guarded.briefItems ?? []).some((item: any) => /药/.test(item.title))).toBe(true);
+
+    const supported = guardBriefClaims(
+      { kind: "brief" },
+      payload,
+      ["今日用药：已服用 2 次"]
+    );
+    expect(supported.summary).toContain("已经吃过");
+  });
+
+  it("turns invented phone numbers and anchors into working in-app actions", () => {
+    expect(
+      safeAction({ label: "联系家人", kind: "call", href: "tel:family_emergency_contact" })
+    ).toEqual({ label: "联系家人", kind: "link", href: "/elder/chat" });
+    expect(safeAction({ label: "拨打 110", kind: "call", href: "tel:110" })).toEqual({
+      label: "拨打 110",
+      kind: "call",
+      href: "tel:110"
+    });
+    expect(safeAction({ label: "去打卡", kind: "link", href: "#confirm-meds" })).toEqual({
+      label: "去打卡",
+      kind: "link",
+      href: "/elder/today"
+    });
+  });
 });
 
 describe("agent runtime", () => {

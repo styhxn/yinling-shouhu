@@ -103,7 +103,7 @@ function confirmationSummary(tool: string, args: unknown): string {
       args && typeof args === "object" && typeof (args as any).amount === "number"
         ? ` ¥${(args as any).amount}`
         : "";
-    return `检测到准备转账${amount}，需要家属确认后才能继续。本系统不会执行真实转账。`;
+    return `检测到准备转账${amount}，需要家人确认后才能继续。本系统不会执行真实转账。`;
   }
   if (tool === "generate_missing_poster") {
     return "即将发布寻人海报，请确认衣着、最后位置和联系方式已脱敏。";
@@ -312,6 +312,7 @@ export function createAgentRunner(deps: AgentRunnerDeps): AgentRunner {
       mergeCitations(recorder.citations, input.initialCitations);
     }
     const citations = recorder.citations;
+    let fallbackNoted = false;
 
     for (let step = 0; step < 4; step += 1) {
       const toolSchemas = deps.toolRegistry.schemas(ctx.user.role);
@@ -335,6 +336,15 @@ export function createAgentRunner(deps: AgentRunnerDeps): AgentRunner {
             calls.push({ id: event.id, name: event.name, args: event.args });
           } else if (event.type === "done") {
             lastUsage = event.usage;
+            if (event.fallback && !fallbackNoted) {
+              fallbackNoted = true;
+              pushStep(recorder, {
+                type: "decision",
+                label: "模型服务暂时不可用，已切换到本地兜底",
+                detail: "本次回答由本地规则生成，内容仍可参考；恢复后会自动回到真实模型。",
+                ok: true
+              });
+            }
           }
         }
       } catch (err) {

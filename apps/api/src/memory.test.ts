@@ -108,7 +108,7 @@ describe("memory", () => {
     expect(exported.body).toContain("家庭记忆册");
     expect(exported.body).toContain("根据长辈口述整理");
     expect(exported.body).toContain("口述原话");
-    expect(exported.body).toContain("用词重合度");
+    expect(exported.body).toContain("口述要点保留");
 
     const anonymous = await server.inject({
       method: "GET",
@@ -150,6 +150,43 @@ describe("memory", () => {
     expect(chapter.fidelity?.warnings.some((warning) => warning.includes("未在口述原文"))).toBe(
       true
     );
+  });
+
+  it("keeps most dictated details in an expanded story and flags a loose rewrite", async () => {
+    const memory = await server.db.memories.create({
+      elderId: "e_li",
+      title: "苏州河边的夏天",
+      summary: "小时候住在苏州河边，夏天常和邻居下河捉鱼。",
+      transcript:
+        "问：小时候住在哪里？\n答：我小时候住在苏州河边，夏天常和邻居下河捉鱼。\n\n问：最难忘的是什么？\n答：母亲总在岸上喊我回家吃饭，我假装没听见。",
+      tags: ["童年"],
+      consent: true
+    });
+    const faithful = createStoryService(
+      server.db,
+      new StubModelRouter({
+        title: "苏州河边的夏天",
+        content:
+          "我小时候住在苏州河边，夏天常和邻居下河捉鱼。母亲总在岸上喊我回家吃饭，我假装没听见。后来我才明白，那是她最朴素的牵挂。\n\n根据长辈口述整理，家属可修改。"
+      })
+    );
+    const { chapter } = await faithful.generate({ elderId: "e_li", memoryIds: [memory.id] });
+    expect(chapter.fidelity?.groundingPct).toBeGreaterThanOrEqual(80);
+
+    const loose = createStoryService(
+      server.db,
+      new StubModelRouter({
+        title: "在北京的日子",
+        content:
+          "我小时候住在北京，冬天常去北海公园滑冰，父亲给我买了一双新冰鞋。那段日子过得很快乐。\n\n根据长辈口述整理，家属可修改。"
+      })
+    );
+    const { chapter: looseChapter } = await loose.generate({
+      elderId: "e_li",
+      memoryIds: [memory.id]
+    });
+    expect(looseChapter.fidelity?.groundingPct).toBeLessThan(45);
+    expect(looseChapter.fidelity?.level).toBe("low");
   });
 
   it("starts from a photo prompt when a picture is provided", async () => {

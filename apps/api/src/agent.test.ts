@@ -65,8 +65,9 @@ describe("agent", () => {
     expect(confirmations).toHaveLength(1);
     expect(confirmations[0]?.tool).toBe("start_cooling_off");
 
-    const pending = await server.db.familyConfirms.listPending("e_li");
-    expect(pending).toHaveLength(1);
+    // 确认前不产生副作用：冷静期与家人确认都应在长辈点“确认”之后才创建。
+    const pendingBefore = await server.db.familyConfirms.listPending("e_li");
+    expect(pendingBefore).toHaveLength(0);
 
     const second = await server.inject({
       method: "POST",
@@ -84,6 +85,8 @@ describe("agent", () => {
     expect(second.body).toContain("start_cooling_off");
     expect(second.body).toContain("event: tool_result");
     expect(second.body).toContain("event: done");
+    const pendingAfter = await server.db.familyConfirms.listPending("e_li");
+    expect(pendingAfter).toHaveLength(1);
   });
 
 

@@ -10,7 +10,7 @@ import type {
 } from "./types.js";
 import { ModelError } from "./types.js";
 
-class FallbackModelRouter implements ModelRouter {
+export class FallbackModelRouter implements ModelRouter {
   readonly mode = "live" as const;
 
   constructor(private readonly providers: ModelRouter[]) {}
@@ -46,9 +46,13 @@ class FallbackModelRouter implements ModelRouter {
         if (emitted) throw err;
       }
     }
-    throw lastError instanceof Error
-      ? lastError
-      : new ModelError("missing_config", "no_model_provider");
+    // 所有真实模型都不可用且尚未输出任何内容时，退回确定性 Mock，保证演示与陪伴不中断。
+    const reason = lastError instanceof Error ? lastError.message : "no_model_provider";
+    console.warn("[llm] all providers failed, falling back to mock:", reason);
+    const fallback = new MockModelProvider();
+    for await (const event of fallback.chatStream(req)) {
+      yield event.type === "done" ? { ...event, fallback: true } : event;
+    }
   }
 
   chatJSON<T>(req: ChatJSONRequest<T>): Promise<T> {

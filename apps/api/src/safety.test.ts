@@ -181,6 +181,9 @@ describe("hybrid scam analysis", () => {
     expect(result.model).toBe("mock");
     expect(result.explanation).toContain("安全账户");
     expect(result.riskLevel).toBe("high");
+    expect(result.faithfulness?.checked).toBe(2);
+    expect(result.faithfulness?.dropped).toBe(1);
+    expect(result.faithfulness?.droppedQuotes[0]).toContain("编造");
   });
 
   it("falls back to the rules engine when the model fails", async () => {

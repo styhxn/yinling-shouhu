@@ -13,6 +13,8 @@ export type EvalModule = "scam" | "story" | "agent";
 
 type ScamExpected = {
   riskLevel: "high" | "medium" | "low" | "unknown";
+  /** 语义上有多个可接受答案时使用，例如正常闲聊既可以是 low 也可以是 unknown。 */
+  riskLevels?: Array<"high" | "medium" | "low" | "unknown">;
   scamType?: string;
   requireAny?: string[];
 };
@@ -107,7 +109,7 @@ const SCAM_CASES: Array<{ id: string; text: string; expected: ScamExpected }> = 
   {
     id: "scam_normal",
     text: "明天上午去菜市场买菜，顺便看看老邻居。",
-    expected: { riskLevel: "unknown", scamType: "other" }
+    expected: { riskLevel: "unknown", riskLevels: ["low", "unknown"], scamType: "other" }
   }
 ];
 
@@ -157,7 +159,7 @@ const AGENT_CASES: AgentCase[] = [
   },
   {
     id: "agent_alert_geofence",
-    goal: "研判一条电子围栏越界：结合最近位置、用药、天气和老人习惯，判断可能原因并给出下一步。",
+    goal: "研判一条电子围栏越界：结合最近位置、用药、天气和长辈习惯，判断可能原因并给出下一步。",
     context: {
       alertType: "geofence.exit",
       alertLevel: "critical",
@@ -173,7 +175,7 @@ const AGENT_CASES: AgentCase[] = [
   },
   {
     id: "agent_alert_cooling_off",
-    goal: "研判一条转账冷静期：结合最近位置、用药、天气和老人习惯，判断可能原因并给出下一步。",
+    goal: "研判一条转账冷静期：结合最近位置、用药、天气和长辈习惯，判断可能原因并给出下一步。",
     context: { alertType: "cooling_off", alertLevel: "critical", amount: 50000 },
     expected: {
       kind: "alert",
@@ -184,7 +186,7 @@ const AGENT_CASES: AgentCase[] = [
   },
   {
     id: "agent_alert_stale",
-    goal: "研判一条长时间没有位置更新：结合最近位置、用药、天气和老人习惯，判断可能原因并给出下一步。",
+    goal: "研判一条长时间没有位置更新：结合最近位置、用药、天气和长辈习惯，判断可能原因并给出下一步。",
     context: { alertType: "location.stale", alertLevel: "info" },
     expected: {
       kind: "alert",
@@ -359,8 +361,11 @@ async function runScamCases(db: AppDb, modelRouter: ModelRouter): Promise<EvalMo
         modelRouter
       });
       const reasons: string[] = [];
-      if (result.riskLevel === expected.riskLevel) riskMatched += 1;
-      else reasons.push(`风险等级 ${result.riskLevel} ≠ ${expected.riskLevel}`);
+      const acceptableRisk = expected.riskLevels?.length
+        ? expected.riskLevels
+        : [expected.riskLevel];
+      if (acceptableRisk.includes(result.riskLevel)) riskMatched += 1;
+      else reasons.push(`风险等级 ${result.riskLevel} ∉ ${acceptableRisk.join("/")}`);
       if (expected.scamType) {
         typeChecked += 1;
         if (result.scamType === expected.scamType) typeMatched += 1;
@@ -379,15 +384,24 @@ async function runScamCases(db: AppDb, modelRouter: ModelRouter): Promise<EvalMo
         reasons.push(`未命中任一关键词：${expected.requireAny.join(" / ")}`);
       }
 
-      for (const flag of result.redFlags) {
-        flagsTotal += 1;
-        if (normalize(item.question).includes(normalize(flag.quote))) flagsFaithful += 1;
-      }
-      const unfaithful = result.redFlags.filter(
-        (flag) => !normalize(item.question).includes(normalize(flag.quote))
-      );
-      if (unfaithful.length > 0) {
-        reasons.push(`有 ${unfaithful.length} 条引文不在原文中`);
+      // 忠实度按模型原始引文统计（含被安全过滤掉的引文），避免过滤后恒为 100%。
+      if (result.faithfulness) {
+        flagsTotal += result.faithfulness.checked;
+        flagsFaithful += result.faithfulness.checked - result.faithfulness.dropped;
+        if (result.faithfulness.dropped > 0) {
+          reasons.push(`有 ${result.faithfulness.dropped} 条引文不在原文中`);
+        }
+      } else {
+        for (const flag of result.redFlags) {
+          flagsTotal += 1;
+          if (normalize(item.question).includes(normalize(flag.quote))) flagsFaithful += 1;
+        }
+        const unfaithful = result.redFlags.filter(
+          (flag) => !normalize(item.question).includes(normalize(flag.quote))
+        );
+        if (unfaithful.length > 0) {
+          reasons.push(`有 ${unfaithful.length} 条引文不在原文中`);
+        }
       }
 
       if (result.engine === "rules+llm") llmUsed += 1;
@@ -423,7 +437,8 @@ async function runScamCases(db: AppDb, modelRouter: ModelRouter): Promise<EvalMo
     metrics: {
       riskAccuracyPct: percent(riskMatched, cases.length),
       typeAccuracyPct: percent(typeMatched, typeChecked),
-      quoteFaithfulnessPct: percent(flagsFaithful, flagsTotal),
+      quoteFaithfulnessPct: flagsTotal > 0 ? percent(flagsFaithful, flagsTotal) : 100,
+      quoteChecked: flagsTotal,
       avgConfidence: cases.length
         ? Number((confidenceSum / cases.length).toFixed(2))
         : 0,
@@ -485,7 +500,7 @@ async function runStoryCases(db: AppDb, modelRouter: ModelRouter): Promise<EvalM
         if (fidelity.engine === "rules+llm") aiUsed += 1;
         if (fidelity.groundingPct < expected.minGroundingPct) {
           reasons.push(
-            `用词重合度 ${fidelity.groundingPct}% < ${expected.minGroundingPct}%`
+            `口述要点保留 ${fidelity.groundingPct}% < ${expected.minGroundingPct}%`
           );
         }
         if (fidelity.verifiedQuotes.length < expected.minVerifiedQuotes) {

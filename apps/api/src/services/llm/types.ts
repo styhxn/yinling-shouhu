@@ -33,7 +33,7 @@ export type Usage = {
 export type ChatStreamEvent =
   | { type: "token"; text: string }
   | { type: "tool_call"; id: string; name: string; args: unknown }
-  | { type: "done"; usage?: Usage };
+  | { type: "done"; usage?: Usage; fallback?: boolean };
 
 export type ChatStreamRequest = {
   messages: ChatMessage[];
