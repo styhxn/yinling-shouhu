@@ -82,6 +82,61 @@ body {
   backdrop-filter: none;
 }
 
+.yl-elderSwitch {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+  color: var(--ys-muted);
+  font-size: 12px;
+}
+
+.yl-elderSwitchLabel {
+  white-space: nowrap;
+}
+
+.yl-elderSwitch select {
+  max-width: 190px;
+  padding: 7px 28px 7px 10px;
+  border: 1px solid var(--ys-line);
+  border-radius: 8px;
+  background: var(--ys-paper);
+  color: var(--ys-ink);
+  font: inherit;
+  font-size: 13px;
+}
+
+.yl-elderSwitchAdd,
+.yl-elderSwitch--empty {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 7px 10px;
+  border: 1px solid var(--ys-line);
+  border-radius: 8px;
+  color: var(--ys-celadon-deep);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.yl-elderSwitchAdd:hover,
+.yl-elderSwitch--empty:hover {
+  background: var(--ys-celadon-soft);
+}
+
+.yl-elderSwitch--empty {
+  margin-left: auto;
+}
+
+@media (max-width: 900px) {
+  .yl-elderSwitchLabel {
+    display: none;
+  }
+  .yl-elderSwitch select {
+    max-width: 130px;
+  }
+}
+
 .yl-brandMark {
   width: 30px;
   height: 30px;
@@ -288,6 +343,99 @@ body {
   border-radius: 2px;
   background: #f7e9e6;
   color: #7f2f24;
+  flex-shrink: 0;
+}
+
+.yl-warnBar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid #e6d3ae;
+  border-radius: 2px;
+  background: #fbf4e6;
+  color: #7a5520;
+  font-size: 14px;
+  line-height: 1.6;
+  flex-shrink: 0;
+}
+
+.yl-errorPage {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 12px;
+  padding: 48px 24px;
+  max-width: 640px;
+  margin: 0 auto;
+}
+
+.yl-errorPage h1 {
+  margin: 0;
+  font-size: clamp(26px, 4vw, 36px);
+}
+
+.yl-errorPage p {
+  margin: 0;
+  color: var(--ys-muted);
+  font-size: 17px;
+  line-height: 1.8;
+}
+
+.yl-errorPageActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.yl-voiceHint {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 2px;
+  background: var(--ys-celadon-soft);
+  color: var(--ys-muted);
+  font-size: 13px;
+  line-height: 1.6;
+  flex-shrink: 0;
+}
+
+.yl-voiceHint svg {
+  flex: none;
+}
+
+.yl-voiceReview {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 12px;
+  border-radius: 2px;
+  border: 1px solid var(--ys-line);
+  background: var(--ys-paper);
+  color: var(--ys-ink);
+  font-size: 13px;
+  line-height: 1.6;
+  flex-shrink: 0;
+}
+
+.yl-voiceReview span {
+  flex: 1;
+  min-width: 0;
+}
+
+.yl-voiceReview button {
+  flex: none;
+  border: 0;
+  background: none;
+  color: var(--ys-celadon-deep);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 6px 8px;
 }
 
 .yl-errorBar .yl-linkBtn {
@@ -456,6 +604,56 @@ body {
 .ys-roleArrow {
   display: inline-flex;
   color: var(--ys-celadon-deep);
+}
+
+.ys-roleRowIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border: 1px solid var(--ys-line);
+  border-radius: 999px;
+  color: var(--ys-celadon-deep);
+  background: var(--ys-paper, #fff);
+}
+
+.ys-roleRowBody {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.ys-demoEntry {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  padding-top: 14px;
+  margin-top: auto;
+  border-top: 1px solid var(--ys-line);
+  color: var(--ys-muted);
+  font-size: 12px;
+}
+
+.ys-demoEntry button {
+  border: 1px solid var(--ys-line);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--ys-celadon-deep);
+  padding: 6px 12px;
+  font: inherit;
+  cursor: pointer;
+}
+
+.ys-demoEntry button:hover:not(:disabled) {
+  background: var(--ys-celadon-soft);
+}
+
+.ys-demoEntry button:disabled {
+  opacity: 0.5;
+  cursor: wait;
 }
 
 .ys-currentIdentity {
@@ -1229,7 +1427,7 @@ body {
   flex-wrap: wrap;
 }
 
-/* ---------- 家属 ---------- */
+/* ---------- 家人 ---------- */
 .ys-summaryStrip {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -1371,7 +1569,7 @@ body {
   font-size: 13px;
 }
 
-/* ---------- 来自老人的消息 ---------- */
+/* ---------- 来自长辈的消息 ---------- */
 .ys-messageList {
   display: flex;
   flex-direction: column;
@@ -2083,9 +2281,18 @@ body {
   }
 }
 
-/* 长者模式：更宽松的字号与点击区域 */
+/* 长辈模式：更宽松的字号与点击区域 */
 .mode-elder .yl-navLink {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 12px 12px;
   font-size: 15px;
+}
+
+.mode-elder .ys-finePrint {
+  font-size: 14px;
+  line-height: 1.7;
 }
 
 .mode-elder .yl-shell .btn {
@@ -2147,6 +2354,13 @@ body {
 .ys-aiGreeting {
   margin: 6px 0 0;
   color: #5c6b66;
+}
+
+.ys-aiRefreshError {
+  margin: 10px 0 0;
+  color: #8a5a2b;
+  font-size: 14px;
+  line-height: 1.6;
 }
 
 .ys-aiItems {

@@ -42,6 +42,7 @@ function alertLabel(type: string) {
   if (type === "geofence.exit") return "离开安全区域";
   if (type === "scam.high") return "高风险信息";
   if (type === "cooling_off") return "转账冷静期";
+  if (type === "help_home") return "找不到家求助";
   return "安全提醒";
 }
 
@@ -54,14 +55,18 @@ function alertDetail(alert: SafetyAlert) {
     return `已离开${name}${distance}`;
   }
   if (alert.type === "scam.high") return "检测到高风险信息，请尽快电话确认";
-  if (alert.type === "cooling_off") return "转账处于冷静期，等待家属处理";
+  if (alert.type === "cooling_off") return "转账处于冷静期，等待家人处理";
+  if (alert.type === "help_home") {
+    const address = typeof payload.address === "string" ? payload.address : "家附近";
+    return `长辈发起了回家求助，位置在${address}附近，请立即联系。`;
+  }
   return "";
 }
 
 export function FamilyDashboardPage() {
   const { me } = useAuth();
   const toast = useToast();
-  const elderId = me?.familyLinks[0]?.elderId ?? "";
+  const elderId = me?.user.elderId ?? me?.familyLinks[0]?.elderId ?? "";
   const [summary, setSummary] = React.useState<FamilySummary | null>(null);
   const [report, setReport] = React.useState<WeeklyReport | null>(null);
   const [brief, setBrief] = React.useState<AgentBrief | null>(null);
@@ -71,6 +76,7 @@ export function FamilyDashboardPage() {
   const [sending, setSending] = React.useState(false);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
+  const [warning, setWarning] = React.useState<string | null>(null);
   const [busyId, setBusyId] = React.useState<string | null>(null);
   const [alertBusyId, setAlertBusyId] = React.useState<string | null>(null);
   const { lastEvent } = useRealtime();
@@ -84,18 +90,33 @@ export function FamilyDashboardPage() {
     if (!silent) {
       setLoading(true);
       setError(null);
+      setWarning(null);
     }
     try {
-      const [summaryRes, reportRes, pendingRes, messagesRes] = await Promise.all([
+      const [summaryRes, reportRes, pendingRes, messagesRes] = await Promise.allSettled([
         api.family.summary(elderId),
         api.family.weeklyReport(elderId),
         api.safety.pendingConfirms(elderId),
         api.family.messages()
       ]);
-      setSummary(summaryRes.summary);
-      setReport(reportRes.report);
-      setItems(pendingRes.items);
-      setMessages(messagesRes.items);
+      const failed: string[] = [];
+      if (summaryRes.status === "fulfilled") setSummary(summaryRes.value.summary);
+      else failed.push("照护概览");
+      if (reportRes.status === "fulfilled") setReport(reportRes.value.report);
+      else failed.push("本周简报");
+      if (pendingRes.status === "fulfilled") setItems(pendingRes.value.items);
+      else failed.push("待确认事项");
+      if (messagesRes.status === "fulfilled") setMessages(messagesRes.value.items);
+      else failed.push("家人消息");
+      if (failed.length === 4) {
+        if (!silent) setError("照护数据暂时读取失败，请点“刷新”重试");
+      } else if (failed.length > 0) {
+        setError(null);
+        setWarning(`${failed.join("、")}暂时没读取成功，其他内容先照常显示。`);
+      } else {
+        setError(null);
+        setWarning(null);
+      }
       void api.agent
         .brief({ elderId })
         .then((res) => setBrief(res.brief))
@@ -143,7 +164,7 @@ export function FamilyDashboardPage() {
       await api.safety.respondConfirm(
         item.id,
         decision,
-        decision === "denied" ? "家属判断为诈骗，已阻止" : "家属已核实"
+        decision === "denied" ? "家人判断为诈骗，已阻止" : "家人已核实"
       );
       setItems((prev) => prev.filter((entry) => entry.id !== item.id));
       toast.push({
@@ -198,7 +219,7 @@ export function FamilyDashboardPage() {
       const res = await api.family.sendToElder({ elderId, content: text });
       if (res.ok) {
         setReplyText("");
-        toast.push({ kind: "ok", title: "已发送给老人", detail: "消息已送到老人的账号。" });
+        toast.push({ kind: "ok", title: "已发送给长辈", detail: "消息已送到长辈的账号。" });
         void load(true);
       } else {
         toast.push({ kind: "danger", title: "发送失败", detail: "请稍后再试一次。" });
@@ -215,8 +236,11 @@ export function FamilyDashboardPage() {
       <div className="yl-page">
         <div className="ys-emptyBlock">
           <Icon name="users" size="xl" />
-          <strong>还没有绑定老人</strong>
-          <p>请让家属账号绑定需要照护的老人。</p>
+          <strong>还没有添加长辈</strong>
+          <p>先建一份长辈档案，系统会生成 6 位绑定码。</p>
+          <Link to="/family/elders/new" className="btn btnPrimary">
+            添加第一位长辈
+          </Link>
         </div>
       </div>
     );
@@ -232,18 +256,34 @@ export function FamilyDashboardPage() {
           <h1>{summary?.elder.displayName ?? "家人"}</h1>
           <p>位置、用药、安全和本周照护简报，都在这一页。</p>
         </div>
-        <button type="button" className="btn" onClick={() => void load()}>
-          <Icon name="refresh" size="sm" />
-          刷新
-        </button>
+        <div className="ys-inlineActions">
+          <Link to="/family/elders/new" className="btn">
+            <Icon name="plus" size="sm" />
+            添加长辈
+          </Link>
+          <Link to="/family/profile" className="btn">
+            <Icon name="heart" size="sm" />
+            健康档案
+          </Link>
+          <button type="button" className="btn" onClick={() => void load()}>
+            <Icon name="refresh" size="sm" />
+            刷新
+          </button>
+        </div>
       </section>
 
-      {loading ? (
+      {loading && !summary ? (
         <p className="ys-mutedText">正在读取照护数据…</p>
-      ) : error ? (
+      ) : error && !summary ? (
         <div className="yl-errorBar"><Icon name="alertCircle" size="sm" /><span>{error}</span></div>
       ) : (
         <>
+          {warning ? (
+            <div className="yl-warnBar" role="status">
+              <Icon name="alertCircle" size="sm" />
+              <span>{warning}</span>
+            </div>
+          ) : null}
           <section className="ys-summaryStrip">
             <div className="ys-summaryItem">
               <span>位置</span>
@@ -305,13 +345,13 @@ export function FamilyDashboardPage() {
           <section className="ys-panel">
             <div className="ys-sectionTitle">
               <Icon name="message" size="sm" />
-              与老人的消息
+              与长辈的消息
             </div>
             {messages.length === 0 ? (
               <div className="ys-emptyBlock ys-emptyBlock--inline">
                 <Icon name="message" size="lg" />
                 <strong>还没有消息</strong>
-                <p>给老人发条消息，TA 登录就能看到。</p>
+                <p>给长辈发条消息，TA 登录就能看到。</p>
               </div>
             ) : (
               <div className="ys-messageList">
@@ -342,9 +382,9 @@ export function FamilyDashboardPage() {
                 value={replyText}
                 maxLength={500}
                 rows={2}
-                placeholder="给老人回句话…"
+                placeholder="给长辈回句话…"
                 onChange={(e) => setReplyText(e.target.value)}
-                aria-label="给老人发消息"
+                aria-label="给长辈发消息"
               />
               <button
                 type="button"
@@ -443,7 +483,7 @@ export function FamilyDashboardPage() {
               <div className="ys-emptyBlock ys-emptyBlock--inline">
                 <Icon name="check" size="lg" />
                 <strong>暂时没有待确认事项</strong>
-                <p>老人发起转账时，确认请求会出现在这里。</p>
+                <p>长辈发起转账时，确认请求会出现在这里。</p>
               </div>
             ) : (
               <div className="ys-confirmList">

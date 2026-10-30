@@ -8,14 +8,14 @@ import { useAuth } from "../state/auth.js";
 const AGENT_LABEL: Record<string, string> = {
   companion: "陪伴 Agent",
   guardian: "守护 Agent",
-  family: "家属 Agent"
+  family: "家人 Agent"
 };
 
 const TRIGGER_LABEL: Record<string, string> = {
   user: "用户主动发起",
   schedule: "定时任务",
   event: "安全事件触发",
-  family: "家属请求",
+  family: "家人请求",
   system: "系统调度"
 };
 
@@ -155,7 +155,12 @@ export function AgentTracePage() {
         <div>
           <span>模型 / 耗时</span>
           <strong>
-            {trace.model} · {trace.latencyMs}ms
+            {trace.model === "live"
+              ? "真实模型"
+              : trace.model === "mock" || trace.model === "mock-fallback"
+                ? "本地兜底"
+                : trace.model}{" "}
+            · {trace.latencyMs}ms
           </strong>
         </div>
         <div>

@@ -93,7 +93,7 @@ export function StoryChapterPage() {
             </span>
           </div>
           <div className="yl-fidelityStats">
-            <span>用词重合度 {chapter.fidelity.groundingPct}%</span>
+            <span>口述要点保留 {chapter.fidelity.groundingPct}%</span>
             <span>原文引语 {chapter.fidelity.verifiedQuotes.length} 处</span>
             <span>来源 {chapter.fidelity.sources.length} 段口述</span>
           </div>

@@ -4,17 +4,24 @@ import type {
   AgentTool,
   AgentTraceResponse,
   AntiFraudHit,
+  AuthMeta,
   CoolingOff,
+  CreateElderResponse,
+  DietCheckResult,
+  DietPlan,
   FamilyConfirm,
   FamilyMessage,
   FamilySummary,
   ElderMessage,
   Geofence,
+  HealthProfile,
+  HelpHomeCard,
   InterviewAnswer,
   InterviewStart,
   LocationPoint,
   Medication,
   MedicationLog,
+  MedicationSafety,
   MedicationScanResult,
   MeResponse,
   MemoryItem,
@@ -42,11 +49,55 @@ function query(params: Record<string, string | undefined>) {
 
 export const api = {
   auth: {
+    meta() {
+      return httpJson<AuthMeta>("/auth/meta");
+    },
     demoLogin(role: Role) {
       return httpJson<MeResponse>("/auth/demo-login", {
         method: "POST",
         body: JSON.stringify({ role })
       });
+    },
+    requestFamilyCode(phone: string) {
+      return httpJson<{ ok: true; expiresAt: number; demoCode?: string }>("/auth/family/request-code", {
+        method: "POST",
+        body: JSON.stringify({ phone })
+      });
+    },
+    familyLogin(phone: string, code: string, displayName?: string) {
+      return httpJson<MeResponse>("/auth/family/login", {
+        method: "POST",
+        body: JSON.stringify({ phone, code, displayName })
+      });
+    },
+    bindElder(code: string) {
+      return httpJson<MeResponse>("/auth/elder/bind", {
+        method: "POST",
+        body: JSON.stringify({ code })
+      });
+    },
+    switchElder(elderId: string) {
+      return httpJson<MeResponse>("/auth/switch-elder", {
+        method: "POST",
+        body: JSON.stringify({ elderId })
+      });
+    },
+    createElder(input: {
+      displayName: string;
+      relation?: string;
+      birthYear?: number;
+      gender?: "female" | "male" | "other";
+    }) {
+      return httpJson<CreateElderResponse>("/auth/family/elders", {
+        method: "POST",
+        body: JSON.stringify(input)
+      });
+    },
+    regenerateInvite(elderId: string) {
+      return httpJson<{ ok: true; invite: { code: string; expiresAt: number } }>(
+        `/auth/family/elders/${encodeURIComponent(elderId)}/invite`,
+        { method: "POST", body: JSON.stringify({}) }
+      );
     },
     me() {
       return httpJson<MeResponse>("/me");
@@ -242,6 +293,15 @@ export const api = {
         `/safety/location/latest${query({ elderId })}`
       );
     },
+    helpHome(input: { elderId?: string; lat?: number; lng?: number } = {}) {
+      return httpJson<{ ok: boolean; card: HelpHomeCard; alertId: string }>(
+        "/safety/help-home",
+        {
+          method: "POST",
+          body: JSON.stringify(input)
+        }
+      );
+    },
     locationHistory(elderId?: string, from?: number, to?: number) {
       const search = new URLSearchParams();
       if (elderId) search.set("elderId", elderId);
@@ -349,7 +409,7 @@ export const api = {
       return httpJson<{ ok: boolean; items: FamilyMessage[] }>(`/family/messages`);
     },
     sendToElder(input: { elderId: string; content: string; kind?: string }) {
-      return httpJson<{ ok: boolean; messageId: string }>(`/elder/message`, {
+      return httpJson<{ ok: boolean; messageId: string }>(`/family/elder/message`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(input)
@@ -359,7 +419,7 @@ export const api = {
 
   elderMessages: {
     list() {
-      return httpJson<{ ok: boolean; items: ElderMessage[] }>(`/elder/messages`);
+      return httpJson<{ ok: boolean; items: ElderMessage[] }>(`/family/elder/messages`);
     }
   },
 
@@ -372,6 +432,7 @@ export const api = {
         takenToday: number;
         logged: number;
         adherencePct: number | null;
+        safety: MedicationSafety;
       }>(`/medications${query({ elderId })}`);
     },
     create(input: {
@@ -418,6 +479,43 @@ export const api = {
       return httpJson<{ items: MedicationLog[] }>(
         `/medications/logs${text ? `?${text}` : ""}`
       );
+    }
+  },
+
+  healthProfile: {
+    get(elderId?: string) {
+      return httpJson<{ ok: boolean; profile: HealthProfile }>(
+        `/health/profile${query({ elderId })}`
+      );
+    },
+    update(input: {
+      elderId?: string;
+      conditions: string[];
+      allergies: string[];
+      dietNotes?: string | null;
+      homeAddress?: string | null;
+    }) {
+      return httpJson<{ ok: boolean; profile: HealthProfile }>(
+        `/health/profile${query({ elderId: input.elderId })}`,
+        {
+          method: "PUT",
+          body: JSON.stringify(input)
+        }
+      );
+    }
+  },
+
+  diet: {
+    plan(elderId?: string, refresh = false) {
+      return httpJson<{ ok: boolean; plan: DietPlan }>(
+        `/diet/plan${query({ elderId, refresh: refresh ? "1" : undefined })}`
+      );
+    },
+    check(food: string, elderId?: string) {
+      return httpJson<{ ok: boolean; result: DietCheckResult }>("/diet/check", {
+        method: "POST",
+        body: JSON.stringify({ food, ...(elderId ? { elderId } : {}) })
+      });
     }
   },
 

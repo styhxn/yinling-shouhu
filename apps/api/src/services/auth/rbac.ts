@@ -35,7 +35,7 @@ export function requireElderAccess(elderId: string): preHandlerHookHandler {
       return reply.code(401).send({ error: "unauthorized", message: "请先选择身份" });
     }
     if (!(await canAccessElder(req, elderId))) {
-      return reply.code(403).send({ error: "forbidden", message: "无权访问该老人数据" });
+      return reply.code(403).send({ error: "forbidden", message: "无权访问该长辈数据" });
     }
   };
 }

@@ -1,6 +1,6 @@
 # 银龄守护 · 前端
 
-面向江苏长者的 AI 陪伴与安全守护 Web 端，视觉主题为「水韵江苏」。本目录是**可独立运行、独立交接**的前端工程，不依赖仓库内其他 workspace。
+面向江苏长辈的 AI 陪伴与安全守护 Web 端，视觉主题为「水韵江苏」。本目录是**可独立运行、独立交接**的前端工程，不依赖仓库内其他 workspace。
 
 ## 技术栈
 
@@ -55,19 +55,27 @@ VITE_PROXY_TARGET=http://127.0.0.1:3100 npm run dev
 
 | 路由 | 页面 | 说明 |
 | --- | --- | --- |
-| `/` | `RoleSelectPage` | 长者 / 家属角色选择与演示登录 |
-| `/elder` | `ElderHomePage` | AI 今日简报、用药、位置、待确认、故事入口 |
+| `/` | `RoleSelectPage` | 家人 / 长辈入口、机构即将开放、演示入口 |
+| `/login/family` | `FamilyLoginPage` | 手机号 + 验证码登录（演示固定 `123456`） |
+| `/login/elder` | `ElderJoinPage` | 输入 6 位绑定码，绑定后免密 |
+| `/elder` | `KioskPage` | 长辈陪伴屏：四个大按钮 + 语音优先 |
+| `/elder/today` | `ElderHomePage` | AI 今日简报、用药、位置、待确认、故事入口 |
 | `/elder/chat` | `AgentChatPage` | 小助手（SSE 流式、语音输入、轨迹入口） |
 | `/elder/trace/:id` | `AgentTracePage` | AI 决策轨迹：计划、工具、依据、建议动作 |
+| `/elder/diet` | `DietPage` | 饮食建议与「这个能吃吗」 |
 | `/elder/story` | `MemoryListPage` | AI 记忆画像、记忆时间轴与故事列表 |
 | `/elder/story/new` | `MemoryInterviewPage` | 5 轮记忆访谈 |
 | `/elder/story/:id` | `StoryChapterPage` | 故事阅读、朗读、导出故事书 |
 | `/elder/meds` | `MedicationsPage` | 用药计划、服药记录、拍照识药 |
 | `/elder/safety` | `SafetyHomePage` | 实时位置共享、围栏、告警知悉与守护 Agent 研判 |
 | `/elder/safety/scam` | `ScamCheckPage` | 文字/链接/截图反诈鉴定 |
+| `/elder/safety/help` | `HelpHomePage` | 一键回家 |
 | `/elder/safety/roleplay` | `RoleplayPage` | 反诈演练与六维复盘 |
-| `/family` | `FamilyDashboardPage` | 家属照护概览、AI 简报、告警研判、待确认 |
-| `/family/trace/:id` | `AgentTracePage` | 家属视角的决策轨迹 |
+| `/family` | `FamilyDashboardPage` | 家人照护概览、AI 简报、告警研判、待确认 |
+| `/family/profile` | `HealthProfilePage` | 健康档案 |
+| `/family/elders/new` | `AddElderPage` | 添加长辈并生成首个绑定码 |
+| `/family/invite` | `FamilyInvitePage` | 当前长辈绑定码与重新生成 |
+| `/family/trace/:id` | `AgentTracePage` | 家人视角的决策轨迹 |
 
 > `src/ui/pages/` 中还保留了一些早期页面（如 HomePage、SettingsPage、QaPage），当前未挂载路由，可逐步清理，不影响构建。
 
@@ -80,7 +88,7 @@ frontend/
 │   ├── lib/                # http、SSE、接口封装、API 类型
 │   ├── ui/
 │   │   ├── components/     # Icon、Button 等基础组件
-│   │   ├── layouts/        # 长者端 / 家属端布局
+│   │   ├── layouts/        # 长辈端 / 家人端布局
 │   │   ├── pages/          # 路由页面
 │   │   ├── state/          # 登录态、Toast、旧版状态
 │   │   ├── voice/          # ASR / TTS
@@ -96,10 +104,12 @@ frontend/
 ## 接口与鉴权
 
 - 所有请求通过 `src/lib/http.ts`，默认 `credentials: "include"`。
-- 后端使用 HttpOnly Cookie 会话；演示登录接口为 `POST /api/auth/demo-login`，body `{ "role": "elder" | "family" }`。
+- 后端使用 HttpOnly Cookie 会话：家人 `POST /api/auth/family/login`（手机号 + 验证码），长辈 `POST /api/auth/elder/bind`（6 位绑定码）；演示入口仍走 `POST /api/auth/demo-login`。
+- 多长辈：`POST /api/auth/switch-elder` 切换当前长辈，`GET /api/me` 返回 `familyLinks`；顶栏 `ElderSwitcher` 负责切换。
+- 语音：TTS 在 HTTP/HTTPS 均可用；ASR 仅 HTTPS 或 localhost 可用。Chrome 在国内可能返回 `network` 错误，演示优先用 Edge；HTTP 地址会在聊天面板提示直接打字。识别用多候选 + 领域词打分，结果先回填输入框并提示确认，不自动发送；无障碍工具条可切换中文音色。
 - SSE 对话：`POST /api/agent/chat`，事件解析在 `src/lib/sse.ts`；`done.traceId` 可跳转决策轨迹。
 - AI 主路径：`GET /api/agent/brief`（今日简报）、`GET /api/agent/traces/:id`（决策轨迹）、`GET /api/memory/profile`（记忆画像）。
-- WebSocket：`/ws`，用于位置更新、安全告警与家属确认推送，需携带会话 Cookie；连接层内置指数退避重连、30 秒心跳与“实时连接/连接中/已断开”状态。
+- WebSocket：`/ws`，用于位置更新、安全告警与家人确认推送，需携带会话 Cookie；连接层内置指数退避重连、30 秒心跳与“实时连接/连接中/已断开”状态。
 - 告警研判：`SafetyAlert.payload.assessment` 异步写入，`safety.alert.updated` 推送后原地刷新。
 - 接口字段与错误码见 [docs/接口契约.md](docs/接口契约.md)，页面与组件约定见 [docs/前端开发文档.md](docs/前端开发文档.md)。
 
@@ -108,7 +118,7 @@ frontend/
 - 色板：纸白 `#F2F4EF`、墨色 `#1C2724`、青瓷 `#5E7F71`、印章红 `#8C3B2E`。
 - 标题使用宋体，正文使用系统无衬线；圆角不超过 2px。
 - 禁止紫色渐变、玻璃拟态、密集卡片堆叠；优先使用细线、留白和真实影像。
-- 长者端字号与触控尺寸遵循 `jiangsu.css` 中的适老化覆盖；支持 `prefers-reduced-motion`。
+- 长辈端字号与触控尺寸遵循 `jiangsu.css` 中的适老化覆盖；支持 `prefers-reduced-motion`。
 - 新增页面优先复用 `.yl-*` / `.ys-*` 类与设计令牌，不要引入新的色板。
 
 ## 共享类型

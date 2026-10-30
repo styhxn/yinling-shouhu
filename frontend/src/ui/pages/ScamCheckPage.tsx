@@ -53,7 +53,7 @@ function CoolingOffPanel({
         <Icon name="clock" size="lg" />
         <div>
           <strong>已暂停：转账冷静期</strong>
-          <p>家属已收到确认请求。请不要转账，等家人确认。</p>
+          <p>家人已收到确认请求。请不要转账，等家人确认。</p>
         </div>
         <span className="yl-coolingCount">{seconds > 0 ? `${seconds}s` : "已结束"}</span>
       </div>
@@ -62,11 +62,11 @@ function CoolingOffPanel({
           取消转账
         </button>
         <button type="button" className="btn" disabled={busy} onClick={() => onRespond("continue")}>
-          仍要继续（通知家属）
+          仍要继续（通知家人）
         </button>
       </div>
       <div className="yl-coolingMeta">
-        状态：{cooling.coolingOff.status} · 家属确认：{cooling.familyConfirm.status}
+        状态：{cooling.coolingOff.status} · 家人确认：{cooling.familyConfirm.status}
       </div>
     </div>
   );
@@ -148,7 +148,7 @@ export function ScamCheckPage() {
       setCooling({ coolingOff: res.coolingOff, familyConfirm: res.familyConfirm });
       toast.push({
         kind: "ok",
-        title: "已通知家属",
+        title: "已通知家人",
         detail: "请先不要转账，等家人确认。"
       });
     } catch (err) {
@@ -170,8 +170,8 @@ export function ScamCheckPage() {
       setCooling({ ...cooling, coolingOff: res.coolingOff });
       toast.push({
         kind: action === "cancel" ? "ok" : "normal",
-        title: action === "cancel" ? "已取消转账" : "已通知家属继续确认",
-        detail: action === "cancel" ? "这一步做得对。" : "家属会收到确认请求。"
+        title: action === "cancel" ? "已取消转账" : "已通知家人继续确认",
+        detail: action === "cancel" ? "这一步做得对。" : "家人会收到确认请求。"
       });
     } catch (err) {
       toast.push({
@@ -319,7 +319,7 @@ export function ScamCheckPage() {
             <div className="yl-coolingCta">
               <div>
                 <strong>先别转账</strong>
-                <p>我可以帮您暂停 60 秒，并通知家属一起确认。</p>
+                <p>我可以帮您暂停 60 秒，并通知家人一起确认。</p>
               </div>
               <button type="button" className="btn btnDanger" disabled={coolingBusy} onClick={() => void startCoolingOff()}>
                 {coolingBusy ? "正在通知…" : "启动转账冷静期"}

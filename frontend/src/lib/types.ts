@@ -13,7 +13,28 @@ export type MeResponse = {
     birthYear: number | null;
     gender: string | null;
   } | null;
-  familyLinks: { elderId: string; relation: string | null }[];
+  familyLinks: { elderId: string; elderName: string; relation: string | null }[];
+};
+
+export type AuthMeta = {
+  demoMode: boolean;
+  demoFamilyCode: string | null;
+};
+
+export type FamilyInvite = {
+  code: string;
+  expiresAt: number;
+};
+
+export type CreateElderResponse = {
+  ok: true;
+  elder: {
+    id: string;
+    displayName: string;
+    birthYear: number | null;
+    gender: string | null;
+  };
+  invite: FamilyInvite;
 };
 
 export type MemoryItem = {
@@ -457,5 +478,91 @@ export type RoleplayReport = {
   advice: string[];
   nextSteps: string[];
   transcript: RoleplayMessage[];
+  disclaimer: string;
+};
+
+export type HealthProfile = {
+  elderId: string;
+  conditions: string[];
+  allergies: string[];
+  dietNotes: string | null;
+  homeAddress: string | null;
+  updatedAt: number;
+};
+
+export type DietSource = { title: string; url?: string };
+
+export type DietMeal = {
+  meal: "早餐" | "午餐" | "晚餐";
+  dishes: string[];
+  reason: string;
+};
+
+export type DietPlan = {
+  headline: string;
+  encouragement: string;
+  meals: DietMeal[];
+  avoid: { food: string; reason: string }[];
+  medicationCautions: { medication: string; food: string; advice: string }[];
+  hydration: string;
+  questions: string[];
+  sources: DietSource[];
+  personalNote?: string;
+  engine: "rules" | "rules+llm";
+  model: string;
+};
+
+export type DietCheckResult = {
+  verdict: "avoid" | "limit" | "ok" | "unknown";
+  hits: {
+    id: string;
+    verdict: "avoid" | "limit" | "ok";
+    food: string;
+    title: string;
+    reason: string;
+    advice: string;
+    source: DietSource;
+  }[];
+  headline: string;
+  advice: string;
+  alternatives: string[];
+  questions: string[];
+  sources: DietSource[];
+  engine: "rules" | "rules+llm";
+  model: string;
+};
+
+export type MedicationSafety = {
+  warnings: {
+    id: string;
+    level: "avoid" | "caution" | "info";
+    title: string;
+    detail: string;
+    drugs: string[];
+    foods?: string[];
+    source: { title: string; url?: string };
+  }[];
+  foodCautions: {
+    medication: string;
+    food: string;
+    level: "avoid" | "caution" | "info";
+    advice: string;
+    source: { title: string; url?: string };
+  }[];
+  missedDose: string[];
+  disclaimer: string;
+};
+
+export type HelpHomeCard = {
+  homeName: string;
+  address: string;
+  distanceMeters: number | null;
+  direction: string | null;
+  walkMinutes: number | null;
+  steps: string[];
+  familyPhone: string | null;
+  familyRelation: string | null;
+  lastLocation: { lat: number; lng: number; ts: number } | null;
+  spoken: string;
   disclaimer: string;
 };

@@ -1,6 +1,6 @@
 import React from "react";
 import { useApi } from "../state/api.js";
-import { startRecognizeZhBuffered, asrErrorZh, asrStatusZh, type AsrStatus } from "../voice/asr.js";
+import { startRecognizeZhBuffered, asrErrorZh, asrStatusZh, AsrError, type AsrStatus } from "../voice/asr.js";
 import { unlockTtsInGesture } from "../voice/tts.js";
 
 export function CompanionPage() {
@@ -44,7 +44,9 @@ export function CompanionPage() {
                 stopRef.current = null;
                 setText(spoken);
               } catch (err) {
-                setError(asrErrorZh(err));
+                if (!(err instanceof AsrError && err.code === "aborted")) {
+                  setError(asrErrorZh(err));
+                }
               } finally {
                 setListeningText(null);
                 setStatus(null);

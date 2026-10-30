@@ -2,6 +2,7 @@ import React from "react";
 import type { AppEvent, SafetyAlertSnapshot } from "@eha/shared";
 import { useAuth } from "./auth.js";
 import { useToast } from "./toast.js";
+import { announce, speakNow } from "../voice/tts.js";
 
 type ConnectionState = "idle" | "connecting" | "online" | "offline";
 
@@ -61,13 +62,24 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
   const notify = React.useCallback(
     (event: AppEvent) => {
       switch (event.type) {
-        case "safety.alert":
+        case "safety.alert": {
           if (role === "family" && event.payload.alert.type === "cooling_off") break;
+          const detail = alertDetail(event.payload.alert);
           toast.push({
             kind: "danger",
             title: "安全提醒",
-            detail: alertDetail(event.payload.alert)
+            detail
           });
+          if (role === "elder") announce(`安全提醒：${detail}`);
+          break;
+        }
+        case "fall.detected":
+          toast.push({ kind: "danger", title: "检测到跌倒风险", detail: "请确认是否需要帮助" });
+          if (role === "elder") speakNow("检测到跌倒风险，请确认是否需要帮助。");
+          break;
+        case "reminder.due":
+          toast.push({ kind: "ok", title: "智能提醒", detail: event.payload.title });
+          if (role === "elder") announce(`提醒您：${event.payload.title}`);
           break;
         case "safety.alert.updated":
           if (event.payload.alert.status !== "open") {
@@ -87,7 +99,7 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
           if (role === "elder") {
             toast.push({
               kind: "normal",
-              title: "家属已处理确认",
+              title: "家人已处理确认",
               detail: "请查看结果，先不要急着转账。"
             });
           }
@@ -98,23 +110,41 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
             title: "紧急呼救已触发",
             detail: event.payload.reason
           });
+          if (role === "elder") speakNow("已触发紧急呼救，家人会尽快联系您。");
+          break;
+        case "companion.command":
+          if (
+            role === "elder" &&
+            event.payload.for === "elder" &&
+            typeof event.payload.content === "string" &&
+            event.payload.content.trim() !== ""
+          ) {
+            toast.push({ kind: "ok", title: "收到陪伴消息", detail: event.payload.content });
+            announce(event.payload.content);
+          }
           break;
         case "family.message":
           if (role === "family") {
             toast.push({
               kind: "normal",
               title: "长辈给您发了消息",
-              detail: "已收到老人的留言，下方可查看。"
+              detail: "已收到长辈的留言，下方可查看。"
             });
+            if (typeof event.payload.content === "string" && event.payload.content.trim() !== "") {
+              announce(`长辈给您留言：${event.payload.content}`);
+            }
           }
           break;
         case "elder.message":
           if (role === "elder") {
             toast.push({
               kind: "normal",
-              title: "家属给您发了消息",
-              detail: "已收到家属的留言，下方可查看。"
+              title: "家人给您发了消息",
+              detail: "已收到家人的留言，下方可查看。"
             });
+            if (typeof event.payload.content === "string" && event.payload.content.trim() !== "") {
+              announce(`家人给您留言：${event.payload.content}`);
+            }
           }
           break;
         default:

@@ -1,6 +1,7 @@
 import React from "react";
 import { ChatPanel } from "./ChatPanel.js";
-import { stopSpeaking, isTtsSupported, unlockTtsInGesture, announce, setTtsEnabled } from "../voice/tts.js";
+import { stopSpeaking, isTtsSupported, unlockTtsInGesture, announce } from "../voice/tts.js";
+import { useA11y } from "../state/a11y.js";
 import "./assistant.css";
 
 /* 打开时的语音问候（每次随机、尽量不重复，并区分白天/夜晚） */
@@ -33,7 +34,6 @@ function pickGreeting(lastRef: React.MutableRefObject<number | null>): string {
 }
 
 const STORAGE_KEY = "yl-jasmine-pos";
-const MUTE_KEY = "yl-jasmine-muted";
 const BADGE = 76;
 
 /* 水韵江苏 · 拟人态茉莉花形象（动漫风）
@@ -152,13 +152,8 @@ export function FloatingAssistant() {
   const [pos, setPos] = React.useState<{ x: number; y: number } | null>(null);
   const [open, setOpen] = React.useState(false);
   const [showHint, setShowHint] = React.useState(false);
-  const [muted, setMuted] = React.useState<boolean>(() => {
-    try {
-      return localStorage.getItem(MUTE_KEY) === "1";
-    } catch {
-      return false;
-    }
-  });
+  const { voiceEnabled, toggleVoice } = useA11y();
+  const muted = !voiceEnabled;
   const badgeRef = React.useRef<HTMLButtonElement>(null);
   const drag = React.useRef<{ sx: number; sy: number; ox: number; oy: number; moved: boolean } | null>(null);
   const lastGreetingRef = React.useRef<number | null>(null);
@@ -197,17 +192,7 @@ export function FloatingAssistant() {
     if (open) setShowHint(false);
   }, [open]);
 
-  // 静音开关：同步到语音引擎总开关并持久化
-  React.useEffect(() => {
-    setTtsEnabled(!muted);
-    try {
-      localStorage.setItem(MUTE_KEY, muted ? "1" : "0");
-    } catch {
-      /* ignore */
-    }
-  }, [muted]);
-
-  // 打开时语音播报（每次随机、尽量不重复，受静音开关控制）；关闭时停止播报
+  // 打开时语音播报（每次随机、尽量不重复，受全局语音开关控制）；关闭时停止播报
   React.useEffect(() => {
     if (open) {
       if (isTtsSupported()) announce(pickGreeting(lastGreetingRef));
@@ -275,7 +260,7 @@ export function FloatingAssistant() {
             <ChatPanel
               variant="float"
               muted={muted}
-              onToggleMute={() => setMuted((m) => !m)}
+              onToggleMute={toggleVoice}
               onClose={() => setOpen(false)}
             />
           </div>

@@ -48,6 +48,8 @@ import {
   Square,
   Download,
   Copy,
+  GlassWater,
+  Heart,
   type LucideIcon,
 } from "lucide-react";
 
@@ -104,6 +106,8 @@ const REGISTRY = {
   stop: Square,
   download: Download,
   copy: Copy,
+  glass: GlassWater,
+  heart: Heart,
 } as const;
 
 export type IconName = keyof typeof REGISTRY;

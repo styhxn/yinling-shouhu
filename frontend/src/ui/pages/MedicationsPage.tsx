@@ -2,8 +2,9 @@ import React from "react";
 import { Link } from "react-router-dom";
 import { Icon } from "../components/Icon.js";
 import { api } from "../../lib/api.js";
-import type { Medication, MedicationLog, MedicationScanResult } from "../../lib/types.js";
+import type { Medication, MedicationLog, MedicationSafety, MedicationScanResult } from "../../lib/types.js";
 import { useToast } from "../state/toast.js";
+import "./care.css";
 
 type Dose = {
   medication: Medication;
@@ -18,6 +19,7 @@ export function MedicationsPage() {
   const [due, setDue] = React.useState(0);
   const [taken, setTaken] = React.useState(0);
   const [adherence, setAdherence] = React.useState<number | null>(null);
+  const [safety, setSafety] = React.useState<MedicationSafety | null>(null);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
   const [busyId, setBusyId] = React.useState<string | null>(null);
@@ -36,6 +38,7 @@ export function MedicationsPage() {
       setDue(res.dueToday);
       setTaken(res.takenToday);
       setAdherence(res.adherencePct);
+      setSafety(res.safety ?? null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "加载失败");
     } finally {
@@ -146,7 +149,7 @@ export function MedicationsPage() {
           <h1>今天的药</h1>
           <p>按计划记录服药。拿不准的药，先问医生或药师，再拍照留档。</p>
         </div>
-        <Link to="/elder" className="btn">返回今日</Link>
+        <Link to="/elder" className="btn">返回陪伴屏</Link>
       </section>
 
       <section className="ys-medLayout">
@@ -163,6 +166,36 @@ export function MedicationsPage() {
               <small>{adherence === null ? "从今天开始记录" : "按今日记录计算"}</small>
             </div>
           </div>
+
+          {safety && safety.warnings.length > 0 && (
+            <section className="ys-medSafety">
+              <div className="ys-medSafetyHead">
+                <span className="ys-kicker">用药提醒</span>
+                <h2>吃药时注意这些</h2>
+              </div>
+              <div className="ys-medSafetyList">
+                {safety.warnings.slice(0, 4).map((warning) => (
+                  <article
+                    key={`${warning.id}_${warning.drugs.join("_")}`}
+                    className={`ys-medSafetyItem ys-medSafetyItem--${warning.level}`}
+                  >
+                    <strong>{warning.title}</strong>
+                    <p>{warning.detail}</p>
+                    <small>依据：{warning.source.title}</small>
+                  </article>
+                ))}
+              </div>
+              {safety.missedDose.length > 0 && (
+                <details className="ys-medMissed">
+                  <summary>漏服了怎么办？点开看</summary>
+                  <ul>
+                    {safety.missedDose.map((item) => <li key={item}>{item}</li>)}
+                  </ul>
+                </details>
+              )}
+              <p className="ys-finePrint">{safety.disclaimer}</p>
+            </section>
+          )}
 
           {loading ? (
             <p className="ys-mutedText">正在读取用药计划…</p>

@@ -48,7 +48,7 @@ const RELATION_LABELS: Record<string, string> = {
 };
 
 function relationLabel(r: string | null): string {
-  if (!r) return "家属";
+  if (!r) return "家人";
   return RELATION_LABELS[r] ?? r;
 }
 
@@ -244,7 +244,7 @@ export function ElderHomeFeatures({ brief }: { brief?: AgentBrief | null }) {
       if (okCount > 0) {
         toast.push({
           kind: "ok",
-          title: `已通知 ${okCount} 位家属`,
+          title: `已通知 ${okCount} 位家人`,
           detail: "消息已送到他们的账号。"
         });
       } else {
@@ -289,13 +289,13 @@ export function ElderHomeFeatures({ brief }: { brief?: AgentBrief | null }) {
           </button>
         </div>
 
-        {/* 一键联系家属（替代拨打电话：给家属账号发消息） */}
+        {/* 一键联系家人（替代拨打电话：给家人账号发消息） */}
         <div className="ys-featureCard ys-featureCard--sos">
           <span className="ys-featureIcon">
             <Icon name="message" size="lg" />
           </span>
           <div>
-            <h3>一键联系家属</h3>
+            <h3>一键联系家人</h3>
             <p>不方便打电话，就给家人的账号发条消息。</p>
           </div>
           <button
@@ -303,7 +303,7 @@ export function ElderHomeFeatures({ brief }: { brief?: AgentBrief | null }) {
             className="btn btnDanger ys-featureAction"
             onClick={() => setMsgOpen(true)}
           >
-            发消息给家属
+            发消息给家人
           </button>
         </div>
 
@@ -381,7 +381,7 @@ export function ElderHomeFeatures({ brief }: { brief?: AgentBrief | null }) {
             <Icon name="phone" size="lg" />
           </span>
           <h3>常用电话与联系人</h3>
-          <p>家属留下的电话、附近的医院药店，点开就能看。</p>
+          <p>家人留下的电话、附近的医院药店，点开就能看。</p>
           <button
             type="button"
             className="btn ys-featureAction"
@@ -409,9 +409,9 @@ export function ElderHomeFeatures({ brief }: { brief?: AgentBrief | null }) {
         </div>
       </div>
 
-      {/* 家属的留言（收件箱）：展示家属发来的站内消息 */}
-      <section className="ys-featureSection" aria-label="家属的留言">
-        <h2 className="ys-featureTitle">家属的留言</h2>
+      {/* 家人的留言（收件箱）：展示家人发来的站内消息 */}
+      <section className="ys-featureSection" aria-label="家人的留言">
+        <h2 className="ys-featureTitle">家人的留言</h2>
         <p className="ys-featureSub">家人给您发的消息都在这里，新的会标“新”。</p>
         {inboxLoading ? (
           <p className="ys-mutedText">正在读取留言…</p>
@@ -446,13 +446,13 @@ export function ElderHomeFeatures({ brief }: { brief?: AgentBrief | null }) {
         )}
       </section>
 
-      {/* 弹窗一：给家属发消息 */}
+      {/* 弹窗一：给家人发消息 */}
       {msgOpen && (
         <div
           className="yl-modalOverlay"
           role="dialog"
           aria-modal="true"
-          aria-label="给家属发消息"
+          aria-label="给家人发消息"
           onPointerDown={(e) => {
             if (e.target === e.currentTarget) setMsgOpen(false);
           }}
@@ -462,25 +462,25 @@ export function ElderHomeFeatures({ brief }: { brief?: AgentBrief | null }) {
               <span className="ys-modalHeadIcon">
                 <Icon name="message" size="lg" />
               </span>
-              <h2>给家属发消息</h2>
+              <h2>给家人发消息</h2>
             </div>
             <p className="ys-contactHint">
-              网页不能直接打电话，这里把消息送到家属的账号，TA 登录就能看到。
+              网页不能直接打电话，这里把消息送到家人的账号，TA 登录就能看到。
             </p>
 
-            <h3 className="ys-contactSub">想对家属说的话</h3>
+            <h3 className="ys-contactSub">想对家人说的话</h3>
             <textarea
               className="input ys-msgInput"
               value={msgText}
               maxLength={500}
               rows={4}
               onChange={(e) => setMsgText(e.target.value)}
-              aria-label="想对家属说的话"
+              aria-label="想对家人说的话"
             />
 
-            <h3 className="ys-contactSub">选择要发送的家属</h3>
+            <h3 className="ys-contactSub">选择要发送的家人</h3>
             {membersLoaded && members.length === 0 && (
-              <p className="ys-contactEmpty">暂未关联家属账号。</p>
+              <p className="ys-contactEmpty">暂未关联家人账号。</p>
             )}
             <div className="ys-contactList">
               {members.map((m) => (
@@ -507,7 +507,7 @@ export function ElderHomeFeatures({ brief }: { brief?: AgentBrief | null }) {
                 disabled={sendingTo !== null}
                 onClick={() => void sendToAll()}
               >
-                {sendingTo === "__all__" ? "发送中…" : "一键通知全部家属"}
+                {sendingTo === "__all__" ? "发送中…" : "一键通知全部家人"}
               </button>
             )}
 
@@ -540,7 +540,7 @@ export function ElderHomeFeatures({ brief }: { brief?: AgentBrief | null }) {
               网页不能直接拨号，号码可复制后手动拨打。
             </p>
 
-            <h3 className="ys-contactSub">家属联系电话</h3>
+            <h3 className="ys-contactSub">家人联系电话</h3>
             <ul className="ys-phoneList">
               {membersLoaded && members.length === 0 && (
                 <li className="ys-phoneEmpty">暂未留下联系电话。</li>

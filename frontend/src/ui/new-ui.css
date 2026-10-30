@@ -362,7 +362,7 @@
   font-size: 0.75rem;
 }
 
-/* ---------- 长者首页 ---------- */
+/* ---------- 长辈首页 ---------- */
 .yl-hello {
   display: flex;
   justify-content: space-between;
@@ -624,7 +624,8 @@
   flex-direction: column;
   gap: 14px;
   height: calc(100vh - 130px);
-  min-height: 560px;
+  height: calc(100dvh - 130px);
+  min-height: 0;
 }
 
 .yl-chatHeader {
@@ -632,6 +633,7 @@
   justify-content: space-between;
   align-items: flex-start;
   gap: 16px;
+  flex-shrink: 0;
 }
 
 .yl-chatHeader h1 {
@@ -647,7 +649,10 @@
 
 .yl-chatList {
   flex: 1;
+  min-height: 0;
   overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
   display: flex;
   flex-direction: column;
   gap: 14px;
@@ -876,6 +881,7 @@ a.yl-citationChip:hover {
   display: flex;
   align-items: center;
   gap: 8px;
+  flex-shrink: 0;
 }
 
 .yl-composer .input {
@@ -1280,6 +1286,19 @@ a.yl-citationChip:hover {
   margin: 0;
   font-size: 1.35rem;
   line-height: 1.5;
+}
+
+.yl-interviewQuestionBody {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.yl-interviewReplay {
+  min-height: 40px;
+  padding: 6px 14px;
+  font-size: 14px;
 }
 
 .yl-textarea {
@@ -1715,7 +1734,7 @@ a.yl-citationChip:hover {
   line-height: 1.5;
 }
 
-/* ---------- 家属 ---------- */
+/* ---------- 家人 ---------- */
 .yl-summaryGrid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));

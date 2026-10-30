@@ -1,0 +1,837 @@
+/* 饮食、用药安全与一键回家页面 */
+
+.ys-dietPage,
+.ys-helpPage {
+  width: min(1120px, 100%);
+  margin: 0 auto;
+}
+
+.ys-dietProfileBar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 14px 18px;
+  margin: 18px 0;
+  border-radius: 16px;
+  border: 1px solid rgba(55, 82, 70, 0.12);
+  background: rgba(255, 255, 255, 0.66);
+}
+
+.ys-dietCondition {
+  padding: 5px 12px;
+  border-radius: 999px;
+  background: #e8efe6;
+  color: #3f6a53;
+  font-size: 14px;
+}
+
+.ys-dietCondition--danger {
+  background: #f7e6e0;
+  color: #9a4031;
+}
+
+.ys-dietProfileLink {
+  margin-left: auto;
+  color: #84928a;
+  font-size: 13px;
+}
+
+.ys-dietLoading,
+.ys-dietError {
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+  padding: 64px 24px;
+  margin-top: 20px;
+  border-radius: 24px;
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid rgba(55, 82, 70, 0.12);
+  text-align: center;
+}
+
+.ys-dietLoading strong,
+.ys-dietError strong {
+  font-size: 22px;
+  color: #2f443a;
+}
+
+.ys-dietLoading p,
+.ys-dietError p {
+  margin: 0;
+  color: #7c8a82;
+  font-size: 15px;
+}
+
+.ys-dietError {
+  color: #8a3d31;
+}
+
+.ys-dietHero {
+  display: grid;
+  grid-template-columns: minmax(0, 1.7fr) minmax(220px, 0.8fr);
+  gap: 20px;
+  padding: 28px;
+  border-radius: 26px;
+  background:
+    radial-gradient(600px 260px at 0% 0%, rgba(228, 238, 224, 0.9), transparent 70%),
+    linear-gradient(150deg, #fffdf7, #f3f6ef);
+  border: 1px solid rgba(55, 82, 70, 0.12);
+  box-shadow: 0 14px 36px rgba(43, 58, 48, 0.07);
+}
+
+.ys-dietHeroMain h2 {
+  margin: 16px 0 10px;
+  font-family: "Songti SC", "STSong", "SimSun", serif;
+  font-size: clamp(28px, 3vw, 38px);
+  line-height: 1.32;
+  font-weight: 600;
+  color: #24382e;
+}
+
+.ys-dietHeroMain > p {
+  margin: 0;
+  color: #5d6e64;
+  font-size: 17px;
+  line-height: 1.7;
+}
+
+.ys-dietPersonal {
+  display: inline-flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-top: 14px !important;
+  padding: 10px 14px;
+  border-radius: 14px;
+  background: #fbf2df;
+  color: #7c5a22 !important;
+  font-size: 15px !important;
+}
+
+.ys-dietActions {
+  display: flex;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.ys-dietHydration {
+  padding: 20px;
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid rgba(55, 82, 70, 0.1);
+  align-self: stretch;
+}
+
+.ys-dietHydration strong {
+  display: block;
+  margin: 10px 0 6px;
+  font-size: 18px;
+}
+
+.ys-dietHydration p {
+  margin: 0;
+  color: #6e7d74;
+  font-size: 15px;
+  line-height: 1.6;
+}
+
+.ys-dietMeals {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+  margin-top: 18px;
+}
+
+.ys-dietMeal {
+  padding: 20px;
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.8);
+  border: 1px solid rgba(55, 82, 70, 0.12);
+}
+
+.ys-dietMealHead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid rgba(55, 82, 70, 0.1);
+}
+
+.ys-dietMealHead span {
+  font-family: "Songti SC", "STSong", "SimSun", serif;
+  font-size: 24px;
+  color: #2f4a3d;
+}
+
+.ys-dietMealHead small {
+  color: #8a978f;
+  font-size: 13px;
+}
+
+.ys-dietDishes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 14px 0 10px;
+}
+
+.ys-dietDish {
+  padding: 7px 12px;
+  border-radius: 10px;
+  background: #eef3ea;
+  color: #3f5a4a;
+  font-size: 16px;
+}
+
+.ys-dietMeal p {
+  margin: 0;
+  color: #77857c;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.ys-dietColumns {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-top: 18px;
+}
+
+.ys-dietCard {
+  padding: 20px;
+  border-radius: 20px;
+  border: 1px solid rgba(55, 82, 70, 0.12);
+  background: rgba(255, 255, 255, 0.78);
+}
+
+.ys-dietCard--warn {
+  border-left: 4px solid #b4644f;
+}
+
+.ys-dietCard--med {
+  border-left: 4px solid #8a7a3f;
+}
+
+.ys-dietCard ul {
+  list-style: none;
+  margin: 12px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 10px;
+}
+
+.ys-dietCard li {
+  display: grid;
+  gap: 3px;
+  padding-bottom: 10px;
+  border-bottom: 1px dashed rgba(55, 82, 70, 0.12);
+}
+
+.ys-dietCard li:last-child {
+  border-bottom: 0;
+  padding-bottom: 0;
+}
+
+.ys-dietCard li strong {
+  font-size: 16px;
+  color: #354d41;
+}
+
+.ys-dietCard li span {
+  color: #75837a;
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+.ys-dietAsk {
+  margin-top: 18px;
+  padding: 24px;
+  border-radius: 24px;
+  background: #fffdf8;
+  border: 1px solid rgba(55, 82, 70, 0.12);
+  box-shadow: 0 12px 32px rgba(43, 58, 48, 0.06);
+}
+
+.ys-dietAskHead {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  color: #4a6a59;
+}
+
+.ys-dietAskHead h2 {
+  margin: 6px 0 6px;
+  font-family: "Songti SC", "STSong", "SimSun", serif;
+  font-size: 30px;
+  color: #263a30;
+}
+
+.ys-dietAskHead p {
+  margin: 0;
+  color: #74827a;
+  font-size: 15px;
+}
+
+.ys-dietAskBar {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.ys-dietAskBar .input {
+  min-height: 52px;
+  font-size: 17px;
+}
+
+.ys-dietAskBar .btn {
+  min-height: 52px;
+  font-size: 16px;
+  white-space: nowrap;
+}
+
+.ys-dietQuick {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.ys-dietQuickBtn {
+  padding: 7px 14px;
+  border-radius: 999px;
+  border: 1px solid rgba(55, 82, 70, 0.18);
+  background: transparent;
+  color: #52685c;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.ys-dietQuickBtn:hover {
+  background: #eef3ea;
+}
+
+.ys-dietResult {
+  margin-top: 18px;
+  padding: 20px;
+  border-radius: 18px;
+  border-left: 5px solid #8a978f;
+  background: #f7f8f4;
+}
+
+.ys-dietResult--avoid {
+  border-left-color: #a84432;
+  background: #fcf2ef;
+}
+
+.ys-dietResult--limit {
+  border-left-color: #b07a2c;
+  background: #fdf7ea;
+}
+
+.ys-dietResult--ok {
+  border-left-color: #3f7a57;
+  background: #f0f7f1;
+}
+
+.ys-dietResultHead {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.ys-dietVerdict {
+  padding: 5px 12px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.72);
+  font-size: 14px;
+  color: #4a5a51;
+}
+
+.ys-dietResult--avoid .ys-dietVerdict { color: #9a4031; }
+.ys-dietResult--limit .ys-dietVerdict { color: #8a6325; }
+.ys-dietResult--ok .ys-dietVerdict { color: #3f7a57; }
+
+.ys-dietResultHead h3 {
+  flex: 1;
+  margin: 0;
+  font-size: 23px;
+  line-height: 1.4;
+  color: #2b3d33;
+}
+
+.ys-dietEngine {
+  color: #8a978f;
+  font-size: 12px;
+}
+
+.ys-dietResult > p {
+  margin: 12px 0 0;
+  font-size: 16px;
+  line-height: 1.7;
+  color: #4f6157;
+}
+
+.ys-dietAlternatives {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 14px;
+  font-size: 14px;
+  color: #718077;
+}
+
+.ys-dietAlternative {
+  padding: 5px 10px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.75);
+  color: #47604f;
+}
+
+.ys-dietReasons {
+  margin-top: 14px;
+  color: #65756b;
+  font-size: 14px;
+}
+
+.ys-dietReasons summary {
+  cursor: pointer;
+  color: #51685b;
+}
+
+.ys-dietReasons ul {
+  margin: 10px 0 0;
+  padding-left: 18px;
+  display: grid;
+  gap: 8px;
+}
+
+.ys-dietReasons li {
+  line-height: 1.55;
+}
+
+.ys-dietReasons li strong {
+  margin-right: 6px;
+}
+
+.ys-dietReasons li small {
+  display: block;
+  color: #93a097;
+  margin-top: 2px;
+}
+
+.ys-dietSources {
+  margin-top: 20px;
+}
+
+/* 用药安全 */
+.ys-medSafety {
+  margin: 18px 0;
+  padding: 20px;
+  border-radius: 20px;
+  background: #fffdf8;
+  border: 1px solid rgba(55, 82, 70, 0.12);
+}
+
+.ys-medSafetyHead h2 {
+  margin: 6px 0 14px;
+  font-family: "Songti SC", "STSong", "SimSun", serif;
+  font-size: 26px;
+  color: #2e4338;
+}
+
+.ys-medSafetyList {
+  display: grid;
+  gap: 10px;
+}
+
+.ys-medSafetyItem {
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: #f8f7f1;
+  border-left: 4px solid #b07a2c;
+}
+
+.ys-medSafetyItem--avoid {
+  border-left-color: #a84432;
+  background: #fcf2ef;
+}
+
+.ys-medSafetyItem--info {
+  border-left-color: #5b7d92;
+}
+
+.ys-medSafetyItem strong {
+  display: block;
+  font-size: 16px;
+  color: #35493e;
+  margin-bottom: 4px;
+}
+
+.ys-medSafetyItem p {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.6;
+  color: #62736a;
+}
+
+.ys-medSafetyItem small {
+  display: block;
+  margin-top: 6px;
+  font-size: 12px;
+  color: #93a097;
+}
+
+.ys-medMissed {
+  margin-top: 12px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: #f2f5ef;
+  color: #566a5f;
+  font-size: 14px;
+}
+
+.ys-medMissed summary {
+  cursor: pointer;
+  color: #45604f;
+}
+
+.ys-medMissed ul {
+  margin: 10px 0 0;
+  padding-left: 18px;
+  display: grid;
+  gap: 6px;
+  line-height: 1.6;
+}
+
+/* 一键回家 */
+.ys-helpStart {
+  display: grid;
+  justify-items: center;
+  gap: 14px;
+  padding: 48px 24px;
+  margin-top: 20px;
+  border-radius: 28px;
+  background:
+    radial-gradient(600px 260px at 50% 0%, rgba(247, 230, 224, 0.8), transparent 70%),
+    #fffdf8;
+  border: 1px solid rgba(55, 82, 70, 0.12);
+  text-align: center;
+}
+
+.ys-helpStartIcon {
+  display: grid;
+  place-items: center;
+  width: 76px;
+  height: 76px;
+  border-radius: 50%;
+  background: #f7e6e0;
+  color: #9a4031;
+}
+
+.ys-helpStart h2 {
+  margin: 6px 0 0;
+  font-family: "Songti SC", "STSong", "SimSun", serif;
+  font-size: clamp(28px, 3vw, 36px);
+  color: #2c3d33;
+}
+
+.ys-helpStart > p {
+  margin: 0;
+  color: #75837a;
+  font-size: 17px;
+}
+
+.ys-helpBigBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  width: min(520px, 100%);
+  min-height: 76px;
+  margin-top: 10px;
+  border: 0;
+  border-radius: 20px;
+  background: linear-gradient(160deg, #a84432, #8c3b2e);
+  color: #fffdf8;
+  font-size: clamp(20px, 2.2vw, 24px);
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 18px 36px rgba(140, 59, 46, 0.26);
+}
+
+.ys-helpBigBtn:disabled {
+  opacity: 0.7;
+  cursor: default;
+}
+
+.ys-helpFallback {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 12px;
+  color: #75837a;
+  font-size: 15px;
+}
+
+.ys-helpError {
+  margin: 8px 0 0;
+  color: #9a4031;
+  font-size: 15px;
+}
+
+.ys-helpCard {
+  margin-top: 20px;
+  padding: 26px;
+  border-radius: 26px;
+  background: #fffdf8;
+  border: 1px solid rgba(55, 82, 70, 0.12);
+  box-shadow: 0 16px 40px rgba(43, 58, 48, 0.08);
+}
+
+.ys-helpCardTop {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.ys-helpNotified {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: #eaf3ec;
+  color: #3f7a57;
+  font-size: 14px;
+}
+
+.ys-helpTime {
+  color: #8a978f;
+  font-size: 13px;
+}
+
+.ys-helpAddress {
+  margin: 20px 0 16px;
+}
+
+.ys-helpAddress h2 {
+  margin: 8px 0 6px;
+  font-family: "Songti SC", "STSong", "SimSun", serif;
+  font-size: clamp(30px, 3.4vw, 44px);
+  line-height: 1.25;
+  color: #263a30;
+}
+
+.ys-helpAddress p {
+  margin: 0;
+  color: #7b8982;
+  font-size: 16px;
+}
+
+.ys-helpCompassRow {
+  display: flex;
+  align-items: center;
+  gap: 28px;
+  flex-wrap: wrap;
+  padding: 20px;
+  border-radius: 20px;
+  background: #f5f7f0;
+}
+
+.ys-helpCompass {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 150px;
+  height: 150px;
+  border-radius: 50%;
+  border: 1px dashed rgba(55, 82, 70, 0.28);
+}
+
+.ys-helpCompassNorth {
+  position: absolute;
+  top: 8px;
+  font-size: 13px;
+  color: #8a978f;
+}
+
+.ys-helpCompassArrow {
+  color: #8c3b2e;
+  transition: transform 0.4s ease;
+}
+
+.ys-helpCompassLabel {
+  position: absolute;
+  bottom: 14px;
+  font-size: 14px;
+  color: #566a5f;
+}
+
+.ys-helpDistance {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.ys-helpDistance strong {
+  font-family: "Songti SC", "STSong", "SimSun", serif;
+  font-size: clamp(46px, 6vw, 72px);
+  line-height: 1;
+  color: #8c3b2e;
+}
+
+.ys-helpDistance span {
+  font-size: 20px;
+  color: #8c3b2e;
+}
+
+.ys-helpDistance small {
+  flex-basis: 100%;
+  color: #7b8982;
+  font-size: 15px;
+}
+
+.ys-helpActions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-top: 20px;
+}
+
+.ys-helpCallBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 58px;
+  padding: 0 24px;
+  border-radius: 16px;
+  background: #3f5a50;
+  color: #fffdf8;
+  text-decoration: none;
+  font-size: 19px;
+  font-weight: 600;
+}
+
+.ys-helpNoPhone {
+  color: #9a4031;
+  font-size: 15px;
+}
+
+.ys-helpSteps {
+  margin-top: 20px;
+  padding: 24px;
+  border-radius: 24px;
+  background: #fffdf8;
+  border: 1px solid rgba(55, 82, 70, 0.12);
+}
+
+.ys-helpSteps h2 {
+  margin: 6px 0 14px;
+  font-family: "Songti SC", "STSong", "SimSun", serif;
+  font-size: 28px;
+  color: #2b3d33;
+}
+
+.ys-helpSteps ol {
+  margin: 0;
+  padding-left: 22px;
+  display: grid;
+  gap: 12px;
+  font-size: 18px;
+  line-height: 1.7;
+  color: #43574c;
+}
+
+@media (max-width: 900px) {
+  .ys-dietHero,
+  .ys-dietColumns {
+    grid-template-columns: 1fr;
+  }
+  .ys-dietMeals {
+    grid-template-columns: 1fr;
+  }
+  .ys-dietAskBar {
+    grid-template-columns: 1fr;
+  }
+  .ys-dietAskBar .btn {
+    width: 100%;
+  }
+}
+
+/* 家人健康档案 */
+.ys-healthProfile {
+  width: min(900px, 100%);
+  margin: 0 auto;
+}
+
+.ys-healthCard {
+  display: grid;
+  gap: 22px;
+  padding: 26px;
+  margin-top: 18px;
+  border-radius: 24px;
+  background: #fffdf8;
+  border: 1px solid rgba(55, 82, 70, 0.12);
+  box-shadow: 0 12px 32px rgba(43, 58, 48, 0.06);
+}
+
+.ys-healthField {
+  display: grid;
+  gap: 10px;
+}
+
+.ys-healthChips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.ys-healthChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 16px;
+  border-radius: 999px;
+  border: 1px solid rgba(55, 82, 70, 0.18);
+  background: #f7f8f3;
+  color: #566a5f;
+  font-size: 15px;
+  cursor: pointer;
+}
+
+.ys-healthChip.is-on {
+  background: #e8efe6;
+  border-color: rgba(63, 106, 83, 0.32);
+  color: #355a45;
+}
+
+.ys-healthTextarea {
+  width: 100%;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid rgba(55, 82, 70, 0.2);
+  background: #fff;
+  color: #2d3c33;
+  font-size: 16px;
+  line-height: 1.6;
+  font-family: inherit;
+  resize: vertical;
+}
+
+.ys-healthActions {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  padding-top: 6px;
+}

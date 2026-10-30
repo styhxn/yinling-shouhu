@@ -1,0 +1,162 @@
+.ys-authPage {
+  min-height: 100dvh;
+  display: grid;
+  place-items: center;
+  padding: clamp(20px, 5vw, 56px);
+  background:
+    radial-gradient(circle at 12% 8%, rgba(120, 154, 135, 0.18), transparent 34%),
+    radial-gradient(circle at 88% 84%, rgba(196, 164, 106, 0.14), transparent 38%),
+    var(--ys-bg, #f7f4ec);
+}
+
+.ys-authCard {
+  width: min(520px, 100%);
+  padding: clamp(24px, 5vw, 40px);
+  background: rgba(255, 255, 255, 0.84);
+  border: 1px solid var(--ys-line, #e5dfd0);
+  border-radius: 24px;
+  box-shadow: 0 24px 70px rgba(60, 54, 42, 0.1);
+}
+
+.ys-authBack {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--ys-muted, #777);
+  font-size: 13px;
+  text-decoration: none;
+  margin-bottom: 18px;
+}
+
+.ys-authKicker {
+  margin: 0 0 6px;
+  color: var(--ys-celadon-deep, #577f6a);
+  font-size: 12px;
+  letter-spacing: 0.16em;
+}
+
+.ys-authTitle {
+  margin: 0;
+  font-family: var(--ys-serif, serif);
+  font-size: clamp(26px, 5vw, 34px);
+  color: var(--ys-ink, #2f2a22);
+}
+
+.ys-authSub {
+  margin: 10px 0 24px;
+  color: var(--ys-muted, #777);
+  line-height: 1.7;
+}
+
+.ys-authForm {
+  display: grid;
+  gap: 16px;
+}
+
+.ys-authField {
+  display: grid;
+  gap: 7px;
+  color: var(--ys-ink-soft, #555);
+  font-size: 14px;
+}
+
+.ys-authField .input {
+  min-height: 48px;
+  font-size: 16px;
+}
+
+.ys-authCodeRow {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 10px;
+}
+
+.ys-authCodeRow .btn {
+  min-height: 48px;
+  white-space: nowrap;
+}
+
+.ys-authSubmit {
+  min-height: 52px;
+  font-size: 17px;
+}
+
+.ys-authHint {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: rgba(87, 127, 106, 0.1);
+  color: var(--ys-celadon-deep, #577f6a);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.ys-authError {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: rgba(180, 70, 60, 0.1);
+  color: #a33a31;
+  font-size: 13px;
+}
+
+.ys-authLinks {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 20px;
+  padding-top: 18px;
+  border-top: 1px solid var(--ys-line, #e5dfd0);
+  font-size: 13px;
+}
+
+.ys-authLinks a {
+  color: var(--ys-celadon-deep, #577f6a);
+}
+
+.ys-bindCode {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  margin: 18px 0;
+  font-family: var(--ys-serif, serif);
+  font-size: clamp(38px, 10vw, 58px);
+  letter-spacing: 0.16em;
+  color: var(--ys-ink, #2f2a22);
+}
+
+.ys-bindCode span {
+  min-width: 0.9em;
+  padding: 4px 0;
+  border-bottom: 2px solid var(--ys-line, #e5dfd0);
+  text-align: center;
+}
+
+.ys-inviteBox {
+  padding: 18px;
+  border: 1px dashed var(--ys-line, #e5dfd0);
+  border-radius: 16px;
+  background: rgba(247, 244, 236, 0.7);
+}
+
+.ys-inviteActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.ys-authSteps {
+  margin: 0;
+  padding-left: 20px;
+  color: var(--ys-muted, #777);
+  line-height: 1.9;
+  font-size: 14px;
+}
+
+@media (max-width: 560px) {
+  .ys-authCodeRow {
+    grid-template-columns: 1fr;
+  }
+}

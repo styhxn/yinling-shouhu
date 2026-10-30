@@ -135,7 +135,7 @@
   color: #15803d;
 }
 
-/* 联系家属 / 常用电话弹窗 */
+/* 联系家人 / 常用电话弹窗 */
 .ys-contactModal {
   max-width: 460px;
   text-align: left;
@@ -216,7 +216,7 @@
   color: var(--muted, #64748b);
 }
 
-/* 电话列表（家属电话 / 附近医院药店） */
+/* 电话列表（家人电话 / 附近医院药店） */
 .ys-phoneList {
   list-style: none;
   margin: 4px 0 0;

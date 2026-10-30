@@ -1,0 +1,496 @@
+/* 长辈陪伴屏：大字号、低密度、四个大按钮 + 一个语音主按钮 */
+
+.ys-kioskShell {
+  min-height: 100vh;
+}
+
+.ys-kiosk {
+  min-height: 100vh;
+  padding: 26px clamp(20px, 4vw, 56px) 32px;
+  color: #22322c;
+  background:
+    radial-gradient(1100px 520px at 12% -8%, rgba(214, 228, 215, 0.72), transparent 62%),
+    radial-gradient(900px 480px at 92% 4%, rgba(244, 224, 198, 0.6), transparent 60%),
+    linear-gradient(180deg, #fbf8f0 0%, #f3f5ee 48%, #eef1e9 100%);
+  font-family: "PingFang SC", "Microsoft YaHei", "Noto Sans SC", sans-serif;
+}
+
+.ys-kioskTop,
+.ys-kioskMain {
+  width: min(1280px, 100%);
+  margin: 0 auto;
+}
+
+.ys-kioskTop {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+}
+
+.ys-kioskBrand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.ys-kioskBrandMark {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  border: 1px solid #7d4134;
+  background:
+    radial-gradient(circle at 50% 42%, #fff7e8 0 28%, transparent 30%),
+    conic-gradient(from 20deg, #8f3f30, #b76048, #8f3f30);
+  box-shadow: inset 0 0 0 5px #fbf8f0;
+}
+
+.ys-kioskBrand strong {
+  display: block;
+  font-family: "Songti SC", "STSong", "SimSun", serif;
+  font-size: 22px;
+  letter-spacing: 0.08em;
+  font-weight: 600;
+}
+
+.ys-kioskBrand small {
+  display: block;
+  margin-top: 2px;
+  font-size: 12px;
+  color: #7b8982;
+  letter-spacing: 0.18em;
+}
+
+.ys-kioskStatus {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.7);
+  border: 1px solid rgba(55, 82, 70, 0.14);
+  color: #4f6a5d;
+  font-size: 14px;
+}
+
+.ys-kioskDot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #3f8f61;
+  box-shadow: 0 0 0 4px rgba(63, 143, 97, 0.14);
+}
+
+.ys-kioskSwitch {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 9px 14px;
+  border-radius: 999px;
+  border: 1px solid rgba(55, 82, 70, 0.2);
+  background: rgba(255, 255, 255, 0.6);
+  color: #4d5d55;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.ys-kioskMain {
+  padding-top: clamp(18px, 3vh, 34px);
+}
+
+.ys-kioskHello {
+  display: grid;
+  gap: 18px;
+}
+
+.ys-kioskClockRow {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 24px;
+}
+
+.ys-kioskDate {
+  margin: 0 0 6px;
+  font-size: 18px;
+  color: #74837a;
+  letter-spacing: 0.06em;
+}
+
+.ys-kioskHello h1 {
+  margin: 0;
+  font-family: "Songti SC", "STSong", "SimSun", serif;
+  font-size: clamp(34px, 4.2vw, 54px);
+  line-height: 1.15;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.ys-kioskClock {
+  font-family: "Songti SC", "STSong", "SimSun", serif;
+  font-size: clamp(42px, 6vw, 78px);
+  line-height: 1;
+  color: #33564a;
+  letter-spacing: 0.04em;
+  font-variant-numeric: tabular-nums;
+}
+
+.ys-kioskBrief {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  padding: 16px 20px;
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid rgba(55, 82, 70, 0.12);
+  box-shadow: 0 8px 26px rgba(43, 58, 48, 0.06);
+}
+
+.ys-kioskBriefBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: #e8efe6;
+  color: #3f6a53;
+  font-size: 14px;
+  white-space: nowrap;
+}
+
+.ys-kioskBrief p {
+  flex: 1 1 320px;
+  margin: 0;
+  font-size: clamp(19px, 2vw, 24px);
+  line-height: 1.55;
+  color: #2e3c35;
+}
+
+.ys-kioskBriefVoice {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 14px;
+  border-radius: 999px;
+  border: 1px solid rgba(55, 82, 70, 0.2);
+  background: transparent;
+  color: #3f5a4f;
+  font-size: 15px;
+  cursor: pointer;
+}
+
+.ys-kioskTalk {
+  display: grid;
+  justify-items: center;
+  gap: 14px;
+  margin: clamp(18px, 3.5vh, 40px) 0;
+}
+
+.ys-kioskTalkBtn {
+  position: relative;
+  width: clamp(210px, 19vw, 250px);
+  height: clamp(210px, 19vw, 250px);
+  border: 0;
+  border-radius: 50%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  color: #fffdf6;
+  background:
+    radial-gradient(circle at 50% 26%, rgba(255, 255, 255, 0.24), transparent 42%),
+    linear-gradient(160deg, #4f7d68 0%, #2f584a 100%);
+  box-shadow:
+    0 22px 50px rgba(38, 66, 55, 0.24),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.18);
+  cursor: pointer;
+  transition: transform 0.18s ease, box-shadow 0.18s ease;
+}
+
+.ys-kioskTalkBtn:hover {
+  transform: translateY(-2px);
+  box-shadow:
+    0 26px 60px rgba(38, 66, 55, 0.28),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.2);
+}
+
+.ys-kioskTalkBtn:active {
+  transform: scale(0.985);
+}
+
+.ys-kioskTalkRing {
+  position: absolute;
+  inset: -14px;
+  border-radius: 50%;
+  border: 1px solid rgba(63, 106, 83, 0.28);
+  animation: ysKioskPulse 2.8s ease-out infinite;
+}
+
+.ys-kioskTalkIcon {
+  display: grid;
+  place-items: center;
+  width: 74px;
+  height: 74px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.14);
+  border: 1px solid rgba(255, 255, 255, 0.26);
+}
+
+.ys-kioskTalkBtn strong {
+  font-size: clamp(21px, 1.8vw, 24px);
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+}
+
+.ys-kioskTalkBtn small {
+  font-size: 15px;
+  color: rgba(255, 253, 246, 0.78);
+}
+
+.ys-kioskTalkHint {
+  margin: 0;
+  text-align: center;
+  color: #76857c;
+  font-size: 15px;
+}
+
+@keyframes ysKioskPulse {
+  0% { transform: scale(0.96); opacity: 0.7; }
+  70% { transform: scale(1.08); opacity: 0; }
+  100% { transform: scale(1.08); opacity: 0; }
+}
+
+.ys-kioskGrid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 18px;
+}
+
+.ys-kioskTile {
+  min-height: 152px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 20px 20px 18px;
+  border-radius: 22px;
+  text-decoration: none;
+  color: #24332c;
+  background: rgba(255, 255, 255, 0.82);
+  border: 1px solid rgba(55, 82, 70, 0.12);
+  box-shadow: 0 10px 28px rgba(43, 58, 48, 0.06);
+  transition: transform 0.18s ease, box-shadow 0.18s ease;
+}
+
+.ys-kioskTile:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 16px 36px rgba(43, 58, 48, 0.1);
+}
+
+.ys-kioskTileIcon {
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  border-radius: 14px;
+  margin-bottom: 4px;
+}
+
+.ys-kioskTile--med .ys-kioskTileIcon { background: #e5efe6; color: #3d6b4f; }
+.ys-kioskTile--scam .ys-kioskTileIcon { background: #f7e6e0; color: #9a4031; }
+.ys-kioskTile--diet .ys-kioskTileIcon { background: #f7edd8; color: #8a6325; }
+.ys-kioskTile--home .ys-kioskTileIcon { background: #e4ebf2; color: #3d5d7a; }
+
+.ys-kioskTileKicker {
+  font-size: 14px;
+  color: #7b8982;
+  letter-spacing: 0.12em;
+}
+
+.ys-kioskTile strong {
+  font-size: clamp(20px, 1.7vw, 24px);
+  line-height: 1.35;
+  font-weight: 600;
+}
+
+.ys-kioskTile small {
+  font-size: 14px;
+  color: #7f8c84;
+  line-height: 1.4;
+}
+
+.ys-kioskFooter {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-top: 22px;
+  padding-top: 18px;
+  border-top: 1px solid rgba(55, 82, 70, 0.12);
+}
+
+.ys-kioskPeace {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 20px;
+  border-radius: 999px;
+  border: 1px solid rgba(55, 82, 70, 0.22);
+  background: #fffdf8;
+  color: #35564a;
+  font-size: 16px;
+  cursor: pointer;
+}
+
+.ys-kioskPeace.is-sent {
+  color: #3f7a57;
+  background: #edf5ee;
+  border-color: rgba(63, 122, 87, 0.22);
+}
+
+.ys-kioskFootLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 14px;
+  color: #5e7066;
+  text-decoration: none;
+  font-size: 15px;
+}
+
+.ys-kioskFootLink:last-child {
+  margin-left: auto;
+}
+
+/* 对话浮层 */
+.ys-kioskChatOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1600;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(24, 34, 29, 0.48);
+  backdrop-filter: blur(4px);
+}
+
+.ys-kioskChatCard {
+  width: min(980px, 96vw);
+  height: min(800px, 92vh);
+  border-radius: 26px;
+  overflow: hidden;
+  background: #fbfaf5;
+  box-shadow: 0 30px 80px rgba(15, 25, 20, 0.32);
+}
+
+.yl-chatPanel--kiosk {
+  height: 100%;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.yl-chatPanel--kiosk .yl-chatHeader {
+  padding: 22px 26px 16px;
+}
+
+.yl-chatPanel--kiosk .yl-chatHeader h1 {
+  font-family: "Songti SC", "STSong", "SimSun", serif;
+  font-size: 32px;
+}
+
+.yl-chatPanel--kiosk .yl-chatHeader p {
+  font-size: 17px;
+}
+
+.yl-chatPanel--kiosk .yl-chatEmpty strong {
+  font-size: 26px;
+}
+
+.yl-chatPanel--kiosk .yl-chatEmpty p,
+.yl-chatPanel--kiosk .yl-quickPrompt {
+  font-size: 18px;
+}
+
+.yl-chatPanel--kiosk .yl-chatList {
+  padding: 8px 26px;
+}
+
+.yl-chatPanel--kiosk .yl-bubble {
+  font-size: 19px;
+  line-height: 1.65;
+}
+
+.yl-chatPanel--kiosk .yl-composer {
+  padding: 16px 22px 20px;
+  gap: 10px;
+}
+
+.yl-chatPanel--kiosk .yl-composer .input {
+  font-size: 19px;
+  min-height: 54px;
+}
+
+.yl-chatPanel--kiosk .yl-composer .btn {
+  min-height: 54px;
+  font-size: 17px;
+  padding: 0 18px;
+}
+
+.yl-chatPanel--kiosk .yl-toolChip {
+  font-size: 15px;
+}
+
+@media (max-width: 980px) {
+  .ys-kioskGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .ys-kioskClock {
+    font-size: 54px;
+  }
+}
+
+@media (max-width: 620px) {
+  .ys-kiosk {
+    padding: 18px 16px 24px;
+  }
+  .ys-kioskTop {
+    flex-wrap: wrap;
+  }
+  .ys-kioskStatus {
+    order: 3;
+    margin-left: 0;
+  }
+  .ys-kioskClockRow {
+    align-items: flex-start;
+    flex-direction: column-reverse;
+    gap: 8px;
+  }
+  .ys-kioskHello h1 {
+    font-size: 32px;
+  }
+  .ys-kioskBrief {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+  .ys-kioskGrid {
+    grid-template-columns: 1fr;
+  }
+  .ys-kioskTalkBtn {
+    width: 170px;
+    height: 170px;
+  }
+  .ys-kioskFootLink:last-child {
+    margin-left: 0;
+  }
+  .ys-kioskChatOverlay {
+    padding: 0;
+  }
+  .ys-kioskChatCard {
+    width: 100vw;
+    height: 100vh;
+    border-radius: 0;
+  }
+}

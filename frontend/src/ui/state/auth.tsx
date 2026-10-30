@@ -7,6 +7,9 @@ type AuthState = {
   me: MeResponse | null;
   loading: boolean;
   login: (role: Role) => Promise<MeResponse>;
+  familyLogin: (phone: string, code: string, displayName?: string) => Promise<MeResponse>;
+  bindElder: (code: string) => Promise<MeResponse>;
+  switchElder: (elderId: string) => Promise<MeResponse>;
   logout: () => Promise<void>;
   refresh: () => Promise<MeResponse | null>;
 };
@@ -40,6 +43,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return next;
   }, []);
 
+  const familyLogin = React.useCallback(
+    async (phone: string, code: string, displayName?: string) => {
+      const next = await api.auth.familyLogin(phone, code, displayName);
+      setMe(next);
+      return next;
+    },
+    []
+  );
+
+  const bindElder = React.useCallback(async (code: string) => {
+    const next = await api.auth.bindElder(code);
+    setMe(next);
+    return next;
+  }, []);
+
+  const switchElder = React.useCallback(async (elderId: string) => {
+    const next = await api.auth.switchElder(elderId);
+    setMe(next);
+    return next;
+  }, []);
+
   const logout = React.useCallback(async () => {
     try {
       await api.auth.logout();
@@ -49,8 +73,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const value = React.useMemo(
-    () => ({ me, loading, login, logout, refresh }),
-    [me, loading, login, logout, refresh]
+    () => ({ me, loading, login, familyLogin, bindElder, switchElder, logout, refresh }),
+    [me, loading, login, familyLogin, bindElder, switchElder, logout, refresh]
   );
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;

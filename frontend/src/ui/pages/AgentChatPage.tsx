@@ -1,33 +1,16 @@
 import React from "react";
 import { ChatPanel } from "../components/ChatPanel.js";
-import { setTtsEnabled } from "../voice/tts.js";
-
-const MUTE_KEY = "yl-jasmine-muted";
+import { useA11y } from "../state/a11y.js";
 
 export function AgentChatPage() {
-  const [muted, setMuted] = React.useState<boolean>(() => {
-    try {
-      return localStorage.getItem(MUTE_KEY) === "1";
-    } catch {
-      return false;
-    }
-  });
-
-  React.useEffect(() => {
-    setTtsEnabled(!muted);
-    try {
-      localStorage.setItem(MUTE_KEY, muted ? "1" : "0");
-    } catch {
-      /* ignore */
-    }
-  }, [muted]);
+  const { voiceEnabled, toggleVoice } = useA11y();
 
   return (
     <div className="yl-chatPage">
       <ChatPanel
         variant="page"
-        muted={muted}
-        onToggleMute={() => setMuted((m) => !m)}
+        muted={!voiceEnabled}
+        onToggleMute={toggleVoice}
       />
     </div>
   );

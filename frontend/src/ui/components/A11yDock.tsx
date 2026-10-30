@@ -1,11 +1,19 @@
 import React from "react";
 import { Icon } from "./Icon.js";
 import { RATE_STEPS, useA11y } from "../state/a11y.js";
+import {
+  getTtsVoiceName,
+  listTtsVoices,
+  onTtsError,
+  setTtsVoice,
+  ttsErrorZh,
+  type TtsErrorCode
+} from "../voice/tts.js";
 
 /**
  * 无障碍工具条
  * -----------------------------------------------------------------------------
- * 固定在左下角的常驻控件，长者不需要进设置页即可：
+ * 固定在左下角的常驻控件，长辈不需要进设置页即可：
  *   放大 / 缩小字号、开关语音播报、调节语速、朗读当前页面。
  * 所有按钮触控区 ≥44px，字号与配色沿用「水韵江苏」纸感风格。
  */
@@ -21,10 +29,31 @@ export function A11yDock() {
     rate,
     setRate,
     readPage,
+    say,
     ttsSupported
   } = useA11y();
 
-  const [collapsed, setCollapsed] = React.useState(false);
+  const [collapsed, setCollapsed] = React.useState(true);
+  const [ttsError, setTtsError] = React.useState<TtsErrorCode | null>(null);
+  const [voiceOptions, setVoiceOptions] = React.useState<SpeechSynthesisVoice[]>(() =>
+    listTtsVoices()
+  );
+  const [voiceName, setVoiceName] = React.useState<string>(() => getTtsVoiceName() ?? "");
+
+  React.useEffect(() => onTtsError(setTtsError), []);
+
+  React.useEffect(() => {
+    const synth = window.speechSynthesis;
+    if (!synth) return;
+    const refresh = () => setVoiceOptions(listTtsVoices());
+    refresh();
+    try {
+      synth.addEventListener("voiceschanged", refresh);
+      return () => synth.removeEventListener("voiceschanged", refresh);
+    } catch {
+      return;
+    }
+  }, []);
 
   if (collapsed) {
     return (
@@ -96,7 +125,10 @@ export function A11yDock() {
         <button
           type="button"
           className="yl-a11y__btn"
-          onClick={readPage}
+          onClick={() => {
+            setTtsError(null);
+            readPage();
+          }}
           aria-label="朗读当前页面"
         >
           <Icon name="bookOpen" size="sm" />
@@ -123,9 +155,36 @@ export function A11yDock() {
         ))}
       </div>
 
-      {!ttsSupported && (
+      <div className="yl-a11y__row yl-a11y__row--compact">
+        <span className="yl-a11y__hint">声音</span>
+        <select
+          className="yl-a11y__select"
+          value={voiceName}
+          aria-label="选择语音播报声音"
+          onChange={(event) => {
+            const next = event.target.value;
+            setVoiceName(next);
+            setTtsVoice(next || null);
+            setTtsError(null);
+            if (ttsSupported) {
+              say(next ? "您好，我是银龄守护，这是新的声音。" : "已恢复系统默认声音。");
+            }
+          }}
+        >
+          <option value="">系统默认</option>
+          {voiceOptions.map((voice) => (
+            <option key={`${voice.name}_${voice.lang}`} value={voice.name}>
+              {voice.name}（{voice.lang}）
+            </option>
+          ))}
+        </select>
+      </div>
+
+      {!ttsSupported ? (
         <p className="yl-a11y__warn">当前浏览器不支持语音播报，建议使用 Chrome 或 Edge。</p>
-      )}
+      ) : ttsError ? (
+        <p className="yl-a11y__warn">{ttsErrorZh(ttsError)}</p>
+      ) : null}
     </div>
   );
 }

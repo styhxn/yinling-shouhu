@@ -19,6 +19,7 @@ function alertLabel(type: string) {
   if (type === "geofence.exit") return "离开安全区域";
   if (type === "scam.high") return "高风险信息";
   if (type === "cooling_off") return "转账冷静期";
+  if (type === "help_home") return "找不到家求助";
   return "安全提醒";
 }
 
@@ -31,7 +32,11 @@ function alertDetail(alert: SafetyAlert) {
     return `已离开${name}${distance}`;
   }
   if (alert.type === "scam.high") return "检测到高风险信息，请先停止转账";
-  if (alert.type === "cooling_off") return "转账已进入冷静期，等待家属确认";
+  if (alert.type === "cooling_off") return "转账已进入冷静期，等待家人确认";
+  if (alert.type === "help_home") {
+    const address = typeof payload.address === "string" ? payload.address : "家附近";
+    return `长辈发起了回家求助，位置在${address}附近，请立即联系。`;
+  }
   return "";
 }
 
@@ -44,9 +49,9 @@ export function SafetyHomePage() {
   const [busy, setBusy] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
 
-  const [lastSeenText, setLastSeenText] = React.useState("南京市鼓楼区某小区北门");
-  const [clothing, setClothing] = React.useState("蓝色外套、深色裤子");
-  const [contact, setContact] = React.useState("138****8888");
+  const [lastSeenText, setLastSeenText] = React.useState("");
+  const [clothing, setClothing] = React.useState("");
+  const [contact, setContact] = React.useState("");
   const [posterUrl, setPosterUrl] = React.useState<string | null>(null);
   const [posterBusy, setPosterBusy] = React.useState(false);
 
@@ -79,6 +84,26 @@ export function SafetyHomePage() {
 
   React.useEffect(() => {
     void load();
+  }, []);
+
+  React.useEffect(() => {
+    let alive = true;
+    Promise.allSettled([api.healthProfile.get(), api.family.members()]).then(
+      ([profileRes, membersRes]) => {
+        if (!alive) return;
+        if (profileRes.status === "fulfilled") {
+          const address = profileRes.value.profile.homeAddress?.trim();
+          if (address) setLastSeenText((prev) => (prev.trim() ? prev : address));
+        }
+        if (membersRes.status === "fulfilled") {
+          const phone = membersRes.value.members.find((member) => member.phone)?.phone;
+          if (phone) setContact((prev) => (prev.trim() ? prev : phone));
+        }
+      }
+    );
+    return () => {
+      alive = false;
+    };
   }, []);
 
   React.useEffect(() => {
@@ -236,7 +261,7 @@ export function SafetyHomePage() {
         toast.push({
           kind: "danger",
           title: "已离开安全区域",
-          detail: "已生成越界提醒，家属端可以看到。"
+          detail: "已生成越界提醒，家人端可以看到。"
         });
       }
       await load();
@@ -286,9 +311,13 @@ export function SafetyHomePage() {
         <div>
           <p className="ys-kicker">安心守护</p>
           <h1>位置、围栏与寻人</h1>
-          <p>先看老人最后在哪里。需要时，一键生成寻人海报，家属和社区都能看到。</p>
+          <p>先看长辈最后在哪里。需要时，一键生成寻人海报，家人和社区都能看到。</p>
         </div>
         <div className="ys-inlineActions">
+          <Link to="/elder/safety/help" className="btn btnDanger">
+            <Icon name="mapPin" size="sm" />
+            我找不到家了
+          </Link>
           <Link to="/elder/safety/roleplay" className="btn">反诈演练</Link>
           <Link to="/elder/safety/scam" className="btn">可疑信息鉴定</Link>
         </div>
@@ -434,15 +463,30 @@ export function SafetyHomePage() {
             <div className="ys-posterForm">
               <label>
                 <span>最后位置</span>
-                <input className="input" value={lastSeenText} onChange={(e) => setLastSeenText(e.target.value)} />
+                <input
+                  className="input"
+                  value={lastSeenText}
+                  placeholder="如：鼓楼区某小区北门（可从健康档案读取）"
+                  onChange={(e) => setLastSeenText(e.target.value)}
+                />
               </label>
               <label>
                 <span>衣着特征</span>
-                <input className="input" value={clothing} onChange={(e) => setClothing(e.target.value)} />
+                <input
+                  className="input"
+                  value={clothing}
+                  placeholder="如：蓝色外套、深色裤子"
+                  onChange={(e) => setClothing(e.target.value)}
+                />
               </label>
               <label>
                 <span>联系人</span>
-                <input className="input" value={contact} onChange={(e) => setContact(e.target.value)} />
+                <input
+                  className="input"
+                  value={contact}
+                  placeholder="家人手机号"
+                  onChange={(e) => setContact(e.target.value)}
+                />
               </label>
               <button type="button" className="btn btnPrimary" disabled={posterBusy} onClick={() => void createPoster()}>
                 <Icon name="fileText" size="sm" />

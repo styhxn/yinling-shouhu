@@ -3,14 +3,16 @@ import { Link, useNavigate } from "react-router-dom";
 import { Icon } from "../components/Icon.js";
 import { api } from "../../lib/api.js";
 import type { MemoryInsight, MemoryItem } from "../../lib/types.js";
-import { asrErrorZh, startRecognizeZhBuffered, type AsrStatus } from "../voice/asr.js";
+import { asrErrorZh, AsrError, startRecognizeZhBuffered, type AsrStatus } from "../voice/asr.js";
 import { useToast } from "../state/toast.js";
+import { useA11y } from "../state/a11y.js";
 
 const TOPICS = ["童年", "家乡", "工作", "家庭", "江苏记忆"];
 
 export function MemoryInterviewPage() {
   const nav = useNavigate();
   const toast = useToast();
+  const { announce, say } = useA11y();
   const [topic, setTopic] = React.useState("童年");
   const [interviewId, setInterviewId] = React.useState<string | null>(null);
   const [question, setQuestion] = React.useState<string | null>(null);
@@ -27,6 +29,10 @@ export function MemoryInterviewPage() {
   const [photoPrompt, setPhotoPrompt] = React.useState(false);
   const [adaptive, setAdaptive] = React.useState(false);
   const stopAsrRef = React.useRef<null | (() => void)>(null);
+
+  React.useEffect(() => {
+    if (question) announce(question);
+  }, [question, announce]);
 
   React.useEffect(() => {
     if (!photoFile) {
@@ -123,7 +129,9 @@ export function MemoryInterviewPage() {
           setAsrStatus(null);
         })
         .catch((err) => {
-          setError(asrErrorZh(err));
+          if (!(err instanceof AsrError && err.code === "aborted")) {
+            setError(asrErrorZh(err));
+          }
           setAsrStatus(null);
         })
         .finally(() => {
@@ -274,7 +282,19 @@ export function MemoryInterviewPage() {
 
           <div className="yl-interviewQuestion" aria-live="polite">
             <Icon name="bot" size="lg" />
-            <h2>{question}</h2>
+            <div className="yl-interviewQuestionBody">
+              <h2>{question}</h2>
+              <button
+                type="button"
+                className="btn yl-interviewReplay"
+                onClick={() => {
+                  if (question) say(question);
+                }}
+              >
+                <Icon name="volume" size="sm" />
+                再念一遍
+              </button>
+            </div>
           </div>
 
           <textarea

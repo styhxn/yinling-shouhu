@@ -10,11 +10,11 @@ import {
 } from "../voice/tts.js";
 
 /**
- * 无障碍（长者友好）设置
+ * 无障碍（长辈友好）设置
  * -----------------------------------------------------------------------------
  * 两项能力：
  *  1. 字体放大：整页等比缩放（CSS zoom），不仅放大文字，按钮、行高、触控区同步放大，
- *     适合视力下降的长者；浏览器不支持 zoom 时退回根字号放大。
+ *     适合视力下降的长辈；浏览器不支持 zoom 时退回根字号放大。
  *  2. 语音播报：全局开关 + 语速，配合无工具条使用；自动播报走 announce()，
  *     手动朗读走 speakNow()，互不影响。
  *
@@ -185,16 +185,16 @@ export function A11yProvider({ children }: { children: React.ReactNode }) {
   const toggleVoice = React.useCallback(() => {
     // 必须在用户手势内预热，否则 iOS 后续自动播报会被静音策略拦掉
     unlockTtsInGesture();
-    setVoiceEnabled((prev) => {
-      const next = !prev;
-      if (next) {
-        announceTts("语音播报已打开。");
-      } else {
-        stopSpeaking();
-      }
-      return next;
-    });
-  }, []);
+    const next = !voiceEnabled;
+    setVoiceEnabled(next);
+    if (next) {
+      // 先打开引擎再播报，避免 announce 仍读到旧的 enabled=false
+      setTtsEnabled(true);
+      announceTts("语音播报已打开。");
+    } else {
+      stopSpeaking();
+    }
+  }, [voiceEnabled]);
 
   const say = React.useCallback((text: string) => {
     unlockTtsInGesture();

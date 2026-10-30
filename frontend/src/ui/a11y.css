@@ -35,11 +35,11 @@
 }
 
 /* =============================================================================
- * 无障碍工具条（长者友好）
+ * 无障碍工具条（长辈友好）
  * -----------------------------------------------------------------------------
  * 左下角常驻控件：字号缩放 / 语音播报开关 / 语速 / 朗读本页。
  * 视觉沿用「水韵江苏」纸感配色（宣纸底 + 青瓷绿点缀 + 细线描边）。
- * 触控区一律 ≥44px，符合 Apple HIG 与长者触控习惯。
+ * 触控区一律 ≥44px，符合 Apple HIG 与长辈触控习惯。
  * ========================================================================== */
 
 .yl-a11y {
@@ -190,6 +190,24 @@
   color: #65736d;
 }
 
+.yl-a11y__select {
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 30px;
+  padding: 0 6px;
+  border: 1px solid #d9e0d8;
+  border-radius: 2px;
+  background: #ffffff;
+  color: #46554f;
+  font-family: inherit;
+  font-size: 12px;
+}
+
+.yl-a11y__select:focus {
+  outline: 2px solid #5e7f71;
+  outline-offset: 1px;
+}
+
 .yl-a11y__chip {
   flex: 1 1 0;
   min-height: 30px;
@@ -258,6 +276,12 @@
     left: 8px;
     right: 8px;
     bottom: 8px;
+    width: auto;
+  }
+
+  /* 收起态保持一个小按钮，避免整条横栏压住页面底部操作 */
+  .yl-a11y--collapsed {
+    right: auto;
     width: auto;
   }
 

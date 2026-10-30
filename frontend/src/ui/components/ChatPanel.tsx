@@ -3,17 +3,22 @@ import { createPortal } from "react-dom";
 import { Link } from "react-router-dom";
 import { Icon } from "./Icon.js";
 import { streamAgent } from "../../lib/sse.js";
-import { asrErrorZh, startRecognizeZhBuffered, type AsrStatus } from "../voice/asr.js";
+import { asrErrorZh, asrSupportIssue, AsrError, startRecognizeZhBuffered, type AsrStatus } from "../voice/asr.js";
 import { speakNow, stopSpeaking } from "../voice/tts.js";
 import { useToast } from "../state/toast.js";
 import { useAuth } from "../state/auth.js";
 import type { ChatMessage, PendingConfirmation, ToolEvent } from "../../lib/types.js";
+import "./assistant.css";
 
 const TOOL_LABELS: Record<string, string> = {
   get_weather: "查询天气",
   get_health_records: "读取健康记录",
   get_medications: "查看用药",
-  search_memories: "检索老人口述",
+  get_medication_safety: "检查用药忌口",
+  get_diet_plan: "生成今日食谱",
+  check_food: "判断能不能吃",
+  help_me_get_home: "通知家人并指路",
+  search_memories: "检索长辈口述",
   get_memory_profile: "读取记忆画像",
   check_scam: "反诈鉴定",
   start_cooling_off: "启动转账冷静期",
@@ -21,10 +26,10 @@ const TOOL_LABELS: Record<string, string> = {
 };
 
 const QUICK_PROMPTS = [
-  "今天天气怎么样？",
+  "今天吃什么合适？",
+  "我能吃红烧肉吗？",
   "我该吃药了吗？",
-  "有人让我转账，怎么办？",
-  "我今天有点闷，想聊聊天"
+  "有人让我转账，怎么办？"
 ];
 
 function uid() {
@@ -65,7 +70,13 @@ function ToolChip({ tool }: { tool: ToolEvent }) {
   );
 }
 
-function MessageBubble({ message, muted }: { message: ChatMessage; muted: boolean }) {
+function MessageBubble({
+  message,
+  onRead
+}: {
+  message: ChatMessage;
+  onRead: (content: string) => void;
+}) {
   const isUser = message.role === "user";
   const { me } = useAuth();
   const isFamily = me?.user.role === "family";
@@ -154,9 +165,7 @@ function MessageBubble({ message, muted }: { message: ChatMessage; muted: boolea
               className="yl-iconBtn"
               aria-label="朗读"
               onClick={() => {
-                if (muted) return;
-                stopSpeaking();
-                speakNow(message.content);
+                onRead(message.content);
               }}
             >
               <Icon name="volume" size="sm" />
@@ -239,7 +248,7 @@ function ConfirmationDialog({
             同意继续
           </button>
         </div>
-        <p className="yl-modalHint">本系统不会执行真实转账，只会暂停并通知家属。</p>
+        <p className="yl-modalHint">本系统不会执行真实转账，只会暂停并通知家人。</p>
       </div>
     </div>,
     document.body
@@ -250,12 +259,16 @@ export function ChatPanel({
   onClose,
   variant = "page",
   muted = false,
-  onToggleMute
+  onToggleMute,
+  autoSpeak = false,
+  autoStartVoice = false
 }: {
   onClose?: () => void;
-  variant?: "page" | "float";
+  variant?: "page" | "float" | "kiosk";
   muted?: boolean;
   onToggleMute?: () => void;
+  autoSpeak?: boolean;
+  autoStartVoice?: boolean;
 }) {
   const toast = useToast();
   const [messages, setMessages] = React.useState<ChatMessage[]>([]);
@@ -265,19 +278,43 @@ export function ChatPanel({
   const [pending, setPending] = React.useState<PendingConfirmation | null>(null);
   const [error, setError] = React.useState<string | null>(null);
   const [asrStatus, setAsrStatus] = React.useState<AsrStatus | null>(null);
+  const [voiceReview, setVoiceReview] = React.useState(false);
+  const asrIssue = React.useMemo(() => asrSupportIssue(), []);
 
   const abortRef = React.useRef<AbortController | null>(null);
   const stopAsrRef = React.useRef<null | (() => void)>(null);
   const scrollRef = React.useRef<HTMLDivElement | null>(null);
+  const stickToBottomRef = React.useRef(true);
   const sessionRef = React.useRef<string | null>(null);
+  const lastAssistantTextRef = React.useRef("");
+  const autoStartedRef = React.useRef(false);
 
   React.useEffect(() => {
     sessionRef.current = sessionId;
   }, [sessionId]);
 
   React.useEffect(() => {
-    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
+    const el = scrollRef.current;
+    if (!el || !stickToBottomRef.current) return;
+    // 流式输出时不要用 smooth，否则每个 token 都会打断滚动动画，长辈想往上翻也会被拽回。
+    el.scrollTop = el.scrollHeight;
   }, [messages, pending]);
+
+  function handleChatScroll(event: React.UIEvent<HTMLDivElement>) {
+    const el = event.currentTarget;
+    stickToBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+  }
+
+  React.useEffect(() => {
+    if (!autoStartVoice || autoStartedRef.current || asrIssue) return;
+    autoStartedRef.current = true;
+    const timer = window.setTimeout(() => startVoice(), 500);
+    return () => {
+      window.clearTimeout(timer);
+      // StrictMode 会先执行一次清理再重跑 effect，不重置会导致自动语音永远不启动。
+      autoStartedRef.current = false;
+    };
+  }, [autoStartVoice, asrIssue]);
 
   function updateLastAssistant(updater: (message: ChatMessage) => ChatMessage) {
     setMessages((prev) => {
@@ -298,6 +335,7 @@ export function ChatPanel({
         setSessionId(data.sessionId);
         break;
       case "token":
+        lastAssistantTextRef.current += data.text ?? "";
         updateLastAssistant((message) => ({ ...message, content: message.content + (data.text ?? "") }));
         break;
       case "tool_call": {
@@ -347,6 +385,13 @@ export function ChatPanel({
           citations: Array.isArray(data.citations) ? data.citations : [],
           ...(typeof data.traceId === "string" ? { traceId: data.traceId } : {})
         }));
+        if (autoSpeak && !muted) {
+          const reply = lastAssistantTextRef.current.trim();
+          if (reply) {
+            stopSpeaking();
+            speakNow(reply);
+          }
+        }
         setStatus("idle");
         break;
       case "error":
@@ -385,10 +430,18 @@ export function ChatPanel({
     }
   }
 
+  function readAloud(content: string) {
+    if (muted && onToggleMute) onToggleMute();
+    stopSpeaking();
+    speakNow(content);
+  }
+
   async function send(text: string) {
     const q = text.trim();
     if (!q || status === "streaming" || status === "waiting") return;
-    setInput("");
+    stickToBottomRef.current = true;
+    lastAssistantTextRef.current = "";    setInput("");
+    setVoiceReview(false);
     setMessages((prev) => [
       ...prev,
       { id: uid(), role: "user", content: q, toolEvents: [], time: nowLabel() },
@@ -403,6 +456,7 @@ export function ChatPanel({
   async function decide(decision: "approve" | "cancel") {
     if (!pending || !sessionRef.current) return;
     const current = pending;
+    lastAssistantTextRef.current = "";
     setPending(null);
     setMessages((prev) => [
       ...prev,
@@ -423,29 +477,36 @@ export function ChatPanel({
   function clearAll() {
     stop();
     stopSpeaking();
+    lastAssistantTextRef.current = "";
     setMessages([]);
     setSessionId(null);
     setError(null);
+    setVoiceReview(false);
     setStatus("idle");
   }
 
   function startVoice() {
     if (asrStatus === "starting" || asrStatus === "listening") return;
+    setVoiceReview(false);
     try {
       const session = startRecognizeZhBuffered({
         timeoutMs: 30_000,
-        silenceMs: 2_000,
+        silenceMs: 2_500,
         onPartial: setInput,
         onStatus: setAsrStatus
       });
       stopAsrRef.current = session.stop;
       session.result
         .then((text) => {
-          setInput(text);
+          const trimmed = text.trim();
+          setInput(trimmed);
           setAsrStatus(null);
+          setVoiceReview(trimmed !== "");
         })
         .catch((err) => {
-          setError(asrErrorZh(err));
+          if (!(err instanceof AsrError && err.code === "aborted")) {
+            setError(asrErrorZh(err));
+          }
           setAsrStatus(null);
         })
         .finally(() => {
@@ -501,7 +562,7 @@ export function ChatPanel({
         </div>
       </div>
 
-      <div className="yl-chatList" ref={scrollRef}>
+      <div className="yl-chatList" ref={scrollRef} onScroll={handleChatScroll}>
         {messages.length === 0 ? (
           <div className="yl-chatEmpty">
             <div className="yl-chatEmptyIcon">
@@ -518,9 +579,38 @@ export function ChatPanel({
             </div>
           </div>
         ) : (
-          messages.map((message) => <MessageBubble key={message.id} message={message} muted={muted} />)
+          messages.map((message) => (
+            <MessageBubble key={message.id} message={message} onRead={readAloud} />
+          ))
         )}
       </div>
+
+      {voiceReview && input.trim() !== "" ? (
+        <div className="yl-voiceReview">
+          <Icon name="mic" size="sm" />
+          <span>已识别，请确认文字是否正确；不对可以重新说。</span>
+          <button
+            type="button"
+            onClick={() => {
+              setVoiceReview(false);
+              startVoice();
+            }}
+          >
+            重新说
+          </button>
+        </div>
+      ) : null}
+
+      {asrIssue ? (
+        <div className="yl-voiceHint">
+          <Icon name="mic" size="sm" />
+          <span>
+            {asrIssue === "insecure"
+              ? "当前是 HTTP 地址，浏览器会禁用麦克风。可以直接打字，或改用 https 地址。"
+              : "当前浏览器不支持语音输入，请用 Edge 或 Chrome，也可以直接打字。"}
+          </span>
+        </div>
+      ) : null}
 
       {error ? (
         <div className="yl-errorBar">

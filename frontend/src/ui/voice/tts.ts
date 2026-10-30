@@ -1,29 +1,23 @@
 /**
- * 语音播报（TTS）封装
- * -----------------------------------------------------------------------------
- * 基于浏览器原生 Web Speech API（speechSynthesis），不依赖网络与外部服务，
- * 面向长者场景做了以下加固：
- *
- *  1. 分句队列：Chrome 对单条 utterance 有 ~15 秒 / 长文本截断的已知缺陷，
- *     这里按标点把长文本切成 ≤90 字的小段顺序播报，保证整段读完。
- *  2. 中文音色优选：自动挑选 zh-CN 且本地（localService）的普通话音色，
- *     避免落到英文音色读中文的"机翻腔"。
- *  3. 总开关：announce() 受"语音播报"开关控制（自动播报用）；
- *     speakNow() 无视开关（用户主动点"朗读"按钮用）。
- *  4. 取消安全：用 generation 计数丢弃 cancel() 之后残留的 onend 回调，
- *     避免"点了停止又冒出下一句"。
- *  5. 手势解锁：iOS / Safari 要求首次播报发生在用户手势内，
- *     提供 unlockTtsInGesture() 在点击时预热。
+ * 语音播报（TTS）封装：浏览器原生 speechSynthesis，不依赖网络与外部服务。
+ * 处理长文本分句、中文音色优选、Chrome 长播报中断、自动播报被浏览器拦截等问题。
  */
 
 export type TtsOptions = {
-  /** 语速，0.6 ~ 1.4；面向长者建议 0.85 ~ 0.95 */
+  /** 语速，0.6 ~ 1.4；面向长辈建议 0.85 ~ 0.95 */
   rate: number;
   pitch: number;
   volume: number;
   /** 自动播报总开关，只影响 announce() */
   enabled: boolean;
 };
+
+export type TtsErrorCode =
+  | "unsupported"
+  | "not_allowed"
+  | "synthesis_failed"
+  | "audio_busy"
+  | "unknown";
 
 const DEFAULT_OPTIONS: TtsOptions = {
   rate: 0.95,
@@ -32,16 +26,31 @@ const DEFAULT_OPTIONS: TtsOptions = {
   enabled: true
 };
 
-/** 单段最大字符数，过长会被部分浏览器截断 */
-const MAX_CHUNK = 90;
+/** 单段最大字符数：Chrome 对长 utterance 有 ~15 秒截断缺陷，控制在 60 字更稳 */
+const MAX_CHUNK = 60;
+const VOICE_KEY = "yl.tts.voice.v1";
 
 let options: TtsOptions = { ...DEFAULT_OPTIONS };
 let voices: SpeechSynthesisVoice[] = [];
 let preferredVoice: SpeechSynthesisVoice | null = null;
+let selectedVoiceName: string | null = null;
+
+if (typeof window !== "undefined") {
+  try {
+    selectedVoiceName = window.localStorage.getItem(VOICE_KEY);
+  } catch {
+    undefined;
+  }
+}
 
 /** 播放代次：每次 stop / 重新 speak 递增，用于丢弃过期回调 */
 let generation = 0;
 let queue: string[] = [];
+let watchdogId: number | undefined;
+
+const errorListeners = new Set<(code: TtsErrorCode) => void>();
+let pendingAnnouncement: string | null = null;
+let gestureBound = false;
 
 /* ------------------------------------------------------------------ 基础 */
 
@@ -51,6 +60,33 @@ export function isTtsSupported(): boolean {
     "speechSynthesis" in window &&
     typeof window.SpeechSynthesisUtterance === "function"
   );
+}
+
+export function onTtsError(listener: (code: TtsErrorCode) => void): () => void {
+  errorListeners.add(listener);
+  return () => {
+    errorListeners.delete(listener);
+  };
+}
+
+export function ttsErrorZh(code: TtsErrorCode): string {
+  if (code === "unsupported") return "当前浏览器不支持语音播报，建议使用 Edge 或 Chrome。";
+  if (code === "not_allowed") {
+    return "浏览器拦截了自动语音。请点一下页面，或点“朗读本页”按钮再试。";
+  }
+  if (code === "audio_busy") return "语音设备正被其他程序占用，请关闭后重试。";
+  if (code === "synthesis_failed") return "语音播报失败，可以在系统设置里换一个中文语音后再试。";
+  return "语音播报失败，请稍后再试。";
+}
+
+function reportError(code: TtsErrorCode) {
+  for (const listener of errorListeners) {
+    try {
+      listener(code);
+    } catch {
+      undefined;
+    }
+  }
 }
 
 function clampRate(rate: number): number {
@@ -75,8 +111,15 @@ function refreshVoices(): void {
 
 if (isTtsSupported()) {
   refreshVoices();
+  const synth = window.speechSynthesis;
   try {
-    window.speechSynthesis.addEventListener("voiceschanged", refreshVoices);
+    synth.addEventListener("voiceschanged", refreshVoices);
+  } catch {
+    undefined;
+  }
+  try {
+    (synth as SpeechSynthesis & { onvoiceschanged?: (() => void) | null }).onvoiceschanged =
+      refreshVoices;
   } catch {
     undefined;
   }
@@ -92,10 +135,43 @@ function scoreVoice(voice: SpeechSynthesisVoice): number {
   return score;
 }
 
-function pickVoice(): SpeechSynthesisVoice | null {
-  if (preferredVoice) return preferredVoice;
+/** 可在设置里选择的中文音色 */
+export function listTtsVoices(): SpeechSynthesisVoice[] {
+  if (!isTtsSupported()) return [];
   if (voices.length === 0) refreshVoices();
+  return voices
+    .filter((voice) => /^zh/i.test(voice.lang) || /chinese|mandarin|中文|普通话/i.test(voice.name))
+    .slice()
+    .sort((a, b) => scoreVoice(b) - scoreVoice(a) || a.name.localeCompare(b.name));
+}
+
+export function getTtsVoiceName(): string | null {
+  return selectedVoiceName;
+}
+
+/** name 传 null 表示回到系统默认音色 */
+export function setTtsVoice(name: string | null): void {
+  selectedVoiceName = name && name.trim() !== "" ? name.trim() : null;
+  preferredVoice = null;
+  if (typeof window === "undefined") return;
+  try {
+    if (selectedVoiceName) window.localStorage.setItem(VOICE_KEY, selectedVoiceName);
+    else window.localStorage.removeItem(VOICE_KEY);
+  } catch {
+    undefined;
+  }
+}
+
+function pickVoice(): SpeechSynthesisVoice | null {
+  if (voices.length === 0) refreshVoices();
+  if (selectedVoiceName) {
+    const chosen = voices.find((voice) => voice.name === selectedVoiceName);
+    if (chosen) return chosen;
+  }
+  if (preferredVoice && voices.includes(preferredVoice)) return preferredVoice;
+  preferredVoice = null;
   if (voices.length === 0) return null;
+
   const zhVoices = voices.filter(
     (v) => /^zh/i.test(v.lang) || /chinese|mandarin|中文|普通话/i.test(v.name)
   );
@@ -113,11 +189,22 @@ function pickVoice(): SpeechSynthesisVoice | null {
   return preferredVoice;
 }
 
-/* ---------------------------------------------------------------- 分句切分 */
+/* ---------------------------------------------------------------- 文本清洗 */
+
+function cleanForSpeech(text: string): string {
+  return text
+    .replace(/```[\s\S]*?```/g, " 代码 ")
+    .replace(/`([^`]*)`/g, "$1")
+    .replace(/\[([^\]]+)\]\([^)]*\)/g, "$1")
+    .replace(/https?:\/\/\S+/g, "链接")
+    .replace(/[*_#>`~|]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
 
 /** 按句号/问号/逗号把长文本切成适合单条播报的片段 */
 export function splitForSpeech(text: string): string[] {
-  const clean = text.replace(/\s+/g, " ").trim();
+  const clean = cleanForSpeech(text);
   if (clean === "") return [];
 
   const sentences = clean.match(/[^。！？!?；;\n]+[。！？!?；;]?/g) ?? [];
@@ -147,9 +234,35 @@ export function splitForSpeech(text: string): string[] {
 
 /* ---------------------------------------------------------------- 播放队列 */
 
+function startWatchdog() {
+  if (!isTtsSupported() || watchdogId !== undefined) return;
+  // Chrome / Edge 长播报 15 秒左右会静默停止，定时 pause+resume 可续命。
+  watchdogId = window.setInterval(() => {
+    const synth = window.speechSynthesis;
+    if (!synth.speaking && !synth.pending) {
+      stopWatchdog();
+      return;
+    }
+    try {
+      synth.pause();
+      synth.resume();
+    } catch {
+      undefined;
+    }
+  }, 8000);
+}
+
+function stopWatchdog() {
+  if (watchdogId !== undefined) {
+    window.clearInterval(watchdogId);
+    watchdogId = undefined;
+  }
+}
+
 function cancelAll(): void {
   generation += 1;
   queue = [];
+  stopWatchdog();
   if (!isTtsSupported()) return;
   try {
     window.speechSynthesis.cancel();
@@ -161,10 +274,13 @@ function cancelAll(): void {
 function playNext(myGeneration: number): void {
   if (myGeneration !== generation || !isTtsSupported()) return;
   const next = queue.shift();
-  if (typeof next === "undefined") return;
+  if (typeof next === "undefined") {
+    stopWatchdog();
+    return;
+  }
 
   const synth = window.speechSynthesis;
-  const utterance = new SpeechSynthesisUtterance(next);
+  const utterance = new window.SpeechSynthesisUtterance(next);
   const voice = pickVoice();
   if (voice) utterance.voice = voice;
   utterance.lang = "zh-CN";
@@ -177,16 +293,61 @@ function playNext(myGeneration: number): void {
     // 句间留一点空隙，听感更自然
     window.setTimeout(() => playNext(myGeneration), 40);
   };
-  utterance.onerror = () => {
+  utterance.onerror = (event) => {
     if (myGeneration !== generation) return;
-    playNext(myGeneration);
+    const error = (event as SpeechSynthesisErrorEvent).error;
+    if (error === "interrupted" || error === "canceled") {
+      playNext(myGeneration);
+      return;
+    }
+    queue = [];
+    stopWatchdog();
+    reportError(
+      error === "not-allowed"
+        ? "not_allowed"
+        : error === "audio-busy" || error === "audio-hardware"
+          ? "audio_busy"
+          : "synthesis_failed"
+    );
   };
 
   try {
+    if (synth.paused) synth.resume();
     synth.speak(utterance);
+    startWatchdog();
   } catch {
     queue = [];
+    stopWatchdog();
+    reportError("synthesis_failed");
   }
+}
+
+/* ---------------------------------------------------------------- 手势解锁 */
+
+function flushPendingAnnouncement() {
+  window.removeEventListener("pointerdown", flushPendingAnnouncement, true);
+  window.removeEventListener("keydown", flushPendingAnnouncement, true);
+  gestureBound = false;
+  unlockTtsInGesture();
+  const text = pendingAnnouncement;
+  pendingAnnouncement = null;
+  if (text) {
+    window.setTimeout(() => speakNow(text), 80);
+  }
+}
+
+function bindGestureFlush() {
+  if (gestureBound || typeof window === "undefined") return;
+  gestureBound = true;
+  window.addEventListener("pointerdown", flushPendingAnnouncement, {
+    once: true,
+    passive: true,
+    capture: true
+  });
+  window.addEventListener("keydown", flushPendingAnnouncement, {
+    once: true,
+    capture: true
+  });
 }
 
 /* ---------------------------------------------------------------- 对外 API */
@@ -196,12 +357,12 @@ export function stopSpeaking(): void {
   cancelAll();
 }
 
-/**
- * 立即朗读（无视"语音播报"开关）。
- * 用于用户主动点击的"朗读"按钮。
- */
+/** 立即朗读（无视“语音播报”开关），用于用户主动点击的“朗读”按钮 */
 export function speakNow(text: string): void {
-  if (!isTtsSupported()) return;
+  if (!isTtsSupported()) {
+    reportError("unsupported");
+    return;
+  }
   const chunks = splitForSpeech(text);
   if (chunks.length === 0) return;
 
@@ -211,8 +372,7 @@ export function speakNow(text: string): void {
   const myGeneration = generation;
   queue = chunks.slice();
 
-  // 正在播报时先 cancel 再 speak，Chrome 需要一点间隔才不会被吞掉；
-  // 空闲时同步调用，保证仍处于用户手势上下文（iOS 自动播放策略）。
+  // Chrome 在 cancel() 之后立刻 speak 有概率吞掉第一条；忙时留一点间隔。
   if (busy) {
     window.setTimeout(() => playNext(myGeneration), 90);
   } else {
@@ -224,18 +384,31 @@ export function speakNow(text: string): void {
 export const speak = speakNow;
 
 /**
- * 自动播报：受"语音播报"总开关控制。
- * 用于提醒、陪伴消息等被动触发的场景。
+ * 自动播报：受“语音播报”总开关控制。
+ * 浏览器尚未发生用户手势时先排队，等第一次点击/按键后自动补播。
  */
 export function announce(text: string): void {
   if (!options.enabled) return;
+  const activation = (
+    typeof navigator !== "undefined"
+      ? (navigator as Navigator & { userActivation?: { hasBeenActive: boolean } }).userActivation
+      : undefined
+  );
+  if (activation && !activation.hasBeenActive) {
+    pendingAnnouncement = text;
+    bindGestureFlush();
+    return;
+  }
   speakNow(text);
 }
 
 /** 开关自动播报；关闭时立即打断正在播放的内容 */
 export function setTtsEnabled(enabled: boolean): void {
   options = { ...options, enabled };
-  if (!enabled) stopSpeaking();
+  if (!enabled) {
+    pendingAnnouncement = null;
+    stopSpeaking();
+  }
 }
 
 export function isTtsEnabled(): boolean {
@@ -253,14 +426,14 @@ export function getTtsRate(): number {
 
 /**
  * 在用户手势中预热语音引擎。
- * iOS Safari 只有"用户点击后"的第一次 speak 才被允许，进页面时先打个空转。
+ * iOS Safari 只有“用户点击后”的第一次 speak 才被允许，进页面时先打个空转。
  */
 export function unlockTtsInGesture(): void {
   if (!isTtsSupported()) return;
   try {
     const synth = window.speechSynthesis;
     if (synth.speaking || synth.pending) return;
-    const utterance = new SpeechSynthesisUtterance(" ");
+    const utterance = new window.SpeechSynthesisUtterance(" ");
     utterance.lang = "zh-CN";
     utterance.rate = options.rate;
     utterance.volume = 0;

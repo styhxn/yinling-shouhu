@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="银龄守护">
+  <rect width="64" height="64" rx="14" fill="#2f5d50"/>
+  <path d="M32 11c9 8.5 15 15.2 15 23.3A15 15 0 0 1 17 34.3C17 26.2 23 19.5 32 11z" fill="#f6f1e4"/>
+  <path d="M32 22v27" stroke="#2f5d50" stroke-width="3.2" stroke-linecap="round"/>
+  <path d="M24 34c3.8 0 6.6 2 8 5.4-3.8 0-6.6-2-8-5.4zM40 34c-3.8 0-6.6 2-8 5.4 3.8 0 6.6-2 8-5.4z" fill="#7f9c8e"/>
+</svg>

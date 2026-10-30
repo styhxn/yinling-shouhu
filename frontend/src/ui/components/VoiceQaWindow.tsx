@@ -1,6 +1,6 @@
 import React from "react";
-import { asrErrorZh, asrStatusZh, startRecognizeZhBuffered } from "../voice/asr.js";
-import type { AsrStatus } from "../voice/asr.js";
+import { asrErrorZh, asrStatusZh, AsrError, startRecognizeZhBuffered } from "../voice/asr.js";
+import type { AsrSession, AsrStatus } from "../voice/asr.js";
 import { speakNow, stopSpeaking } from "../voice/tts.js";
 import { Icon } from "./Icon.js";
 
@@ -51,7 +51,7 @@ export function VoiceQaWindow({
 
   const [asrStatus, setAsrStatus] = React.useState<AsrStatus | null>(null);
   const [asrPartial, setAsrPartial] = React.useState<string>("");
-  const asrStopRef = React.useRef<null | (() => void)>(null);
+  const asrSessionRef = React.useRef<AsrSession | null>(null);
 
   const scrollRef = React.useRef<HTMLDivElement>(null);
 
@@ -62,7 +62,7 @@ export function VoiceQaWindow({
   React.useEffect(() => {
     return () => {
       if (speakTimerRef.current) window.clearTimeout(speakTimerRef.current);
-      asrStopRef.current?.();
+      asrSessionRef.current?.stop();
       stopSpeaking();
     };
   }, []);
@@ -128,7 +128,6 @@ export function VoiceQaWindow({
     }
   }
 
-  const voiceResolveRef = React.useRef<null | ((t: string) => void)>(null);
   const pressedRef = React.useRef(false);
 
   // 按住开始识别
@@ -142,26 +141,22 @@ export function VoiceQaWindow({
     stopSpeaking();
 
     try {
-      const { result, stop } = startRecognizeZhBuffered({
+      const session = startRecognizeZhBuffered({
         timeoutMs: 30_000,
         silenceMs: 1_800,
         onPartial: (t) => setAsrPartial(t),
         onStatus: (s) => setAsrStatus(s)
       });
-      asrStopRef.current = stop;
-      // 识别完成后，若仍在按住态则先存下结果，松开时再发送
-      result
-        .then((t) => {
-          voiceResolveRef.current?.(t);
-          voiceResolveRef.current = null;
-        })
-        .catch(() => {
-          voiceResolveRef.current = null;
-        });
-      voiceResolveRef.current = (t: string) => {
+      asrSessionRef.current = session;
+      session.result.catch((err) => {
+        if (!pressedRef.current) return;
+        pressedRef.current = false;
+        asrSessionRef.current = null;
         setAsrStatus(null);
-        void sendQuestion(t);
-      };
+        if (!(err instanceof AsrError && err.code === "aborted")) {
+          setError(asrErrorZh(err));
+        }
+      });
     } catch (err) {
       pressedRef.current = false;
       setAsrStatus("error");
@@ -170,20 +165,30 @@ export function VoiceQaWindow({
     }
   }
 
-  // 松开：结束识别并发送
+  // 松开：结束识别并发送已累积的文本
   function pressEnd() {
     if (!pressedRef.current) return;
     pressedRef.current = false;
-    const partial = asrPartial.trim();
-    // 手动结束识别
-    asrStopRef.current?.();
-    asrStopRef.current = null;
-    if (partial) {
-      setAsrStatus(null);
-      void sendQuestion(partial);
-    } else {
-      setAsrStatus(null);
-    }
+    const session = asrSessionRef.current;
+    asrSessionRef.current = null;
+    setAsrStatus(null);
+    if (!session) return;
+
+    session.stop();
+    void session.result
+      .then((text) => {
+        const trimmed = text.trim();
+        if (trimmed !== "") {
+          void sendQuestion(trimmed);
+        } else {
+          setError("没有听到声音，请再说一次。");
+        }
+      })
+      .catch((err) => {
+        if (!(err instanceof AsrError && err.code === "aborted")) {
+          setError(asrErrorZh(err));
+        }
+      });
   }
 
   const listening = asrStatus === "starting" || asrStatus === "listening";
