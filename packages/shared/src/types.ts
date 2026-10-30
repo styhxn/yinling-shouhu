@@ -34,8 +34,8 @@ export type AppEvent =
   | { type: "location.updated"; ts: number; payload: { elderId: string; point: LocationSnapshot } }
   | { type: "family.confirm.requested"; ts: number; payload: { confirm: unknown } }
   | { type: "family.confirm.responded"; ts: number; payload: { confirm: unknown } }
-  | { type: "family.message"; ts: number; payload: { elderId: string; familyUserId: string; messageId: string } }
-  | { type: "elder.message"; ts: number; payload: { elderId: string; familyUserId: string; messageId: string } };
+  | { type: "family.message"; ts: number; payload: { elderId: string; familyUserId: string; messageId: string; content: string } }
+  | { type: "elder.message"; ts: number; payload: { elderId: string; familyUserId: string; messageId: string; content: string } };
 
 export type PrivacySettings = {
   cameraEnabled: boolean;

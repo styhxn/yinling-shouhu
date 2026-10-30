@@ -22,6 +22,7 @@ const ALERT_LABELS: Record<string, string> = {
   "geofence.exit": "电子围栏越界",
   "geofence.enter": "回到电子围栏",
   cooling_off: "转账冷静期",
+  help_home: "找不到家求助",
   "scam.high": "高风险诈骗提醒",
   "location.stale": "长时间没有位置更新"
 };
@@ -35,16 +36,33 @@ function alertContext(alert: DbSafetyAlert) {
     alert.payload && typeof alert.payload === "object" && !Array.isArray(alert.payload)
       ? (alert.payload as Record<string, unknown>)
       : {};
+  const lastLocation =
+    payload.lastLocation &&
+    typeof payload.lastLocation === "object" &&
+    !Array.isArray(payload.lastLocation)
+      ? (payload.lastLocation as Record<string, unknown>)
+      : null;
   return {
     alertId: alert.id,
     alertType: alert.type,
     alertLevel: alert.level,
     occurredAt: alert.createdAt,
     geofenceName: typeof payload.geofenceName === "string" ? payload.geofenceName : undefined,
+    homeName: typeof payload.homeName === "string" ? payload.homeName : undefined,
+    homeAddress: typeof payload.homeAddress === "string" ? payload.homeAddress : undefined,
     distanceMeters:
       typeof payload.distanceMeters === "number" ? Math.round(payload.distanceMeters) : undefined,
+    direction: typeof payload.direction === "string" ? payload.direction : undefined,
+    familyPhone: typeof payload.familyPhone === "string" ? payload.familyPhone : undefined,
     amount: typeof payload.amount === "number" ? payload.amount : undefined,
-    hasLastPoint: Boolean(payload.lastPoint)
+    lastLocation: lastLocation
+      ? {
+          lat: typeof lastLocation.lat === "number" ? lastLocation.lat : undefined,
+          lng: typeof lastLocation.lng === "number" ? lastLocation.lng : undefined,
+          ts: typeof lastLocation.ts === "number" ? lastLocation.ts : undefined
+        }
+      : undefined,
+    hasLastPoint: Boolean(payload.lastPoint || lastLocation)
   };
 }
 
@@ -98,7 +116,7 @@ export function createProactiveAgent(deps: {
       elderId: current.elderId,
       userId: "system_guardian",
       requestId: `alert_${current.id}`,
-      goal: `研判一条${label}：结合最近位置、用药、天气和老人习惯，判断可能原因并给出下一步。`,
+      goal: `研判一条${label}：结合最近位置、用药、天气和长辈习惯，判断可能原因并给出下一步。`,
       context: alertContext(current),
       maxTools: 3
     });

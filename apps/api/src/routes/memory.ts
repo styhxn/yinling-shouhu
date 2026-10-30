@@ -98,14 +98,14 @@ function storyBookHtml(input: {
         ? `<p class="warn">${warnings.map((warning) => escapeHtml(warning)).join(" ")}</p>`
         : "";
       const fidelityLine = chapter.fidelity
-        ? `依据 ${chapter.fidelity.sources.length} 段口述 · 原文引语 ${quotes.length} 处 · 用词重合度 ${chapter.fidelity.groundingPct}%`
-        : "根据长辈口述整理，家属可修改。";
+        ? `依据 ${chapter.fidelity.sources.length} 段口述 · 原文引语 ${quotes.length} 处 · 口述要点保留 ${chapter.fidelity.groundingPct}%`
+        : "根据长辈口述整理，家人可修改。";
       return `<section class="chapter">
   <header><span class="no">第 ${index + 1} 篇</span><h2>${escapeHtml(chapter.title)}</h2></header>
   ${paragraphs}
   ${quotesHtml}
   ${warningsHtml}
-  <footer>根据长辈口述整理，家属可修改。<br /><span class="basis">${fidelityLine}</span></footer>
+  <footer>根据长辈口述整理，家人可修改。<br /><span class="basis">${fidelityLine}</span></footer>
 </section>`;
     })
     .join("\n");
@@ -163,7 +163,7 @@ function storyBookHtml(input: {
     <h1>${escapeHtml(input.bookTitle)}</h1>
     <p class="name">${escapeHtml(input.elderName)} 口述</p>
     <p class="meta">整理于 ${escapeHtml(date)}</p>
-    <p class="note">本册由长辈口述、家人整理，AI 仅协助润色。文中引语均逐字回查口述原文；其余润色内容请家人核对。各篇末尾附「口述原话」与用词重合度，便于溯源。</p>
+    <p class="note">本册由长辈口述、家人整理，AI 仅协助润色。文中引语均逐字回查口述原文；其余润色内容请家人核对。各篇末尾附「口述原话」与口述要点保留率，便于溯源。</p>
   </section>
   ${chapters}
   <section class="end"><p>— 完 —</p><p class="note">银龄守护 · 家庭记忆</p></section>
@@ -281,7 +281,7 @@ export const memoryRoutes: FastifyPluginAsync = async (server) => {
       if (!parsed.success) return reply.code(400).send({ error: "invalid_body" });
       const user = req.user!;
       if (!user.elderId) {
-        return reply.code(403).send({ error: "forbidden", message: "当前账号未绑定老人" });
+        return reply.code(403).send({ error: "forbidden", message: "当前账号未绑定长辈" });
       }
       const result = await server.interview.start({
         elderId: user.elderId,

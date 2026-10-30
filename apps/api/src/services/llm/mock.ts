@@ -50,6 +50,19 @@ function pickTool(text: string): ToolCall | null {
   if (/吃药|用药|药盒|服药/.test(text)) {
     return { id: "call_meds", name: "get_medications", args: {} };
   }
+  if (/忌口|冲突|漏服|一起吃|同吃|能不能和药/.test(text)) {
+    return { id: "call_med_safety", name: "get_medication_safety", args: {} };
+  }
+  if (/能吃|可以吃|能不能吃|红烧肉|咸菜|葡萄柚|甜饮料|喝酒/.test(text)) {
+    return {
+      id: "call_food",
+      name: "check_food",
+      args: { food: text.replace(/[?？。！!]/g, "").slice(0, 40) }
+    };
+  }
+  if (/吃什么|吃饭|菜谱|饮食|早饭|午饭|晚饭|血糖/.test(text)) {
+    return { id: "call_diet", name: "get_diet_plan", args: {} };
+  }
   if (/小时候|记得|故事|回忆|童年|家乡|工作|老伴|以前/.test(text)) {
     return { id: "call_memories", name: "search_memories", args: { query: text.slice(0, 80) } };
   }
@@ -59,6 +72,9 @@ function pickTool(text: string): ToolCall | null {
       name: "check_scam",
       args: { inputType: "text", text: text.slice(0, 2000) }
     };
+  }
+  if (/找不到家|迷路|回家|走丢|不认得路/.test(text)) {
+    return { id: "call_home", name: "help_me_get_home", args: {} };
   }
   if (/位置|没回来|找不到|在哪|走丢/.test(text)) {
     return { id: "call_location", name: "get_location", args: {} };
@@ -73,14 +89,26 @@ function summarizeTool(content: string): string {
   if (/风险|诈骗|转账|安全账户/.test(content)) {
     return "这条信息风险很高，先不要转账，也不要点链接。建议马上联系家人，必要时拨打 96110。";
   }
+  if (/找不到家|迷路|回家|通知.*家人|站在安全/.test(content)) {
+    return "您先别急，我已经通知家人了。先站在安全、明亮的地方，看看身边的门牌或店铺，给家人打个电话。";
+  }
+  if (/葡萄柚|忌口|漏服|药物冲突/.test(content)) {
+    return "用药方面有一处要留意：吃氨氯地平时别吃葡萄柚，二甲双胍期间别喝酒。漏服了不要吃双倍，先问医生或家人。";
+  }
+  if (/早餐|午餐|晚餐|少盐|少油|饮食/.test(content)) {
+    return "今天的饭菜我帮您安排好了：清淡少盐，主食少量，配点鱼、豆腐和青菜。想吃别的东西，先问我一声。";
+  }
+  if (/建议先别吃|少量吃|没有查到明确禁忌/.test(content)) {
+    return "我帮您看过了。您有高血压和糖尿病，吃之前先看看咸淡和份量；拿不准就少吃一点，或问问家人。";
+  }
   if (/药|服用|氨氯地平|二甲双胍/.test(content)) {
-    return "我查到您的用药计划了。请按医生说的时间服用，如果不确定，先问家属或药师。";
+    return "我查到您的用药计划了。请按医生说的时间服用，如果不确定，先问家人或药师。";
   }
   if (/位置|坐标|最后|鼓楼/.test(content)) {
-    return "我查到老人最后的位置了。建议先打电话确认，如果联系不上，马上通知家属或使用一键寻人。";
+    return "我查到长辈最后的位置了。建议先打电话确认，如果联系不上，马上通知家人或使用一键寻人。";
   }
-  if (/冷静期|已通知|家属/.test(content)) {
-    return "好的，我已经暂停这次操作，并通知了家属。请先不要转账，等家人确认。";
+  if (/冷静期|已通知|家人/.test(content)) {
+    return "好的，我已经暂停这次操作，并通知了家人。请先不要转账，等家人确认。";
   }
   return `我查到了：${content.slice(0, 180)}`;
 }
@@ -226,7 +254,7 @@ export class MockModelProvider implements ModelRouter {
       const quote = answers[0]?.slice(0, 24);
       return req.schema.parse({
         title: firstTitle,
-        content: `${body}\n\n${quote ? `“${quote}”\n\n` : ""}根据长辈口述整理，家属可修改。`
+        content: `${body}\n\n${quote ? `“${quote}”\n\n` : ""}根据长辈口述整理，家人可修改。`
       });
     }
 
@@ -347,7 +375,7 @@ export class MockModelProvider implements ModelRouter {
               : tool === "get_location"
                 ? "看最后一次位置上报"
                 : tool === "get_memory_profile"
-                  ? "带上老人熟悉的人和习惯"
+                  ? "带上长辈熟悉的人和习惯"
                   : "找与今天相关的口述记忆"
       }));
       return req.schema.parse({

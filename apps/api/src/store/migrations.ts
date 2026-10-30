@@ -10,8 +10,32 @@ export const SCHEMA_SQL = `
       role TEXT NOT NULL,
       display_name TEXT NOT NULL,
       elder_id TEXT,
+      phone TEXT,
       created_at INTEGER NOT NULL
     );
+
+    CREATE TABLE IF NOT EXISTS auth_codes (
+      id TEXT PRIMARY KEY,
+      phone TEXT NOT NULL,
+      code_hash TEXT NOT NULL,
+      expires_at INTEGER NOT NULL,
+      consumed_at INTEGER,
+      attempts INTEGER NOT NULL DEFAULT 0,
+      created_at INTEGER NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_auth_codes_phone ON auth_codes(phone, created_at DESC);
+
+    CREATE TABLE IF NOT EXISTS elder_invites (
+      id TEXT PRIMARY KEY,
+      elder_id TEXT NOT NULL,
+      created_by TEXT NOT NULL,
+      code_hash TEXT NOT NULL,
+      expires_at INTEGER NOT NULL,
+      consumed_at INTEGER,
+      attempts INTEGER NOT NULL DEFAULT 0,
+      created_at INTEGER NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_elder_invites_elder ON elder_invites(elder_id, created_at DESC);
 
     CREATE TABLE IF NOT EXISTS elders (
       id TEXT PRIMARY KEY,
@@ -20,6 +44,15 @@ export const SCHEMA_SQL = `
       gender TEXT,
       cognitive_note_enc TEXT,
       created_at INTEGER NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS health_profiles (
+      elder_id TEXT PRIMARY KEY,
+      conditions_json TEXT NOT NULL,
+      allergies_json TEXT NOT NULL,
+      diet_notes TEXT,
+      home_address TEXT,
+      updated_at INTEGER NOT NULL
     );
 
     CREATE TABLE IF NOT EXISTS family_links (
@@ -41,7 +74,7 @@ export const SCHEMA_SQL = `
       from_role TEXT NOT NULL,
       content TEXT NOT NULL,
       kind TEXT NOT NULL DEFAULT 'general',
-      read INTEGER NOT NULL DEFAULT 0,
+      \`read\` INTEGER NOT NULL DEFAULT 0,
       created_at INTEGER NOT NULL
     );
     CREATE INDEX IF NOT EXISTS idx_family_messages_family ON family_messages(family_user_id, created_at DESC);
@@ -412,8 +445,33 @@ export const MYSQL_SCHEMA_SQL = `
       role VARCHAR(32) NOT NULL,
       display_name VARCHAR(128) NOT NULL,
       elder_id VARCHAR(64),
+      phone VARCHAR(32),
       created_at BIGINT NOT NULL,
+      UNIQUE KEY uq_users_phone (phone),
       KEY idx_users_role (role)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+    CREATE TABLE IF NOT EXISTS auth_codes (
+      id VARCHAR(64) PRIMARY KEY,
+      phone VARCHAR(32) NOT NULL,
+      code_hash VARCHAR(128) NOT NULL,
+      expires_at BIGINT NOT NULL,
+      consumed_at BIGINT,
+      attempts INT NOT NULL DEFAULT 0,
+      created_at BIGINT NOT NULL,
+      KEY idx_auth_codes_phone (phone, created_at DESC)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+    CREATE TABLE IF NOT EXISTS elder_invites (
+      id VARCHAR(64) PRIMARY KEY,
+      elder_id VARCHAR(64) NOT NULL,
+      created_by VARCHAR(64) NOT NULL,
+      code_hash VARCHAR(128) NOT NULL,
+      expires_at BIGINT NOT NULL,
+      consumed_at BIGINT,
+      attempts INT NOT NULL DEFAULT 0,
+      created_at BIGINT NOT NULL,
+      KEY idx_elder_invites_elder (elder_id, created_at DESC)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
     CREATE TABLE IF NOT EXISTS elders (
@@ -423,6 +481,15 @@ export const MYSQL_SCHEMA_SQL = `
       gender VARCHAR(16),
       cognitive_note_enc LONGTEXT,
       created_at BIGINT NOT NULL
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+    CREATE TABLE IF NOT EXISTS health_profiles (
+      elder_id VARCHAR(64) PRIMARY KEY,
+      conditions_json LONGTEXT NOT NULL,
+      allergies_json LONGTEXT NOT NULL,
+      diet_notes VARCHAR(255),
+      home_address VARCHAR(255),
+      updated_at BIGINT NOT NULL
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
     CREATE TABLE IF NOT EXISTS family_links (
@@ -444,7 +511,7 @@ export const MYSQL_SCHEMA_SQL = `
       from_role VARCHAR(32) NOT NULL,
       content LONGTEXT NOT NULL,
       kind VARCHAR(32) NOT NULL DEFAULT 'general',
-      read TINYINT NOT NULL DEFAULT 0,
+      \`read\` TINYINT NOT NULL DEFAULT 0,
       created_at BIGINT NOT NULL,
       KEY idx_family_messages_family (family_user_id, created_at DESC),
       KEY idx_family_messages_elder (elder_id, created_at DESC)
@@ -822,6 +889,14 @@ async function sqliteMigrate(db: SqlClient) {
   await db.exec(SCHEMA_SQL);
   await db.exec("PRAGMA user_version = 1;");
 
+  const userColumns = await db
+    .prepare("PRAGMA table_info(users)")
+    .all<{ name?: string }>();
+  if (!userColumns.some((column) => column.name === "phone")) {
+    await db.exec("ALTER TABLE users ADD COLUMN phone TEXT");
+  }
+  await db.exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_users_phone ON users(phone)");
+
   const memoryColumns = await db
     .prepare("PRAGMA table_info(memories)")
     .all<{ name?: string }>();
@@ -870,9 +945,25 @@ async function mysqlHasColumn(db: SqlClient, table: string, column: string) {
   return rows.some((row) => row.name === column);
 }
 
+async function mysqlHasIndex(db: SqlClient, table: string, index: string) {
+  const rows = await db
+    .prepare(
+      "SELECT INDEX_NAME AS name FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND INDEX_NAME = ?"
+    )
+    .all<{ name?: string }>(table, index);
+  return rows.length > 0;
+}
+
 async function mysqlMigrate(db: SqlClient) {
   for (const statement of mysqlStatements(MYSQL_SCHEMA_SQL)) {
     await db.exec(statement);
+  }
+
+  if (!(await mysqlHasColumn(db, "users", "phone"))) {
+    await db.exec("ALTER TABLE users ADD COLUMN phone VARCHAR(32)");
+  }
+  if (!(await mysqlHasIndex(db, "users", "uq_users_phone"))) {
+    await db.exec("ALTER TABLE users ADD UNIQUE KEY uq_users_phone (phone)");
   }
 
   if (

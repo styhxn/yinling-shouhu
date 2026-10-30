@@ -51,7 +51,7 @@ export const ROLEPLAY_SCENARIOS: RoleplayScenario[] = [
     title: "保健品推销",
     subtitle: "免费义诊，号称能根治高血压",
     opener:
-      "我们是社区义诊专家，这款药能根治高血压，今天免费体验。很多老人用了都停掉了医院的药。",
+      "我们是社区义诊专家，这款药能根治高血压，今天免费体验。很多长辈用了都停掉了医院的药。",
     turns: [
       "先买三个疗程，效果不好可以再来找我。",
       "今天买二送一，明天就恢复原价。",
@@ -74,12 +74,12 @@ const RoleplayTurnSchema = z.object({
   intensity: z.number().min(1).max(3)
 });
 
-const ROLEPLAY_SYSTEM_PROMPT = `你在「银龄守护」的反诈演练中扮演诈骗分子，目的是让长者练习识别、拒绝和求助。
+const ROLEPLAY_SYSTEM_PROMPT = `你在「银龄守护」的反诈演练中扮演诈骗分子，目的是让长辈练习识别、拒绝和求助。
 规则：
 1. 只输出 JSON：{"reply":"1-2 句口语化话术","tactic":"本轮手法，4-8 个中文字","intensity":1到3}。
 2. 这是虚构演练。不得出现真实网站、真实电话、真实账号、真实收款方式，不得给出可执行的转账步骤。
 3. 不得威胁现实人身安全、辱骂、歧视，不得诱导具体停药或提供具体药名。
-4. 根据长者的回应调整话术：对方警惕就换身份/换理由，对方犹豫就催促，对方求助就尝试隔离信息，但最多施压一次。
+4. 根据长辈的回应调整话术：对方警惕就换身份/换理由，对方犹豫就催促，对方求助就尝试隔离信息，但最多施压一次。
 5. 不要跳出角色，不要解释这是演练，不要输出任何 JSON 以外的内容。`;
 
 function excerpt(messages: RoleplayMessage[], pattern: RegExp, fallback: string): string {

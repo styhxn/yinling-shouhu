@@ -117,7 +117,7 @@ function posterHtml(input: {
       <div class="row"><dt>联系人</dt><dd>${escapeHtml(input.contact)}</dd></div>
     </dl>
     <a class="call" href="tel:110">拨打 110</a>
-    <p class="note">位置信息由家属提供，已做模糊处理。如见到相似老人，请先确保安全，再联系家属或拨打 110。</p>
+    <p class="note">位置信息由家人提供，已做模糊处理。如见到相似长辈，请先确保安全，再联系家人或拨打 110。</p>
   </main>
 </body>
 </html>`;

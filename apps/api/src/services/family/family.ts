@@ -1,5 +1,17 @@
 import type { AppDb } from "../../store/db.js";
 
+const ALERT_LABELS: Record<string, string> = {
+  "geofence.exit": "离开安全范围",
+  "location.stale": "位置长时间未更新",
+  help_home: "找不到家求助",
+  cooling_off: "转账冷静期",
+  "fall.detected": "疑似跌倒"
+};
+
+function alertLabel(type?: string) {
+  return (type ? ALERT_LABELS[type] : undefined) ?? "安全提醒";
+}
+
 function startOfToday() {
   const d = new Date();
   d.setHours(0, 0, 0, 0);
@@ -89,7 +101,7 @@ export function createFamilyService(db: AppDb) {
         title: "安全",
         content:
           alerts.length > 0
-            ? `本周有 ${alerts.length} 条安全提醒，最近一条是「${alerts[0]?.type ?? "提醒"}」。`
+            ? `本周有 ${alerts.length} 条安全提醒，最近一条是「${alertLabel(alerts[0]?.type)}」。`
             : "本周没有新的越界或反诈告警。"
       },
       {
@@ -97,7 +109,7 @@ export function createFamilyService(db: AppDb) {
         content:
           memoryCount > 0
             ? `本周新增 ${memoryCount} 段回忆，可以挑一段整理成故事。`
-            : "本周还没有新回忆，可以找个时间陪老人聊 10 分钟。"
+            : "本周还没有新回忆，可以找个时间陪长辈聊 10 分钟。"
       },
       {
         title: "待确认",
@@ -107,10 +119,10 @@ export function createFamilyService(db: AppDb) {
 
     const suggestions: string[] = [];
     if (adherencePct !== null && adherencePct < 80) {
-      suggestions.push("用药依从率偏低，建议设一个固定提醒，或让家属在饭后电话确认。");
+      suggestions.push("用药依从率偏低，建议设一个固定提醒，或让家人在饭后电话确认。");
     }
     if (logged === 0) suggestions.push("本周还没有用药记录，可以从今天开始打卡。");
-    if (alerts.length > 0) suggestions.push("本周出现过安全提醒，建议和老人一起回顾一次出行路线。");
+    if (alerts.length > 0) suggestions.push("本周出现过安全提醒，建议和长辈一起回顾一次出行路线。");
     if (memoryCount === 0) suggestions.push("本周没有新增回忆，可以问一个童年问题，录 3 分钟就够。");
     if (pending.length > 0) suggestions.push("有待确认事项，请先处理转账/用药相关的高风险请求。");
     if (suggestions.length === 0) suggestions.push("本周整体平稳，保持规律作息和每天一次简短通话即可。");

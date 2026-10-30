@@ -25,6 +25,11 @@ const CoolingOffSchema = z.object({
   reason: z.string().max(500).optional()
 });
 const CoolingOffRespondSchema = z.object({ action: z.enum(["cancel", "continue"]) });
+const HelpHomeSchema = z.object({
+  elderId: z.string().max(80).optional(),
+  lat: z.number().min(-90).max(90).optional(),
+  lng: z.number().min(-180).max(180).optional()
+});
 const PendingQuerySchema = z.object({ elderId: z.string().max(80).optional() });
 const ConfirmRespondSchema = z.object({
   decision: z.enum(["approved", "denied"]),
@@ -50,7 +55,7 @@ export const safetyRoutes: FastifyPluginAsync = async (server) => {
     }
     const elderId = await resolveElderId(req);
     if (!elderId) {
-      return reply.code(403).send({ error: "forbidden", message: "请先绑定老人" });
+      return reply.code(403).send({ error: "forbidden", message: "请先绑定长辈" });
     }
 
     if (parsed.data.inputType === "image") {
@@ -130,6 +135,25 @@ export const safetyRoutes: FastifyPluginAsync = async (server) => {
     return { ok: true, result: enriched, related: hits };
   });
 
+  server.post("/help-home", { preHandler: requireAuth }, async (req, reply) => {
+    const parsed = HelpHomeSchema.safeParse(req.body ?? {});
+    if (!parsed.success) return reply.code(400).send({ error: "invalid_body" });
+    const elderId = await resolveElderId(req, parsed.data.elderId);
+    if (!elderId) {
+      return reply.code(403).send({ error: "forbidden", message: "请先绑定长辈" });
+    }
+    const point =
+      typeof parsed.data.lat === "number" && typeof parsed.data.lng === "number"
+        ? { lat: parsed.data.lat, lng: parsed.data.lng }
+        : undefined;
+    const result = await server.helpHome.requestHelp({
+      elderId,
+      userId: req.user!.userId,
+      ...(point ? { point } : {})
+    });
+    return { ok: true, ...result };
+  });
+
   server.post("/anti-fraud/search", { preHandler: requireAuth }, async (req, reply) => {
     const parsed = SearchSchema.safeParse(req.body);
     if (!parsed.success) return reply.code(400).send({ error: "invalid_body" });
@@ -145,7 +169,7 @@ export const safetyRoutes: FastifyPluginAsync = async (server) => {
       if (!parsed.success) return reply.code(400).send({ error: "invalid_body" });
       const user = req.user!;
       if (!user.elderId) {
-        return reply.code(403).send({ error: "forbidden", message: "当前账号未绑定老人" });
+        return reply.code(403).send({ error: "forbidden", message: "当前账号未绑定长辈" });
       }
       const result = await server.coolingOff.start({
         elderId: user.elderId,

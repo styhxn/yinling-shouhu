@@ -5,6 +5,7 @@ import { z } from "zod";
 import { resolveElderId } from "../services/auth/elder.js";
 import { requireAuth } from "../services/auth/rbac.js";
 import { analyzeMedicationImage } from "../services/medication/scan.js";
+import { buildMedicationSafety } from "../services/medication/interactions.js";
 
 const ScheduleSchema = z
   .array(z.object({ time: z.string().regex(/^\d{2}:\d{2}$/) }))
@@ -63,7 +64,17 @@ export const medicationRoutes: FastifyPluginAsync = async (server) => {
     const taken = logs.filter((log) => log.status === "taken").length;
     const logged = logs.length;
     const adherencePct = due > 0 && logged > 0 ? Math.round((taken / due) * 100) : null;
-    return { items, logs, dueToday: due, takenToday: taken, logged, adherencePct };
+    return {
+      items,
+      logs,
+      dueToday: due,
+      takenToday: taken,
+      logged,
+      adherencePct,
+      safety: buildMedicationSafety(
+        items.map((med) => ({ name: med.name, genericName: med.genericName }))
+      )
+    };
   });
 
   server.post("/", { preHandler: requireAuth }, async (req, reply) => {

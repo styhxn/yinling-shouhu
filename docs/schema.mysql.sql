@@ -13,8 +13,33 @@ SET NAMES utf8mb4;
       role VARCHAR(32) NOT NULL,
       display_name VARCHAR(128) NOT NULL,
       elder_id VARCHAR(64),
+      phone VARCHAR(32),
       created_at BIGINT NOT NULL,
+      UNIQUE KEY uq_users_phone (phone),
       KEY idx_users_role (role)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+    CREATE TABLE IF NOT EXISTS auth_codes (
+      id VARCHAR(64) PRIMARY KEY,
+      phone VARCHAR(32) NOT NULL,
+      code_hash VARCHAR(128) NOT NULL,
+      expires_at BIGINT NOT NULL,
+      consumed_at BIGINT,
+      attempts INT NOT NULL DEFAULT 0,
+      created_at BIGINT NOT NULL,
+      KEY idx_auth_codes_phone (phone, created_at DESC)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+    CREATE TABLE IF NOT EXISTS elder_invites (
+      id VARCHAR(64) PRIMARY KEY,
+      elder_id VARCHAR(64) NOT NULL,
+      created_by VARCHAR(64) NOT NULL,
+      code_hash VARCHAR(128) NOT NULL,
+      expires_at BIGINT NOT NULL,
+      consumed_at BIGINT,
+      attempts INT NOT NULL DEFAULT 0,
+      created_at BIGINT NOT NULL,
+      KEY idx_elder_invites_elder (elder_id, created_at DESC)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
     CREATE TABLE IF NOT EXISTS elders (
@@ -26,15 +51,38 @@ SET NAMES utf8mb4;
       created_at BIGINT NOT NULL
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+    CREATE TABLE IF NOT EXISTS health_profiles (
+      elder_id VARCHAR(64) PRIMARY KEY,
+      conditions_json LONGTEXT NOT NULL,
+      allergies_json LONGTEXT NOT NULL,
+      diet_notes VARCHAR(255),
+      home_address VARCHAR(255),
+      updated_at BIGINT NOT NULL
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
     CREATE TABLE IF NOT EXISTS family_links (
       id VARCHAR(64) PRIMARY KEY,
       family_user_id VARCHAR(64) NOT NULL,
       elder_id VARCHAR(64) NOT NULL,
       relation VARCHAR(64),
       status VARCHAR(32) NOT NULL DEFAULT 'active',
+      phone VARCHAR(64),
       created_at BIGINT NOT NULL,
       KEY idx_family_links_user (family_user_id),
       KEY idx_family_links_elder (elder_id)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+    CREATE TABLE IF NOT EXISTS family_messages (
+      id VARCHAR(64) PRIMARY KEY,
+      elder_id VARCHAR(64) NOT NULL,
+      family_user_id VARCHAR(64) NOT NULL,
+      from_role VARCHAR(32) NOT NULL,
+      content LONGTEXT NOT NULL,
+      kind VARCHAR(32) NOT NULL DEFAULT 'general',
+      `read` TINYINT NOT NULL DEFAULT 0,
+      created_at BIGINT NOT NULL,
+      KEY idx_family_messages_family (family_user_id, created_at DESC),
+      KEY idx_family_messages_elder (elder_id, created_at DESC)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
     CREATE TABLE IF NOT EXISTS profiles (

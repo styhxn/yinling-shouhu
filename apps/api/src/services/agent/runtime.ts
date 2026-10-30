@@ -78,35 +78,49 @@ type AgentDecisionPayload = z.infer<typeof AgentDecisionSchema>;
 
 const DEFAULT_TOOLS: Record<AgentTaskKind, string[]> = {
   brief: [
-    "get_memory_profile",
     "get_medications",
     "get_weather",
     "get_location",
+    "get_memory_profile",
+    "get_medication_safety",
+    "get_diet_plan",
     "search_memories",
     "get_health_records"
   ],
-  alert: ["get_location", "get_memory_profile", "get_medications", "get_weather", "search_memories"],
-  custom: ["get_weather", "get_medications", "get_memory_profile", "get_location", "search_memories"]
+  alert: ["get_location", "get_medications", "get_weather", "get_memory_profile", "search_memories"],
+  custom: [
+    "get_weather",
+    "get_medications",
+    "get_medication_safety",
+    "get_diet_plan",
+    "check_food",
+    "help_me_get_home",
+    "get_memory_profile",
+    "get_location",
+    "search_memories"
+  ]
 };
 
 const ROLE_PROMPTS: Record<AgentRole, string> = {
   companion:
-    "你是「银龄守护」的陪伴 Agent，服务对象是江苏长者。语气短句、口语、温暖克制，一次只给一个明确动作。",
+    "你是「银龄守护」的陪伴 Agent，服务对象是江苏长辈。语气短句、口语、温暖克制，一次只给一个明确动作。",
   guardian:
     "你是「银龄守护」的守护 Agent，负责安全事件研判。先共情，再给事实和下一步；不制造恐慌，不替代警方或医生。",
   family:
-    "你是「银龄守护」的家属协同 Agent，帮助家属理解老人的状态。只陈述记录与依据，不推测隐私，不制造焦虑。"
+    "你是「银龄守护」的家人协同 Agent，帮助家人理解长辈的状态。只陈述记录与依据，不推测隐私，不制造焦虑。"
 };
 
-const PLAN_SYSTEM_PROMPT = `你在为一个长者守护系统制定只读工具计划。只输出 JSON：
+const PLAN_SYSTEM_PROMPT = `你在为一个长辈守护系统制定只读工具计划。只输出 JSON：
 {"steps":[{"tool":"工具名","args":{},"reason":"为什么查"}],"rationale":"一句话计划理由"}
 规则：
 1. 只能使用提供的工具，不得编造工具名。
 2. 只查生成任务所需的最少信息，最多 4 个工具。
 3. 不调用任何写操作或高风险工具，不访问链接。
-4. 工具参数使用 JSON 对象；天气默认城市南京。`;
+4. 工具参数使用 JSON 对象；天气默认城市南京。
+5. 目标点名的每一类信息都要安排对应工具：用药→get_medications，天气→get_weather，位置/围栏→get_location，记忆画像/长辈习惯/偏好→get_memory_profile，具体往事/故事→search_memories。
+6. 工具数量不够时，优先覆盖目标点名的类别；不要用 search_memories 代替 get_memory_profile。`;
 
-const DECISION_SYSTEM_PROMPT = `你在为一个长者守护系统生成结构化决策。只输出 JSON：
+const DECISION_SYSTEM_PROMPT = `你在为一个长辈守护系统生成结构化决策。只输出 JSON：
 {"summary":"给用户看的一两句话","riskLevel":"low|medium|high","confidence":0到1,
 "needsConfirmation":true或false,"escalation":"none|family|emergency",
 "facts":["引用到的事实"],"actions":[{"label":"动作","kind":"link|call|confirm|tool","href":"可选"}],
@@ -115,9 +129,17 @@ const DECISION_SYSTEM_PROMPT = `你在为一个长者守护系统生成结构化
 规则：
 1. 只用提供的事实，不编造时间、地点、金额或健康结论。
 2. 今日简报任务给 2-4 条 briefItems，按 now/today/later 排序；安全告警任务不给 briefItems。
-3. 安全告警的风险等级不得低于事件本身的级别；无法确认时建议先电话核实并通知家属。
+3. 安全告警的风险等级不得低于事件本身的级别；无法确认时建议先电话核实并通知家人。
 4. 医疗、金融、定位建议必须保留不确定性，不替代医生、警方或银行。
-5. 长者端动作优先“联系家人 / 打 96110 / 查看位置”，不要给复杂步骤。`;
+5. 长辈端动作优先“联系家人 / 打 96110 / 查看位置”，不要给复杂步骤。
+6. 升级等级按事件类型判断：电子围栏越界、找不到家、转账冷静期先升级到 family；只有跌倒、突发疾病、明确人身危险或对方正在施压转账时才用 emergency；位置长时间未更新的 info 级提醒用 none。
+7. context 里提供了 lastLocation、distanceMeters、direction、homeAddress、familyPhone 时，必须按这些事实描述；不得说“无法获取位置”，也不得编造新的距离、方向或电话号码。
+8. 简报任务控制篇幅：summary 不超过 50 字；briefItems 2–3 条，每条 detail 不超过 50 字；facts 最多 3 条；explanation 不超过 80 字。
+9. summary 不要写“早安/早上好/晚上好”等问候语，系统会单独展示问候；直接说今天最重要的 1–2 件事。
+10. briefItems 的 href 只能用 /elder/meds、/elder/diet、/elder/safety、/elder/safety/help、/elder/story、/elder/today、/elder/chat，不要用 # 锚点或外部链接。
+11. context.localTime 是当前时间；已经过去的服药时间不要写成“记得吃/请服用”，改成“按计划吃药”或提示下一次服药；不确定剩余次数时不要编造。
+12. 用药事实：除非 facts 明确出现“已服用/已打卡/taken”，否则不得说长辈已经吃药；只能提醒“按计划吃药/记得打卡”。不要根据时间推断已经服过药。
+13. 时间说法用日常中文说：18 点写“晚上 6 点”，15 点写“下午 3 点”，不要说“下午 18 点”这种不自然的表达。`;
 
 function localDateKey(ts = Date.now()) {
   const date = new Date(ts);
@@ -304,6 +326,86 @@ function fallbackDecision(input: AgentTaskInput, facts: string[]): AgentDecision
   };
 }
 
+export function safeAction(action: {
+  label: string;
+  kind: "link" | "call" | "confirm" | "tool";
+  href?: string | undefined;
+  tool?: string | undefined;
+}) {
+  if (action.kind === "call") {
+    const href = action.href ?? "";
+    if (!/^tel:(1\d{10}|110|119|120|96110)$/.test(href)) {
+      return { ...action, kind: "link" as const, href: "/elder/chat" };
+    }
+  }
+  if (action.kind === "link" && (!action.href || !action.href.startsWith("/"))) {
+    return { ...action, href: "/elder/today" };
+  }
+  return action;
+}
+
+export const TAKEN_CLAIM = /已(经)?.{0,4}(服用|吃药|吃过|服药|打卡|安排|完成)/;
+
+export function guardBriefClaims(
+  input: Pick<AgentTaskInput, "kind">,
+  payload: AgentDecisionPayload,
+  facts: string[]
+): AgentDecisionPayload {
+  if (input.kind !== "brief") return payload;
+  const factsSayTaken = facts.some((fact) => /已服|已吃|已打卡|taken/i.test(fact));
+  if (factsSayTaken) return payload;
+  const claimsTaken =
+    TAKEN_CLAIM.test(payload.summary) ||
+    (payload.briefItems ?? []).some((item) => TAKEN_CLAIM.test(`${item.title}${item.detail}`));
+  if (!claimsTaken) return payload;
+  const originalItems = payload.briefItems ?? [];
+  const items = originalItems.filter(
+    (item) => !TAKEN_CLAIM.test(`${item.title}${item.detail}`)
+  );
+  if (
+    items.length < originalItems.length &&
+    !items.some((item) => /药|服用|mg|片|打卡/.test(`${item.title}${item.detail}`))
+  ) {
+    const medFact = payload.facts.find((fact) => /药|服用|mg|片|每日|每次/.test(fact));
+    items.unshift(
+      briefItemForFact(medFact ?? "按计划吃药，吃完记得打卡。", 0)
+    );
+  }
+  let replaced = false;
+  const summary = payload.summary
+    .split(/(?<=[。！？!?；;，,])/)
+    .filter(Boolean)
+    .map((sentence) => {
+      if (!TAKEN_CLAIM.test(sentence)) return sentence;
+      if (replaced) return "";
+      replaced = true;
+      return "今天按计划吃药。";
+    })
+    .join("")
+    .trim();
+  return {
+    ...payload,
+    summary: summary || "今天按计划吃药，慢慢来。",
+    briefItems: items.length
+      ? items
+      : payload.facts.slice(0, 3).map((fact, index) => briefItemForFact(fact, index))
+  };
+}
+
+export function guardEscalation(
+  input: Pick<AgentTaskInput, "kind" | "context">,
+  escalation: AgentDecisionPayload["escalation"]
+): AgentDecisionPayload["escalation"] {
+  if (input.kind !== "alert") return escalation;
+  const alertType =
+    typeof input.context?.alertType === "string" ? input.context.alertType : "";
+  // 围栏越界、找不到家、转账冷静期先由家人介入；系统不会自动报警或叫救护车。
+  if (/geofence|help_home|cooling_off|stale/i.test(alertType) && escalation === "emergency") {
+    return "family";
+  }
+  return escalation;
+}
+
 function normalizeDecision(
   input: AgentTaskInput,
   payload: AgentDecisionPayload,
@@ -323,12 +425,12 @@ function normalizeDecision(
     riskLevel: input.kind === "alert" ? maxRiskLevel(payload.riskLevel, alertRisk(input)) : payload.riskLevel,
     confidence: Number(Math.max(0, Math.min(1, payload.confidence)).toFixed(2)),
     needsConfirmation: payload.needsConfirmation,
-    escalation: payload.escalation,
+    escalation: guardEscalation(input, payload.escalation),
     facts: payload.facts,
-    actions: payload.actions.map((action) => ({
-      ...action,
-      kind: action.kind ?? "link"
-    })),
+    actions: payload.actions.map((action) => {
+      const safe = safeAction(action);
+      return { ...safe, kind: safe.kind ?? "link" };
+    }),
     ...(briefItems ? { briefItems } : {}),
     explanation: payload.explanation,
     citations,
@@ -356,6 +458,20 @@ export function createAgentRuntime(deps: { db: AppDb; modelRouter: ModelRouter; 
     allowed: string[],
     steps: AgentTraceStep[]
   ): Promise<{ plan: AgentPlan; usedModel: boolean }> {
+    // 简报/告警每天都会跑，数据源固定；固定只读计划可省掉一次模型往返，首屏更快。
+    // 自由任务（custom）和聊天仍由模型规划工具。
+    if (input.kind === "brief" || input.kind === "alert") {
+      const plan = fallbackPlan(input, allowed);
+      steps.push({
+        index: steps.length,
+        type: "plan",
+        label: input.kind === "brief" ? "使用固定简报计划" : "使用固定告警计划",
+        detail: "按任务类型读取最少必要的只读数据，避免模型规划带来的额外延迟。",
+        args: { steps: plan.steps.map((step) => step.tool) }
+      });
+      return { plan, usedModel: false };
+    }
+
     const catalog = deps.toolRegistry
       .list("elder")
       .filter((tool) => allowed.includes(tool.name))
@@ -502,15 +618,23 @@ export function createAgentRuntime(deps: { db: AppDb; modelRouter: ModelRouter; 
           task: "agent_decision",
           schema: AgentDecisionSchema,
           temperature: 0.2,
-          maxTokens: 900,
-          timeoutMs: 12_000,
+          maxTokens: 700,
+          timeoutMs: 18_000,
           messages: decisionMessages
         });
         usedModel = true;
-      } catch {
+      } catch (err) {
+        steps.push({
+          index: steps.length,
+          type: "error",
+          label: "决策模型失败，使用规则结果",
+          detail: err instanceof Error ? err.message : "decision_model_failed",
+          ok: false
+        });
         payload = fallbackDecision(input, facts);
       }
 
+      payload = guardBriefClaims(input, payload, facts);
       const decision = normalizeDecision(input, payload, citations, usedModel, deps.modelRouter.mode);
       steps.push({
         index: steps.length,

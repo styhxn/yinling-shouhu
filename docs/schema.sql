@@ -15,8 +15,32 @@ PRAGMA journal_mode = WAL;
       role TEXT NOT NULL,
       display_name TEXT NOT NULL,
       elder_id TEXT,
+      phone TEXT,
       created_at INTEGER NOT NULL
     );
+
+    CREATE TABLE IF NOT EXISTS auth_codes (
+      id TEXT PRIMARY KEY,
+      phone TEXT NOT NULL,
+      code_hash TEXT NOT NULL,
+      expires_at INTEGER NOT NULL,
+      consumed_at INTEGER,
+      attempts INTEGER NOT NULL DEFAULT 0,
+      created_at INTEGER NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_auth_codes_phone ON auth_codes(phone, created_at DESC);
+
+    CREATE TABLE IF NOT EXISTS elder_invites (
+      id TEXT PRIMARY KEY,
+      elder_id TEXT NOT NULL,
+      created_by TEXT NOT NULL,
+      code_hash TEXT NOT NULL,
+      expires_at INTEGER NOT NULL,
+      consumed_at INTEGER,
+      attempts INTEGER NOT NULL DEFAULT 0,
+      created_at INTEGER NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_elder_invites_elder ON elder_invites(elder_id, created_at DESC);
 
     CREATE TABLE IF NOT EXISTS elders (
       id TEXT PRIMARY KEY,
@@ -27,16 +51,39 @@ PRAGMA journal_mode = WAL;
       created_at INTEGER NOT NULL
     );
 
+    CREATE TABLE IF NOT EXISTS health_profiles (
+      elder_id TEXT PRIMARY KEY,
+      conditions_json TEXT NOT NULL,
+      allergies_json TEXT NOT NULL,
+      diet_notes TEXT,
+      home_address TEXT,
+      updated_at INTEGER NOT NULL
+    );
+
     CREATE TABLE IF NOT EXISTS family_links (
       id TEXT PRIMARY KEY,
       family_user_id TEXT NOT NULL,
       elder_id TEXT NOT NULL,
       relation TEXT,
       status TEXT NOT NULL DEFAULT 'active',
+      phone TEXT,
       created_at INTEGER NOT NULL
     );
     CREATE INDEX IF NOT EXISTS idx_family_links_user ON family_links(family_user_id);
     CREATE INDEX IF NOT EXISTS idx_family_links_elder ON family_links(elder_id);
+
+    CREATE TABLE IF NOT EXISTS family_messages (
+      id TEXT PRIMARY KEY,
+      elder_id TEXT NOT NULL,
+      family_user_id TEXT NOT NULL,
+      from_role TEXT NOT NULL,
+      content TEXT NOT NULL,
+      kind TEXT NOT NULL DEFAULT 'general',
+      `read` INTEGER NOT NULL DEFAULT 0,
+      created_at INTEGER NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_family_messages_family ON family_messages(family_user_id, created_at DESC);
+    CREATE INDEX IF NOT EXISTS idx_family_messages_elder ON family_messages(elder_id, created_at DESC);
 
     CREATE TABLE IF NOT EXISTS profiles (
       elder_id TEXT PRIMARY KEY,

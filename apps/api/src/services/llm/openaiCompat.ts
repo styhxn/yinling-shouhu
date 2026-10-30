@@ -97,6 +97,10 @@ export class OpenAICompatProvider implements ModelRouter {
     private readonly defaultTimeoutMs: number
   ) {}
 
+  private thinkingBody(): Record<string, unknown> {
+    return this.config.thinking === false ? { enable_thinking: false } : {};
+  }
+
   async *chatStream(req: ChatStreamRequest): AsyncIterable<ChatStreamEvent> {
     const timeoutMs = this.defaultTimeoutMs;
     const res = await fetchWithTimeout({
@@ -113,6 +117,7 @@ export class OpenAICompatProvider implements ModelRouter {
           model: this.config.model,
           messages: toOpenAIMessages(req.messages),
           stream: true,
+          ...this.thinkingBody(),
           ...(typeof req.temperature === "number" ? { temperature: req.temperature } : {}),
           ...(typeof req.maxTokens === "number" ? { max_tokens: req.maxTokens } : {}),
           ...(req.tools?.length ? { tools: req.tools, tool_choice: "auto" } : {})
@@ -230,6 +235,7 @@ export class OpenAICompatProvider implements ModelRouter {
           model: this.config.model,
           messages: toOpenAIMessages(req.messages),
           stream: false,
+          ...this.thinkingBody(),
           temperature: req.temperature ?? 0.1,
           ...(typeof req.maxTokens === "number" ? { max_tokens: req.maxTokens } : {})
         })
@@ -262,6 +268,7 @@ export class OpenAICompatProvider implements ModelRouter {
         body: JSON.stringify({
           model,
           stream: false,
+          ...this.thinkingBody(),
           temperature: 0.1,
           messages: [
             { role: "system", content: "只输出 JSON，不要输出其他文字。" },

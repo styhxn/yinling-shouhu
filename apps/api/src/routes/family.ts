@@ -39,7 +39,7 @@ export const familyRoutes: FastifyPluginAsync = async (server) => {
     }
   });
 
-  // 家属联系人（含其留下的联系电话），长者端用于查看与一键发消息
+  // 家人联系人（含其留下的联系电话），长辈端用于查看与一键发消息
   server.get("/members", { preHandler: requireAuth }, async (req, reply) => {
     const query = QuerySchema.safeParse(req.query);
     if (!query.success) return reply.code(400).send({ error: "invalid_body" });
@@ -51,7 +51,7 @@ export const familyRoutes: FastifyPluginAsync = async (server) => {
         const user = await server.db.users.getById(link.familyUserId);
         return {
           familyUserId: link.familyUserId,
-          displayName: user?.displayName ?? "家属",
+          displayName: user?.displayName ?? "家人",
           relation: link.relation,
           phone: link.phone
         };
@@ -60,7 +60,7 @@ export const familyRoutes: FastifyPluginAsync = async (server) => {
     return { ok: true, members };
   });
 
-  // 一键给对应家属账号发送信息（站内消息，无需拨打电话）
+  // 一键给对应家人账号发送信息（站内消息，无需拨打电话）
   server.post("/message", { preHandler: requireAuth }, async (req, reply) => {
     const parsed = MemberSchema.safeParse(req.body);
     if (!parsed.success) return reply.code(400).send({ error: "invalid_body" });
@@ -80,12 +80,17 @@ export const familyRoutes: FastifyPluginAsync = async (server) => {
     server.eventBus.publish({
       type: "family.message",
       ts: message.createdAt,
-      payload: { elderId, familyUserId: link.familyUserId, messageId: message.id }
+      payload: {
+        elderId,
+        familyUserId: link.familyUserId,
+        messageId: message.id,
+        content: message.content
+      }
     });
     return { ok: true, messageId: message.id };
   });
 
-  // 家属读取老人发来的站内消息（按当前家属账号聚合，含老人姓名；未读自动标记已读）
+  // 家人读取长辈发来的站内消息（按当前家人账号聚合，含长辈姓名；未读自动标记已读）
   server.get("/messages", { preHandler: requireRole("family") }, async (req, reply) => {
     const familyUserId = req.user!.userId;
     const items = await server.db.familyMessages.listByFamily(familyUserId);
@@ -97,7 +102,7 @@ export const familyRoutes: FastifyPluginAsync = async (server) => {
         if (elder) names.set(id, elder.displayName);
       })
     );
-    // 仅把“老人发来”的未读标记为已读（家属自己发出的不算未读）
+    // 仅把“长辈发来”的未读标记为已读（家人自己发出的不算未读）
     const unreadIds = items
       .filter((item) => !item.read && item.fromRole === "elder")
       .map((item) => item.id);
@@ -119,7 +124,7 @@ export const familyRoutes: FastifyPluginAsync = async (server) => {
     };
   });
 
-  // 家属给绑定的老人发送站内消息（反向：家属 -> 老人）
+  // 家人给绑定的长辈发送站内消息（反向：家人 -> 长辈）
   server.post("/elder/message", { preHandler: requireRole("family") }, async (req, reply) => {
     const parsed = z
       .object({
@@ -144,12 +149,17 @@ export const familyRoutes: FastifyPluginAsync = async (server) => {
     server.eventBus.publish({
       type: "elder.message",
       ts: message.createdAt,
-      payload: { elderId: message.elderId, familyUserId, messageId: message.id }
+      payload: {
+        elderId: message.elderId,
+        familyUserId,
+        messageId: message.id,
+        content: message.content
+      }
     });
     return { ok: true, messageId: message.id };
   });
 
-  // 老人读取家属发来的站内消息（按当前老人聚合，含家属姓名；未读自动标记已读）
+  // 长辈读取家人发来的站内消息（按当前长辈聚合，含家人姓名；未读自动标记已读）
   server.get("/elder/messages", { preHandler: requireRole("elder") }, async (req, reply) => {
     const elderId = req.user!.elderId!;
     const items = await server.db.familyMessages.listByElder(elderId);
@@ -172,7 +182,7 @@ export const familyRoutes: FastifyPluginAsync = async (server) => {
       items: items.map((item) => ({
         id: item.id,
         elderId: item.elderId,
-        familyName: names.get(item.familyUserId) ?? "家属",
+        familyName: names.get(item.familyUserId) ?? "家人",
         fromRole: item.fromRole,
         content: item.content,
         kind: item.kind,

@@ -28,7 +28,7 @@ const MemoryProfileSchema = z.object({
 
 type ProfilePayload = z.infer<typeof MemoryProfileSchema>;
 
-const SYSTEM_PROMPT = `你在为一位长者整理“记忆画像”，帮助陪伴 Agent 更懂他/她。只输出 JSON：
+const SYSTEM_PROMPT = `你在为一位长辈整理“记忆画像”，帮助陪伴 Agent 更懂他/她。只输出 JSON：
 {"summary":"两三句总体印象","people":[{"name":"称呼","relation":"关系，可选","note":"一句说明，可选"}],
 "places":[{"name":"地点","note":"一句说明，可选"}],"routines":["长期习惯"],"preferences":["明确偏好"],
 "sensitivities":["沟通时需要避开或先共情的话题"]}

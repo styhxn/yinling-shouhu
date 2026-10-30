@@ -9,6 +9,8 @@ export type LlmProviderConfig = {
   model: string;
   visionModel?: string;
   embedModel?: string;
+  /** false 时向兼容网关发送 enable_thinking:false，降低长辈对话延迟。 */
+  thinking?: boolean;
 };
 
 export type AppConfig = {
@@ -96,6 +98,7 @@ function provider(input: {
   model: string;
   visionModel?: string;
   embedModel?: string;
+  thinking?: boolean;
 }): LlmProviderConfig | null {
   if (!input.baseUrl || !input.apiKey || !input.model) return null;
   return {
@@ -104,7 +107,8 @@ function provider(input: {
     apiKey: input.apiKey,
     model: input.model,
     ...(input.visionModel ? { visionModel: input.visionModel } : {}),
-    ...(input.embedModel ? { embedModel: input.embedModel } : {})
+    ...(input.embedModel ? { embedModel: input.embedModel } : {}),
+    ...(typeof input.thinking === "boolean" ? { thinking: input.thinking } : {})
   };
 }
 
@@ -131,8 +135,9 @@ function gatherProviders(): LlmProviderConfig[] {
       baseUrl: env("QWEN_BASE_URL") || "https://dashscope.aliyuncs.com/compatible-mode/v1",
       apiKey: env("QWEN_API_KEY"),
       model: env("QWEN_MODEL") || "qwen-plus",
-      visionModel: env("LLM_VISION_MODEL") || "qwen-vl-plus",
-      embedModel: env("LLM_EMBED_MODEL") || "text-embedding-v3"
+      visionModel: env("LLM_VISION_MODEL") || "qwen/qwen3-vl-plus",
+      embedModel: env("LLM_EMBED_MODEL") || "text-embedding-v3",
+      thinking: bool("QWEN_ENABLE_THINKING", false)
     }),
     provider({
       name: "doubao",

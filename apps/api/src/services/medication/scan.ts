@@ -76,7 +76,7 @@ export async function analyzeMedicationImage(input: {
       warnings: [],
       contraindications: [],
       sources: [],
-      disclaimer: "图片没看清。请重拍药盒正面，或让家属/药师帮忙确认。"
+      disclaimer: "图片没看清。请重拍药盒正面，或让家人/药师帮忙确认。"
     };
   }
 }

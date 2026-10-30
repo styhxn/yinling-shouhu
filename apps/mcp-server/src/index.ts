@@ -98,7 +98,7 @@ const server = new McpServer(
   { name: "yinling-shouhu", version: "0.1.0" },
   {
     instructions:
-      "银龄守护 MCP 服务：面向长者陪伴与安全守护。只读工具可直接调用；写入工具（set_geofence）执行前请先向用户确认。所有结果仅供参考，不替代医生诊断或警方判断。"
+      "银龄守护 MCP 服务：面向长辈陪伴与安全守护。只读工具可直接调用；写入工具（set_geofence）执行前请先向用户确认。所有结果仅供参考，不替代医生诊断或警方判断。"
   }
 );
 
@@ -240,7 +240,7 @@ server.registerTool(
   "set_geofence",
   {
     title: "设置电子围栏",
-    description: "为老人创建一个圆形安全区域，老人离开该区域时会通知家属。写入操作，调用前请先向用户确认。",
+    description: "为长辈创建一个圆形安全区域，长辈离开该区域时会通知家人。写入操作，调用前请先向用户确认。",
     inputSchema: {
       name: z.string().min(1).max(40).describe("围栏名称，例如 家附近"),
       lat: z.number().min(-90).max(90).describe("中心点纬度"),
@@ -268,7 +268,7 @@ server.registerTool(
       const center = Array.isArray(fence.shape?.center) ? fence.shape.center.join(", ") : `${lng}, ${lat}`;
       return ok(
         `已创建电子围栏「${fence.name ?? name}」：中心 ${center}，半径 ${fence.shape?.radius ?? radius} 米；` +
-          `老人离开后会通知家属。`
+          `长辈离开后会通知家人。`
       );
     })
 );

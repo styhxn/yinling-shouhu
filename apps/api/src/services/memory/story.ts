@@ -17,6 +17,17 @@ function memoryCorpus(memory: DbMemory) {
   return [memory.title, memory.summary ?? "", memory.transcript].join("\n");
 }
 
+/** 去掉访谈提问，只保留长辈自己说过的内容，用于衡量正文保留了多少口述要点。 */
+function answerCorpus(memory: DbMemory) {
+  const answers = memory.transcript
+    .split(/\n+/)
+    .map((line) => line.trim())
+    .filter((line) => line.startsWith("答："))
+    .map((line) => line.replace(/^答：\s*/, "").trim())
+    .filter(Boolean);
+  return [memory.title, memory.summary ?? "", ...(answers.length ? answers : [memory.transcript])].join("\n");
+}
+
 function bigrams(text: string) {
   const compact = normalize(text).replace(/[^\u4e00-\u9fa5A-Za-z0-9]/g, "");
   const out = new Set<string>();
@@ -24,6 +35,21 @@ function bigrams(text: string) {
     out.add(compact.slice(index, index + 2));
   }
   return out;
+}
+
+function firstAnswerQuote(memory: DbMemory): string | null {
+  const answers = memory.transcript
+    .split(/\n+/)
+    .map((line) => line.trim())
+    .filter((line) => line.startsWith("答："))
+    .map((line) => line.replace(/^答：\s*/, "").replace(/[“”"]/g, "").trim())
+    .filter(Boolean);
+  for (const answer of answers) {
+    const sentence = answer.split(/[。！？!?]/)[0]?.trim() ?? "";
+    const candidate = sentence.length >= 4 ? sentence : answer;
+    if (candidate.length >= 2) return candidate.slice(0, 80);
+  }
+  return null;
 }
 
 function collectQuotes(content: string) {
@@ -62,17 +88,19 @@ function applyFidelity(input: {
     content = content.split(quote.raw).join(quote.text);
   }
 
-  const sourceGrams = bigrams(input.memories.map(memoryCorpus).join("\n"));
+  // 口述要点保留率：原文中出现的 2-gram 有多少被正文沿用。
+  // 长篇润色稿无法做到“正文每个词都来自原文”，但可以用这个比例确认核心事实没有丢。
+  const sourceGrams = bigrams(input.memories.map(answerCorpus).join("\n"));
   const contentGrams = bigrams(content);
   let overlap = 0;
-  for (const gram of contentGrams) {
-    if (sourceGrams.has(gram)) overlap += 1;
+  for (const gram of sourceGrams) {
+    if (contentGrams.has(gram)) overlap += 1;
   }
-  const groundingPct = contentGrams.size
-    ? Math.round((overlap / contentGrams.size) * 100)
+  const groundingPct = sourceGrams.size
+    ? Math.round((overlap / sourceGrams.size) * 100)
     : 0;
   const level: StoryFidelity["level"] =
-    groundingPct >= 55 ? "high" : groundingPct >= 35 ? "medium" : "low";
+    groundingPct >= 75 ? "high" : groundingPct >= 45 ? "medium" : "low";
 
   const warnings: string[] = [];
   if (removedQuotes.length > 0) {
@@ -81,7 +109,7 @@ function applyFidelity(input: {
     );
   }
   if (level === "low") {
-    warnings.push("整理稿与口述原文的用词重合度偏低，建议家人逐段核对后再分享。");
+    warnings.push("整理稿保留的口述要点偏少，建议家人逐段核对后再分享。");
   }
   if (input.engine === "rules") {
     warnings.push("当前为规则整理稿，未使用模型润色。");
@@ -146,10 +174,12 @@ export function createStoryService(db: AppDb, modelRouter: ModelRouter) {
           {
             role: "system",
             content:
-              "你是家庭传记编辑。只输出 JSON：{\"title\":\"章节标题\",\"content\":\"正文\"}。" +
-              "只使用提供的事实，不编造时间、地点、人物或对话；" +
-              "如需引用长辈原话，必须逐字照抄 transcript 中的句子并加中文引号；" +
-              "300–600 字，语气温暖克制；末尾注明“根据长辈口述整理，家属可修改”。"
+              "你是家庭传记编辑，为长辈整理一章口述故事。只输出 JSON：{\"title\":\"章节标题\",\"content\":\"正文\"}。" +
+              "要求：1）只使用 memories 中的事实，不编造时间、地点、人物、数字或对话；" +
+              "2）尽量沿用长辈的原词原句，只做必要的衔接和润色，正文 260–420 字；" +
+              "3）至少逐字引用 1 句 transcript 中的原话，用中文引号“”标出，不得改写引语；" +
+              "4）按时间或情感线索组织，开头点题，结尾回到现在，语气温暖克制；" +
+              "5）末尾另起一段注明“根据长辈口述整理，家人可修改”。"
           },
           {
             role: "user",
@@ -167,7 +197,7 @@ export function createStoryService(db: AppDb, modelRouter: ModelRouter) {
           }
         ],
         schema: StorySchema,
-        temperature: 0.4,
+        temperature: 0.25,
         maxTokens: 1200,
         timeoutMs: 20_000
       });
@@ -184,6 +214,25 @@ export function createStoryService(db: AppDb, modelRouter: ModelRouter) {
       }
     } catch {
       // Keep the deterministic draft when the model is unavailable.
+    }
+
+    // 模型偶尔全篇转述、不直接引用原话：正文本身够贴原文时，补一段可逐字回查的“口述原话”。
+    // 如果正文已经偏离口述，不再用一句真话去“装饰”它，保留低忠实度警告。
+    if (
+      validated.fidelity.verifiedQuotes.length === 0 &&
+      validated.fidelity.groundingPct >= 45
+    ) {
+      const quote = firstAnswerQuote(memories[0]!);
+      if (quote) {
+        const withQuote = `${validated.content.trim()}\n\n口述原话：“${quote}”`;
+        const revalidated = applyFidelity({
+          content: withQuote,
+          memories,
+          engine: validated.fidelity.engine,
+          model: validated.fidelity.model
+        });
+        if (revalidated.fidelity.verifiedQuotes.length > 0) validated = revalidated;
+      }
     }
 
     const orderIndex = (await db.storyChapters.listByBook(book.id)).length + 1;

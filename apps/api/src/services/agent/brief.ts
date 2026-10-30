@@ -17,6 +17,33 @@ export type BriefView = {
   generatedAt: number;
 };
 
+const BRIEF_ROUTES = new Set([
+  "/elder/meds",
+  "/elder/diet",
+  "/elder/safety",
+  "/elder/safety/help",
+  "/elder/story",
+  "/elder/today",
+  "/elder/chat"
+]);
+
+function safeBriefHref(item: AgentBriefItem): AgentBriefItem {
+  const text = `${item.title}${item.detail}`;
+  const derived = /药|服用|mg|片|打卡/.test(text)
+    ? "/elder/meds"
+    : /天气|℃|雨|风|穿衣/.test(text)
+      ? "/elder/today"
+      : /记忆|故事|回忆/.test(text)
+        ? "/elder/story"
+        : /位置|围栏|找不到家/.test(text)
+          ? "/elder/safety"
+          : undefined;
+  if (derived) return { ...item, href: derived };
+  if (item.href && BRIEF_ROUTES.has(item.href)) return item;
+  const { href: _drop, ...rest } = item;
+  return rest;
+}
+
 function sortBriefItems(items: AgentBriefItem[]) {
   const rank = { now: 0, today: 1, later: 2 };
   const seen = new Set<string>();
@@ -88,6 +115,8 @@ export function createBriefService(deps: {
     }
 
     await deps.memoryProfile.get(input.elderId).catch(() => undefined);
+    const now = new Date();
+    const localTime = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
     const result = await deps.runtime.runTask({
       kind: "brief",
       agent: "companion",
@@ -96,14 +125,14 @@ export function createBriefService(deps: {
       userId: input.userId,
       requestId: input.requestId,
       goal: "为长辈生成今天的贴心简报：先看用药，再看天气和位置安全，最后带一句与口述记忆有关的陪伴。",
-      context: { briefDate: date },
+      context: { briefDate: date, localTime },
       maxTools: 4
     });
 
     const content: AgentBriefContent = {
       greeting: greetingFor(await nameOf(input.elderId)),
       summary: result.decision.summary,
-      items: sortBriefItems(result.decision.briefItems ?? []),
+      items: sortBriefItems((result.decision.briefItems ?? []).map(safeBriefHref)),
       encouragement: "慢慢来，今天也会是稳当的一天。",
       riskLevel: result.decision.riskLevel,
       confidence: result.decision.confidence,

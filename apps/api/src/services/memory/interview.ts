@@ -158,9 +158,10 @@ export function createInterviewService(db: AppDb, modelRouter: ModelRouter) {
           {
             role: "system",
             content:
-              "你在陪一位长者做口述史访谈。根据话题和已有回答，只问一个自然、具体、口语化的问题。" +
+              "你在陪一位长辈做口述史访谈。根据话题和已有回答，只问一个自然、具体、口语化的问题。" +
               "要求：20-40 字；结合上一句提到的地点、人物、物品或感受；" +
-              "不要重复已经问过的问题；不评判、不追问创伤细节；只输出 JSON。"
+              "不要重复已经问过的问题；不评判、不追问创伤细节；只输出 JSON。" +
+              '格式：{"question":"一个问题","focus":"place|people|detail|feeling|object"}。'
           },
           {
             role: "user",
