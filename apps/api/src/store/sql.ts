@@ -27,6 +27,7 @@ export interface SqlClient {
   readonly driver: SqlDriver;
   exec(sql: string): Promise<void>;
   prepare(sql: string): SqlStatement;
+  transaction<T>(fn: (tx: SqlClient) => Promise<T>): Promise<T>;
   ping(): Promise<void>;
   close(): Promise<void>;
 }
@@ -56,13 +57,34 @@ export function createSqliteClient(path: string): SqlClient {
   raw.exec("PRAGMA busy_timeout = 5000");
   if (path !== ":memory:") raw.exec("PRAGMA journal_mode = WAL");
 
-  return {
+  let inTransaction = false;
+
+  const client: SqlClient = {
     driver: "sqlite",
     async exec(sql: string) {
       raw.exec(sql);
     },
     prepare(sql: string) {
       return sqliteStatement(raw.prepare(sql));
+    },
+    async transaction<T>(fn: (tx: SqlClient) => Promise<T>): Promise<T> {
+      if (inTransaction) return fn(client);
+      raw.exec("BEGIN IMMEDIATE");
+      inTransaction = true;
+      try {
+        const result = await fn(client);
+        raw.exec("COMMIT");
+        return result;
+      } catch (err) {
+        try {
+          raw.exec("ROLLBACK");
+        } catch {
+          // 事务已失效时忽略回滚错误，保留原始异常。
+        }
+        throw err;
+      } finally {
+        inTransaction = false;
+      }
     },
     async ping() {
       raw.prepare("SELECT 1 AS ok").get();
@@ -71,23 +93,26 @@ export function createSqliteClient(path: string): SqlClient {
       raw.close();
     }
   };
+  return client;
 }
 
-function mysqlStatement(pool: Pool, sql: string): SqlStatement {
+type MysqlQuery = (sql: string, values: unknown[]) => Promise<any>;
+
+function mysqlStatement(query: MysqlQuery, sql: string): SqlStatement {
   const values = (params: unknown[]) =>
     params.map((value) => (typeof value === "undefined" ? null : value));
 
   return {
     async get<T>(...params: unknown[]) {
-      const [rows] = await pool.query(sql, values(params));
+      const [rows] = await query(sql, values(params));
       return (Array.isArray(rows) ? rows[0] : undefined) as T | undefined;
     },
     async all<T>(...params: unknown[]) {
-      const [rows] = await pool.query(sql, values(params));
+      const [rows] = await query(sql, values(params));
       return (Array.isArray(rows) ? rows : []) as T[];
     },
     async run(...params: unknown[]) {
-      const [result] = await pool.query(sql, values(params));
+      const [result] = await query(sql, values(params));
       const header = result as ResultSetHeader;
       return {
         changes: Number(header?.affectedRows ?? 0),
@@ -124,13 +149,50 @@ export function createMysqlClient(options: {
     ...(options.ssl ? { ssl: { rejectUnauthorized: false } } : {})
   });
 
+  const poolQuery: MysqlQuery = (sql, values) => pool.query(sql, values as any[]);
+
   return {
     driver: "mysql",
     async exec(sql: string) {
       await pool.query(sql);
     },
     prepare(sql: string) {
-      return mysqlStatement(pool, sql);
+      return mysqlStatement(poolQuery, sql);
+    },
+    async transaction<T>(fn: (tx: SqlClient) => Promise<T>): Promise<T> {
+      const conn = await pool.getConnection();
+      try {
+        await conn.beginTransaction();
+        const query: MysqlQuery = (sql, values) => conn.query(sql, values as any[]);
+        const tx: SqlClient = {
+          driver: "mysql",
+          async exec(sql: string) {
+            await conn.query(sql);
+          },
+          prepare(sql: string) {
+            return mysqlStatement(query, sql);
+          },
+          transaction: (inner) => inner(tx),
+          async ping() {
+            await conn.query("SELECT 1 AS ok");
+          },
+          async close() {
+            // 事务连接由外层统一释放。
+          }
+        };
+        const result = await fn(tx);
+        await conn.commit();
+        return result;
+      } catch (err) {
+        try {
+          await conn.rollback();
+        } catch {
+          // 连接已断开时忽略回滚错误，保留原始异常。
+        }
+        throw err;
+      } finally {
+        conn.release();
+      }
     },
     async ping() {
       await pool.query("SELECT 1 AS ok");

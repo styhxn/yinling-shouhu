@@ -68,6 +68,27 @@ describe("hardening", () => {
     await unlimited.close();
   });
 
+  it("applies the stricter auth bucket to elder binding attempts", async () => {
+    const server = await createServer({
+      config: testConfig({
+        rateLimit: { ...rateLimit, max: 100, authMax: 1, aiMax: 100, uploadMax: 100, locationMax: 100 }
+      })
+    });
+    const first = await server.inject({
+      method: "POST",
+      url: "/api/auth/elder/bind",
+      payload: { code: "000000" }
+    });
+    expect(first.statusCode).toBe(401);
+    const second = await server.inject({
+      method: "POST",
+      url: "/api/auth/elder/bind",
+      payload: { code: "000001" }
+    });
+    expect(second.statusCode).toBe(429);
+    await server.close();
+  });
+
   it("prunes location history older than the retention window", async () => {
     const server = await createServer({ config: testConfig() });
     const oldTs = Date.now() - 200 * 24 * 60 * 60 * 1000;

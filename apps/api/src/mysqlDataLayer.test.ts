@@ -52,6 +52,34 @@ maybeDescribe("MySQL 8 data layer", () => {
     expect((await db.memories.getById(memory.id))?.title).toBe("MySQL 迁移测试");
     expect(await db.memories.countByElder("e_li")).toBe(4);
 
+    const familyUser = await db.users.create({
+      id: "u_mysql_family",
+      role: "family",
+      displayName: "测试家人",
+      elderId: null,
+      phone: "13900001111",
+      createdAt: Date.now()
+    });
+    expect((await db.users.getByPhone("13900001111"))?.id).toBe(familyUser.id);
+    const createdElder = await db.elders.create({
+      id: "e_mysql_account",
+      displayName: "测试长辈",
+      birthYear: 1950,
+      gender: "female",
+      createdAt: Date.now()
+    });
+    await db.familyLinks.create({
+      id: "fl_mysql_account",
+      familyUserId: familyUser.id,
+      elderId: createdElder.id,
+      relation: "daughter",
+      phone: familyUser.phone,
+      createdAt: Date.now()
+    });
+    expect((await db.users.listFamilyLinks(familyUser.id)).map((link) => link.elderId)).toContain(
+      createdElder.id
+    );
+
     await db.sessions.upsert({
       id: "s_mysql_test",
       userId: "u_elder",
@@ -68,6 +96,22 @@ maybeDescribe("MySQL 8 data layer", () => {
     const session = await db.sessions.get("s_mysql_test");
     expect(session?.messages[0]).toMatchObject({ content: "更新" });
     expect(session?.summary).toBe("测试摘要");
+
+    const message = await db.familyMessages.insert({
+      elderId: "e_li",
+      familyUserId: "u_family",
+      fromRole: "family",
+      content: "记得按时吃药",
+      kind: "reminder"
+    });
+    expect(message.read).toBe(false);
+    expect((await db.familyMessages.listByFamily("u_family")).find((item) => item.id === message.id)?.read).toBe(
+      false
+    );
+    expect(await db.familyMessages.markReadElder("e_li", [message.id])).toBe(1);
+    expect((await db.familyMessages.listByElder("e_li")).find((item) => item.id === message.id)?.read).toBe(
+      true
+    );
 
     const alert = await db.safetyAlerts.create({
       elderId: "e_li",

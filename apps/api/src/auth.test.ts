@@ -78,4 +78,15 @@ describe("auth", () => {
     });
     expect(me.statusCode).toBe(401);
   });
+
+  it("rejects privileged roles at the demo entrance", async () => {
+    for (const role of ["admin", "institution"]) {
+      const res = await server.inject({
+        method: "POST",
+        url: "/api/auth/demo-login",
+        payload: { role }
+      });
+      expect(res.statusCode).toBe(400);
+    }
+  });
 });

@@ -1,7 +1,7 @@
 import { encryptJson } from "../services/crypto.js";
 import type { SqlClient } from "./sql.js";
 
-/** Idempotent demo data: 李奶奶、家属小李、两种药、一个位置点。 */
+/** Idempotent demo data: 李奶奶、家人小李、两种药、一个位置点。 */
 export async function seedDemo(db: SqlClient, masterKey: Buffer) {
   const now = Date.now();
   const ignoreExisting = db.driver === "mysql"
@@ -13,6 +13,24 @@ export async function seedDemo(db: SqlClient, masterKey: Buffer) {
      ${ignoreExisting}`
   );
   await elder.run("e_li", "李奶奶", 1948, "female", null, now);
+
+  const healthIgnoreExisting = db.driver === "mysql"
+    ? "ON DUPLICATE KEY UPDATE elder_id = elder_id"
+    : "ON CONFLICT (elder_id) DO NOTHING";
+  const health = db.prepare(
+    `INSERT INTO health_profiles
+      (elder_id, conditions_json, allergies_json, diet_notes, home_address, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?)
+     ${healthIgnoreExisting}`
+  );
+  await health.run(
+    "e_li",
+    JSON.stringify(["高血压", "2型糖尿病"]),
+    JSON.stringify([]),
+    "医生建议少盐少油、主食适量、晚饭七分饱",
+    "南京市鼓楼区湖南路街道 3 号院 2 栋",
+    now
+  );
 
   const user = db.prepare(
     `INSERT INTO users (id, role, display_name, elder_id, created_at)
@@ -30,7 +48,7 @@ export async function seedDemo(db: SqlClient, masterKey: Buffer) {
      ${ignoreExisting}`
   );
   await link.run("fl_1", "u_family", "e_li", "daughter", "active", "13800001234", now);
-  // 演示库每次启动都会 seed：为历史已存在的家属链接补上联系电话
+  // 演示库每次启动都会 seed：为历史已存在的家人链接补上联系电话
   await db.exec("UPDATE family_links SET phone = '13800001234' WHERE id = 'fl_1' AND phone IS NULL");
 
   const med = db.prepare(
@@ -66,6 +84,20 @@ export async function seedDemo(db: SqlClient, masterKey: Buffer) {
     now
   );
 
+  // 演示数据每天保持“今天已吃过一次”，让依从率与用药卡片不至于空白。
+  const eight = new Date(now);
+  eight.setHours(8, 0, 0, 0);
+  if (now >= eight.getTime()) {
+    const ymd = `${eight.getFullYear()}${String(eight.getMonth() + 1).padStart(2, "0")}${String(eight.getDate()).padStart(2, "0")}`;
+    await db
+      .prepare(
+        `INSERT INTO medication_logs (id, medication_id, elder_id, status, scheduled_time, ts)
+         VALUES (?, ?, ?, ?, ?, ?)
+         ${ignoreExisting}`
+      )
+      .run(`ml_seed_${ymd}`, "med_1", "e_li", "taken", "08:00", eight.getTime());
+  }
+
   const loc = db.prepare(
     `INSERT INTO location_points (id, elder_id, lat_enc, lng_enc, accuracy, source, ts)
      VALUES (?, ?, ?, ?, ?, ?, ?)
@@ -74,12 +106,16 @@ export async function seedDemo(db: SqlClient, masterKey: Buffer) {
   await loc.run(
     "loc_seed",
     "e_li",
-    encryptJson(masterKey, 32.041),
-    encryptJson(masterKey, 118.781),
+    encryptJson(masterKey, 32.044),
+    encryptJson(masterKey, 118.783),
     25,
     "demo",
     now - 120_000
   );
+  // 每次启动刷新演示位置时间，避免首页显示几小时前的旧位置。
+  await db
+    .prepare("UPDATE location_points SET ts = ? WHERE id = 'loc_seed'")
+    .run(now - 120_000);
 
   const geofence = db.prepare(
     `INSERT INTO geofences

@@ -42,8 +42,10 @@ usage() {
   status       查看 systemd 服务状态与 /ready 就绪信息
   logs         持续查看应用日志（journalctl）
   backup       立即备份 MySQL、数据目录与 /etc/yinling/yinling.env
+  pack         在本机打包干净源码（排除依赖、密钥、数据和截图），用于上传服务器
   restart      重启服务并等待就绪
   stop         停止应用（MySQL 继续运行，数据保留）
+  ai           配置 Qwen 真实模型（写入 /etc/yinling/yinling.env 并重启）
 
 选项:
   --no-build   跳过 npm 安装与构建，直接用现有 dist 重启
@@ -52,19 +54,29 @@ usage() {
   -h, --help   显示本帮助
 
 可覆盖的环境变量（写在命令前）:
-  APP_BASE_URL=http://1.2.3.4:3100   # 不填则自动探测公网 IP
-  APP_PORT=3100
+  APP_BASE_URL=http://1.2.3.4:3200   # 不填则自动探测公网 IP
+  APP_PORT=3200                      # 默认 3200，避免与同机已有 3100 服务冲突
   MYSQL_DATABASE=yinling
   MYSQL_USER=yinling
   MYSQL_PASSWORD=...                 # 只允许字母、数字和 ._~-
   MYSQL_ROOT_PASSWORD=...            # 可选；已有 MySQL 且 root 有密码时，终端会提示输入，不会写入配置
-  DEEPSEEK_API_KEY=... QWEN_API_KEY=... ARK_API_KEY=... AMAP_WEB_KEY=...
+  QWEN_API_KEY=... QWEN_BASE_URL=... QWEN_MODEL=... QWEN_ENABLE_THINKING=0
+  DEEPSEEK_API_KEY=... ARK_API_KEY=... AMAP_WEB_KEY=...
   DEMO_MODE=1                        # 正式环境改 0 关闭演示账号与种子数据
   INSTALL_DIR=/opt/yinling-shouhu
   NPM_REGISTRY=https://registry.npmmirror.com
 
 首次部署:
   bash deploy.sh
+
+更新部署（上传新代码后）:
+  本机: bash deploy.sh pack   # 生成不含 node_modules/.env/数据/截图的 tar.gz
+  上传后在服务器解压到任意目录，执行 bash deploy.sh
+  脚本会先备份数据库、数据目录、当前代码与 /etc/yinling/yinling.env，再同步代码、构建、迁移表结构并重启
+
+配置真实模型:
+  bash deploy.sh ai
+  或 QWEN_API_KEY=... QWEN_BASE_URL=... QWEN_MODEL=... bash deploy.sh
 
 HTTPS / 域名:
   改 /etc/yinling/yinling.env 里的 APP_BASE_URL，再执行 bash deploy.sh
@@ -93,6 +105,17 @@ gen_master_key() {
     openssl rand -base64 32 | tr -d '\n'
   else
     head -c 32 /dev/urandom | base64 | tr -d '\n'
+  fi
+}
+
+mask_secret() {
+  local value="${1:-}"
+  if [[ -z "$value" ]]; then
+    printf '未配置'
+  elif (( ${#value} <= 8 )); then
+    printf '****'
+  else
+    printf '%s…%s' "${value:0:4}" "${value: -4}"
   fi
 }
 
@@ -154,7 +177,7 @@ is_private_ipv4() {
 }
 
 detect_base_url() {
-  local port="${1:-3100}"
+  local port="${1:-3200}"
   local host=""
   if command -v curl >/dev/null 2>&1; then
     host="$(curl -fsS --max-time 4 https://api.ipify.org 2>/dev/null | tr -d '[:space:]' || true)"
@@ -526,11 +549,11 @@ EOF
     fi
   done
 
-  put_default APP_PORT 3100
+  put_default APP_PORT 3200
   local port
   port="$(get_env APP_PORT)"
   case "$port" in
-    ''|*[!0-9]*) port=3100 ;;
+    ''|*[!0-9]*) port=3200 ;;
   esac
   set_env APP_PORT "$port"
   set_env PORT "$port"
@@ -611,7 +634,13 @@ EOF
   put_default CORS_ORIGINS ""
 
   local key
-  for key in DEEPSEEK_API_KEY QWEN_API_KEY ARK_API_KEY ARK_BASE_URL ARK_MODEL AMAP_WEB_KEY LLM_API_KEY LLM_BASE_URL LLM_MODEL; do
+  # 命令行显式传入的模型配置优先覆盖，方便“上传新版本 + 一条命令切换模型”。
+  for key in LLM_MOCK QWEN_API_KEY QWEN_BASE_URL QWEN_MODEL QWEN_ENABLE_THINKING LLM_VISION_MODEL LLM_EMBED_MODEL; do
+    if [[ -n "${!key:-}" ]]; then
+      set_env "$key" "${!key}"
+    fi
+  done
+  for key in DEEPSEEK_API_KEY ARK_API_KEY ARK_BASE_URL ARK_MODEL AMAP_WEB_KEY LLM_API_KEY LLM_BASE_URL LLM_MODEL; do
     if [[ -n "${!key:-}" && -z "$(get_env "$key")" ]]; then
       set_env "$key" "${!key}"
     fi
@@ -623,7 +652,7 @@ EOF
 
 load_settings() {
   APP_PORT="$(get_env APP_PORT)"
-  APP_PORT="${APP_PORT:-3100}"
+  APP_PORT="${APP_PORT:-3200}"
   APP_BASE_URL="$(get_env APP_BASE_URL)"
   MYSQL_DATABASE="$(get_env MYSQL_DATABASE)"
   MYSQL_USER="$(get_env MYSQL_USER)"
@@ -689,6 +718,10 @@ sync_source() {
     --exclude '.env' \
     --exclude 'dist' \
     --exclude 'backups' \
+    --exclude '.backup' \
+    --exclude '.shots' \
+    --exclude '*.zip' \
+    --exclude '*.tar.gz' \
     --exclude '*.log' \
     --exclude 'apps/api/data' \
     --exclude 'apps/api/public/uploads' \
@@ -888,17 +921,28 @@ backup_once() {
     tar -czf "$dir/files.tar.gz" -C "$DATA_ROOT" "${items[@]}" 2>/dev/null || warn "数据目录打包失败"
   fi
 
+  if [[ -f "$INSTALL_DIR/package.json" ]]; then
+    tar -czf "$dir/code.tar.gz" -C "$INSTALL_DIR" \
+      --exclude='node_modules' \
+      --exclude='.env' \
+      --exclude='apps/api/data' \
+      --exclude='apps/api/public/uploads' \
+      --exclude='*.log' \
+      . 2>/dev/null || warn "当前已部署代码打包失败（不影响数据备份）"
+  fi
+
   cat >"$dir/README.txt" <<EOF
 备份时间: $(date '+%Y-%m-%d %H:%M:%S')
 数据库: ${MYSQL_DATABASE} / ${MYSQL_USER}
-文件: db.sql.gz、files.tar.gz、env.backup（含密钥，注意保管）
+文件: db.sql.gz、files.tar.gz、code.tar.gz、env.backup（含密钥，注意保管）
 
 恢复步骤:
 1. systemctl stop ${SERVICE_NAME}
 2. gunzip < db.sql.gz | mysql -h127.0.0.1 -u${MYSQL_USER} -p ${MYSQL_DATABASE}
 3. tar -xzf files.tar.gz -C ${DATA_ROOT}
 4. cp env.backup ${ENV_FILE} && chmod 600 ${ENV_FILE}
-5. systemctl start ${SERVICE_NAME}
+5. 回滚代码（可选）: tar -xzf code.tar.gz -C ${INSTALL_DIR}
+6. systemctl start ${SERVICE_NAME}
 EOF
 
   LAST_BACKUP="$dir"
@@ -911,9 +955,22 @@ EOF
       done || true
 }
 
+verify_schema() {
+  local table=""
+  table="$(MYSQL_PWD="$MYSQL_PASSWORD" mysql -h127.0.0.1 -P3306 -u"$MYSQL_USER" -N -B \
+    -e "SHOW TABLES LIKE 'health_profiles'" "$MYSQL_DATABASE" 2>/dev/null || true)"
+  if [[ "$table" == "health_profiles" ]]; then
+    log "数据库迁移检查通过：health_profiles 已就绪"
+  else
+    warn "数据库迁移检查未找到 health_profiles；请执行 ./deploy.sh logs 查看迁移错误"
+  fi
+}
+
 print_summary() {
   local flavor_label="MySQL 8"
   [[ "$MYSQL_FLAVOR" == "mariadb" ]] && flavor_label="MariaDB"
+  local ready_json=""
+  ready_json="$(show_ready 2>/dev/null || true)"
   printf '\n'
   log "部署完成"
   printf '  访问地址: %s\n' "$APP_BASE_URL"
@@ -923,11 +980,19 @@ print_summary() {
   printf '  数据目录: %s\n' "$DATA_ROOT"
   printf '  备份目录: %s（保留最近 5 份）\n' "$BACKUP_DIR"
   printf '  数据库: %s / 库 %s / 用户 %s（应用连接 127.0.0.1）\n' "$flavor_label" "$MYSQL_DATABASE" "$MYSQL_USER"
+  case "$ready_json" in
+    *'"llm":"live"'*) printf '  AI 模型: live（真实模型已生效）\n' ;;
+    *'"llm":"mock"'*)
+      printf '  AI 模型: mock（未配置模型 Key）\n'
+      printf '  下一步: bash deploy.sh ai 配置 Qwen，或编辑 %s 后重启\n' "$ENV_FILE"
+      ;;
+    *) printf '  AI 模型: 未确认（请查看 ./deploy.sh status）\n' ;;
+  esac
   if [[ -n "$LAST_BACKUP" ]]; then
     printf '  本次备份: %s\n' "$LAST_BACKUP"
   fi
   if [[ "${DEMO_MODE:-1}" == "1" ]]; then
-    printf '  演示登录: 长者 elder / 家属 family（DEMO_MODE=1）\n'
+    printf '  演示登录: 长辈 elder / 家人 family（DEMO_MODE=1）\n'
   else
     printf '  正式模式: DEMO_MODE=0，演示登录已关闭\n'
   fi
@@ -986,6 +1051,7 @@ do_deploy() {
     die "部署失败；修复后重新执行 bash deploy.sh"
   fi
 
+  verify_schema
   print_summary
 }
 
@@ -1045,10 +1111,10 @@ do_check() {
     log "应用服务: 尚未安装"
   fi
 
-  if command -v ss >/dev/null 2>&1 && ss -ltn 2>/dev/null | awk '{print $4}' | grep -Eq "[:.]${APP_PORT:-3100}$"; then
-    log "端口 ${APP_PORT:-3100}: 已被监听"
+  if command -v ss >/dev/null 2>&1 && ss -ltn 2>/dev/null | awk '{print $4}' | grep -Eq "[:.]${APP_PORT:-3200}$"; then
+    log "端口 ${APP_PORT:-3200}: 已被监听"
   else
-    log "端口 ${APP_PORT:-3100}: 空闲"
+    log "端口 ${APP_PORT:-3200}: 空闲"
   fi
 
   if systemctl is-active --quiet firewalld 2>/dev/null; then
@@ -1094,6 +1160,94 @@ do_restart() {
   print_summary
 }
 
+do_ai() {
+  require_root
+  systemctl cat "$SERVICE_NAME.service" >/dev/null 2>&1 \
+    || die "服务尚未部署，请先执行 bash deploy.sh"
+  ensure_env
+
+  local key base model
+  key="$(get_env QWEN_API_KEY)"
+  base="$(get_env QWEN_BASE_URL)"
+  model="$(get_env QWEN_MODEL)"
+  [[ -n "${QWEN_API_KEY:-}" ]] && key="$QWEN_API_KEY"
+  [[ -n "${QWEN_BASE_URL:-}" ]] && base="$QWEN_BASE_URL"
+  [[ -n "${QWEN_MODEL:-}" ]] && model="$QWEN_MODEL"
+  base="${base:-https://moma.cmecloud.cn/v1}"
+  model="${model:-qwen/qwen3.5-plus}"
+
+  if [[ -t 0 ]]; then
+    printf '[deploy] 当前 Key: %s\n' "$(mask_secret "$key")"
+    printf '[deploy] QWEN_API_KEY（回车保留当前）: ' >&2
+    local input=""
+    IFS= read -r -s input || true
+    printf '\n' >&2
+    [[ -n "$input" ]] && key="$input"
+    printf '[deploy] QWEN_BASE_URL [%s]: ' "$base" >&2
+    IFS= read -r input || true
+    [[ -n "$input" ]] && base="$input"
+    printf '[deploy] QWEN_MODEL [%s]: ' "$model" >&2
+    IFS= read -r input || true
+    [[ -n "$input" ]] && model="$input"
+  fi
+
+  [[ -n "$key" ]] || die "未提供 QWEN_API_KEY；非交互环境示例：QWEN_API_KEY=sk-... bash deploy.sh ai"
+  set_env LLM_MOCK 0
+  set_env QWEN_API_KEY "$key"
+  set_env QWEN_BASE_URL "$base"
+  set_env QWEN_MODEL "$model"
+  set_env QWEN_ENABLE_THINKING 0
+  log "已写入模型配置：Key $(mask_secret "$key") · $base · $model"
+
+  load_settings
+  validate_env
+  systemctl restart "$SERVICE_NAME"
+  wait_ready || die "模型配置后服务未就绪，请执行 ./deploy.sh logs 查看日志"
+  local ready
+  ready="$(show_ready 2>/dev/null || true)"
+  if [[ "$ready" == *'"llm":"live"'* ]]; then
+    log "真实模型已生效（llm=live）"
+  else
+    warn "服务已启动，但 /ready 未显示 live：$ready"
+    warn "请检查 Key、网关地址和模型名，或执行 ./deploy.sh logs 查看模型错误"
+  fi
+}
+
+do_pack() {
+  local parent out stage
+  parent="$(cd "$SOURCE_DIR/.." && pwd -P)"
+  out="${PACK_OUT:-$parent/yinling-shouhu-src-$(date +%Y%m%d-%H%M).tar.gz}"
+  stage="$(mktemp -d "${TMPDIR:-/tmp}/yinling-pack.XXXXXX")" || die "无法创建临时目录"
+  log "打包干净源码到 $out"
+  tar -cf - -C "$SOURCE_DIR" \
+    --exclude='.git' \
+    --exclude='node_modules' \
+    --exclude='dist' \
+    --exclude='.env' \
+    --exclude='.backup' \
+    --exclude='.shots' \
+    --exclude='backups' \
+    --exclude='apps/api/data' \
+    --exclude='apps/api/public/uploads' \
+    --exclude='*.log' \
+    --exclude='*.zip' \
+    --exclude='*.tar.gz' \
+    . | tar -xf - -C "$stage" || {
+      rm -rf -- "$stage"
+      die "暂存源码失败"
+    }
+  # Windows 打包会保留 CRLF，Linux 上的 bash 会报 pipefail 非法；统一转为 LF
+  find "$stage" -type f \( -name '*.sh' -o -name '*.service' \) \
+    -exec sed -i 's/\r$//' {} + 2>/dev/null || true
+  tar -czf "$out" -C "$stage" . || {
+    rm -rf -- "$stage"
+    die "打包失败"
+  }
+  rm -rf -- "$stage"
+  log "打包完成：$out"
+  du -h "$out" 2>/dev/null || true
+}
+
 do_stop() {
   require_root
   systemctl stop "$SERVICE_NAME"
@@ -1115,7 +1269,7 @@ while [[ $# -gt 0 ]]; do
     --force-deps)
       FORCE_DEPS=1
       ;;
-    deploy|up|check|status|logs|backup|restart|stop)
+    deploy|up|check|status|logs|backup|pack|restart|stop|ai)
       [[ "$COMMAND_SET" -eq 0 ]] || die "只能指定一个命令"
       COMMAND="$1"
       COMMAND_SET=1
@@ -1133,6 +1287,8 @@ case "$COMMAND" in
   status) do_status ;;
   logs) do_logs ;;
   backup) do_backup ;;
+  pack) do_pack ;;
   restart) do_restart ;;
   stop) do_stop ;;
+  ai) do_ai ;;
 esac

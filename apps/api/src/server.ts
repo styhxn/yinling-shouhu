@@ -24,8 +24,10 @@ import { createRateLimiter } from "./services/rateLimit.js";
 import { createInterviewService, type InterviewService } from "./services/memory/interview.js";
 import { createMemoryProfileService, type MemoryProfileService } from "./services/memory/profile.js";
 import { createStoryService, type StoryService } from "./services/memory/story.js";
+import { createDietService, type DietService } from "./services/diet/diet.js";
 import { createAntiFraudService, type AntiFraudService } from "./services/safety/antiFraud.js";
 import { createCoolingOffService, type CoolingOffService } from "./services/safety/coolingOff.js";
+import { createHelpHomeService, type HelpHomeService } from "./services/safety/helpHome.js";
 import { createStore } from "./services/store.js";
 import { createWeatherService } from "./services/weather.js";
 import { createDb, type AppDb } from "./store/db.js";
@@ -63,8 +65,10 @@ export async function createServer(options: CreateServerOptions = {}) {
   const location = createLocationService(db);
   const antiFraud = createAntiFraudService(modelRouter);
   const coolingOff = createCoolingOffService({ db, eventBus });
+  const helpHome = createHelpHomeService({ db, eventBus });
   const interview = createInterviewService(db, modelRouter);
   const story = createStoryService(db, modelRouter);
+  const diet = createDietService({ db, modelRouter });
   const toolRegistry = createToolRegistry({
     db,
     store,
@@ -74,7 +78,9 @@ export async function createServer(options: CreateServerOptions = {}) {
     location,
     antiFraud,
     coolingOff,
-    modelRouter
+    modelRouter,
+    diet,
+    helpHome
   });
   const memoryProfile = createMemoryProfileService(db, modelRouter);
   const agentRuntime = createAgentRuntime({ db, modelRouter, toolRegistry });
@@ -117,9 +123,11 @@ export async function createServer(options: CreateServerOptions = {}) {
   server.decorate("memoryProfile", memoryProfile);
   server.decorate("antiFraud", antiFraud);
   server.decorate("coolingOff", coolingOff);
+  server.decorate("helpHome", helpHome);
   server.decorate("weather", weather);
   server.decorate("interview", interview);
   server.decorate("story", story);
+  server.decorate("diet", diet);
 
   server.addHook("onRequest", async (req, reply) => {
     const token = readCookie(req.headers.cookie, config.cookieName);
@@ -146,8 +154,11 @@ export async function createServer(options: CreateServerOptions = {}) {
       pathname.startsWith("/api/memory/interview") ||
       pathname === "/api/memory/story/generate" ||
       pathname === "/api/safety/scam/check" ||
-      pathname.startsWith("/api/safety/roleplay");
-    const bucket = pathname === "/api/auth/demo-login"
+      pathname.startsWith("/api/safety/roleplay") ||
+      pathname.startsWith("/api/diet");
+    const isAuthPath =
+      pathname.startsWith("/api/auth/") && pathname !== "/api/auth/meta";
+    const bucket = isAuthPath
       ? { name: "auth", max: config.rateLimit.authMax }
       : isAiPath
         ? { name: "ai", max: config.rateLimit.aiMax }
@@ -330,8 +341,10 @@ declare module "fastify" {
     memoryProfile: MemoryProfileService;
     antiFraud: AntiFraudService;
     coolingOff: CoolingOffService;
+    helpHome: HelpHomeService;
     weather: ReturnType<typeof createWeatherService>;
     interview: InterviewService;
     story: StoryService;
+    diet: DietService;
   }
 }

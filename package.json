@@ -1,6 +1,6 @@
 {
   "name": "zhiban-yinling-system",
-  "description": "银龄守护：会倾听也会守护的江苏长者 AI 陪伴系统",
+  "description": "银龄守护：会倾听也会守护的江苏长辈 AI 陪伴系统",
   "private": true,
   "type": "module",
   "workspaces": [
@@ -20,7 +20,8 @@
     "build": "npm run build:packages && npm run build:apps",
     "typecheck": "npm run typecheck:packages && npm run typecheck:apps",
     "verify": "npm run build:packages && npm run typecheck:packages && npm run typecheck:apps && npm run build:apps && npm run test",
-    "eval": "tsx scripts/eval.ts"
+    "eval": "tsx scripts/eval.ts",
+    "reset:demo": "tsx scripts/reset-demo.ts"
   },
   "devDependencies": {
     "concurrently": "^9.1.2",

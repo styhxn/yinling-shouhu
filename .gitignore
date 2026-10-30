@@ -17,6 +17,7 @@ apps/api/public/uploads/
 tmp_*.json
 .shots/
 backups/
+.backup/
 
 # Python / 数字人训练环境（保留 web_demo/static）
 .venv/

@@ -11,6 +11,28 @@ export type DbUser = {
   role: Role;
   displayName: string;
   elderId: string | null;
+  phone: string | null;
+  createdAt: number;
+};
+
+export type DbAuthCode = {
+  id: string;
+  phone: string;
+  codeHash: string;
+  expiresAt: number;
+  consumedAt: number | null;
+  attempts: number;
+  createdAt: number;
+};
+
+export type DbElderInvite = {
+  id: string;
+  elderId: string;
+  createdBy: string;
+  codeHash: string;
+  expiresAt: number;
+  consumedAt: number | null;
+  attempts: number;
   createdAt: number;
 };
 
@@ -19,6 +41,15 @@ export type DbElder = {
   displayName: string;
   birthYear: number | null;
   gender: string | null;
+};
+
+export type DbHealthProfile = {
+  elderId: string;
+  conditions: string[];
+  allergies: string[];
+  dietNotes: string | null;
+  homeAddress: string | null;
+  updatedAt: number;
 };
 
 export type DbFamilyLink = {
@@ -408,12 +439,78 @@ export type CreateDbOptions = {
   seed?: boolean;
 };
 
+/**
+ * 演示数据重置会清空的业务表（按子表优先排列）。
+ * 保留 schema_migrations、kb_docs/kb_chunks 与 eval_cases/eval_runs，避免重置后丢失评测材料；
+ * 新增业务表时必须同步加入此列表。
+ */
+export const DEMO_RESET_TABLES = [
+  "agent_confirmations",
+  "cooling_offs",
+  "family_confirms",
+  "family_messages",
+  "medication_logs",
+  "medications",
+  "missing_posters",
+  "safety_alerts",
+  "location_points",
+  "geofences",
+  "story_chapters",
+  "story_books",
+  "interviews",
+  "memories",
+  "memory_profiles",
+  "agent_briefs",
+  "agent_traces",
+  "tool_logs",
+  "scam_checks",
+  "roleplay_sessions",
+  "auth_codes",
+  "elder_invites",
+  "family_links",
+  "health_profiles",
+  "privacy",
+  "profiles",
+  "consents",
+  "uploads",
+  "audit_logs",
+  "sessions",
+  "users",
+  "elders"
+] as const;
+
 function asUser(row: any): DbUser {
   return {
     id: String(row.id),
     role: row.role as Role,
     displayName: String(row.display_name),
     elderId: row.elder_id ? String(row.elder_id) : null,
+    phone: row.phone ? String(row.phone) : null,
+    createdAt: Number(row.created_at)
+  };
+}
+
+function asAuthCode(row: any): DbAuthCode {
+  return {
+    id: String(row.id),
+    phone: String(row.phone),
+    codeHash: String(row.code_hash),
+    expiresAt: Number(row.expires_at),
+    consumedAt: row.consumed_at === null ? null : Number(row.consumed_at),
+    attempts: Number(row.attempts ?? 0),
+    createdAt: Number(row.created_at)
+  };
+}
+
+function asElderInvite(row: any): DbElderInvite {
+  return {
+    id: String(row.id),
+    elderId: String(row.elder_id),
+    createdBy: String(row.created_by),
+    codeHash: String(row.code_hash),
+    expiresAt: Number(row.expires_at),
+    consumedAt: row.consumed_at === null ? null : Number(row.consumed_at),
+    attempts: Number(row.attempts ?? 0),
     createdAt: Number(row.created_at)
   };
 }
@@ -447,13 +544,46 @@ export async function createDb(sql: SqlClient, options: CreateDbOptions) {
       const row = await sql.prepare("SELECT * FROM users WHERE id = ?").get(id) as any;
       return row ? asUser(row) : null;
     },
+    async getByPhone(phone: string): Promise<DbUser | null> {
+      const row = await sql.prepare("SELECT * FROM users WHERE phone = ? LIMIT 1").get(phone) as any;
+      return row ? asUser(row) : null;
+    },
+    async getElderUser(elderId: string): Promise<DbUser | null> {
+      const row = await sql
+        .prepare("SELECT * FROM users WHERE role = 'elder' AND elder_id = ? ORDER BY created_at ASC LIMIT 1")
+        .get(elderId) as any;
+      return row ? asUser(row) : null;
+    },
+    async create(input: {
+      id: string;
+      role: Role;
+      displayName: string;
+      elderId: string | null;
+      phone?: string | null;
+      createdAt: number;
+    }): Promise<DbUser> {
+      await sql
+        .prepare(
+          "INSERT INTO users (id, role, display_name, elder_id, phone, created_at) VALUES (?, ?, ?, ?, ?, ?)"
+        )
+        .run(
+          input.id,
+          input.role,
+          input.displayName,
+          input.elderId,
+          input.phone ?? null,
+          input.createdAt
+        );
+      return (await users.getById(input.id))!;
+    },
     async findDemo(role: Role): Promise<DbUser | null> {
       const row = await sql.prepare("SELECT * FROM users WHERE role = ? ORDER BY created_at ASC LIMIT 1")
         .get(role) as any;
       return row ? asUser(row) : null;
     },
     async listFamilyLinks(userId: string): Promise<DbFamilyLink[]> {
-      const rows = await sql.prepare("SELECT * FROM family_links WHERE family_user_id = ? AND status = 'active'")
+      const rows = await sql
+        .prepare("SELECT * FROM family_links WHERE family_user_id = ? AND status = 'active' ORDER BY created_at ASC")
         .all(userId) as any[];
       return rows.map((r) => ({
         id: String(r.id),
@@ -480,8 +610,110 @@ export async function createDb(sql: SqlClient, options: CreateDbOptions) {
         phone: r.phone ? String(r.phone) : null
       }));
     },
+    async create(input: {
+      id: string;
+      familyUserId: string;
+      elderId: string;
+      relation?: string | null;
+      phone?: string | null;
+      createdAt: number;
+    }): Promise<DbFamilyLink> {
+      await sql
+        .prepare(
+          "INSERT INTO family_links (id, family_user_id, elder_id, relation, status, phone, created_at) VALUES (?, ?, ?, ?, 'active', ?, ?)"
+        )
+        .run(
+          input.id,
+          input.familyUserId,
+          input.elderId,
+          input.relation ?? null,
+          input.phone ?? null,
+          input.createdAt
+        );
+      const row = await sql.prepare("SELECT * FROM family_links WHERE id = ?").get(input.id) as any;
+      return {
+        id: String(row.id),
+        familyUserId: String(row.family_user_id),
+        elderId: String(row.elder_id),
+        relation: row.relation ? String(row.relation) : null,
+        status: String(row.status),
+        phone: row.phone ? String(row.phone) : null
+      };
+    },
     async setPhone(id: string, phone: string | null): Promise<void> {
       await sql.prepare("UPDATE family_links SET phone = ? WHERE id = ?").run(phone, id);
+    }
+  };
+
+  const authCodes = {
+    async create(input: {
+      id: string;
+      phone: string;
+      codeHash: string;
+      expiresAt: number;
+      createdAt: number;
+    }): Promise<void> {
+      await sql
+        .prepare(
+          "INSERT INTO auth_codes (id, phone, code_hash, expires_at, consumed_at, attempts, created_at) VALUES (?, ?, ?, ?, NULL, 0, ?)"
+        )
+        .run(input.id, input.phone, input.codeHash, input.expiresAt, input.createdAt);
+    },
+    async latest(phone: string): Promise<DbAuthCode | null> {
+      const row = await sql
+        .prepare("SELECT * FROM auth_codes WHERE phone = ? ORDER BY created_at DESC LIMIT 1")
+        .get(phone) as any;
+      return row ? asAuthCode(row) : null;
+    },
+    async markConsumed(id: string, ts: number): Promise<void> {
+      await sql
+        .prepare("UPDATE auth_codes SET consumed_at = ? WHERE id = ? AND consumed_at IS NULL")
+        .run(ts, id);
+    },
+    async incrementAttempts(id: string): Promise<number> {
+      await sql.prepare("UPDATE auth_codes SET attempts = attempts + 1 WHERE id = ?").run(id);
+      const row = await sql.prepare("SELECT attempts FROM auth_codes WHERE id = ?").get(id) as any;
+      return Number(row?.attempts ?? 0);
+    }
+  };
+
+  const elderInvites = {
+    async create(input: {
+      id: string;
+      elderId: string;
+      createdBy: string;
+      codeHash: string;
+      expiresAt: number;
+      createdAt: number;
+    }): Promise<void> {
+      await sql
+        .prepare(
+          "INSERT INTO elder_invites (id, elder_id, created_by, code_hash, expires_at, consumed_at, attempts, created_at) VALUES (?, ?, ?, ?, ?, NULL, 0, ?)"
+        )
+        .run(input.id, input.elderId, input.createdBy, input.codeHash, input.expiresAt, input.createdAt);
+    },
+    async findByHash(codeHash: string): Promise<DbElderInvite | null> {
+      const row = await sql
+        .prepare(
+          "SELECT * FROM elder_invites WHERE code_hash = ? AND consumed_at IS NULL ORDER BY created_at DESC LIMIT 1"
+        )
+        .get(codeHash) as any;
+      return row ? asElderInvite(row) : null;
+    },
+    async markConsumed(id: string, ts: number): Promise<void> {
+      await sql
+        .prepare("UPDATE elder_invites SET consumed_at = ? WHERE id = ? AND consumed_at IS NULL")
+        .run(ts, id);
+    },
+    async incrementAttempts(id: string): Promise<number> {
+      await sql.prepare("UPDATE elder_invites SET attempts = attempts + 1 WHERE id = ?").run(id);
+      const row = await sql.prepare("SELECT attempts FROM elder_invites WHERE id = ?").get(id) as any;
+      return Number(row?.attempts ?? 0);
+    },
+    async invalidateForElder(elderId: string, ts: number): Promise<void> {
+      await sql
+        .prepare("UPDATE elder_invites SET consumed_at = ? WHERE elder_id = ? AND consumed_at IS NULL")
+        .run(ts, elderId);
     }
   };
 
@@ -498,7 +730,7 @@ export async function createDb(sql: SqlClient, options: CreateDbOptions) {
       const kind = input.kind ?? "general";
       await sql
         .prepare(
-          "INSERT INTO family_messages (id, elder_id, family_user_id, from_role, content, kind, read, created_at) VALUES (?, ?, ?, ?, ?, ?, 0, ?)"
+          "INSERT INTO family_messages (id, elder_id, family_user_id, from_role, content, kind, `read`, created_at) VALUES (?, ?, ?, ?, ?, ?, 0, ?)"
         )
         .run(id, input.elderId, input.familyUserId, input.fromRole, input.content, kind, now);
       return {
@@ -515,7 +747,7 @@ export async function createDb(sql: SqlClient, options: CreateDbOptions) {
     async listByFamily(familyUserId: string, limit = 50): Promise<DbFamilyMessage[]> {
       const rows = (await sql
         .prepare(
-          "SELECT id, elder_id, family_user_id, from_role, content, kind, read, created_at FROM family_messages WHERE family_user_id = ? ORDER BY created_at DESC LIMIT ?"
+          "SELECT id, elder_id, family_user_id, from_role, content, kind, `read`, created_at FROM family_messages WHERE family_user_id = ? ORDER BY created_at DESC LIMIT ?"
         )
         .all(familyUserId, limit)) as Record<string, unknown>[];
       return rows.map((r) => ({
@@ -534,7 +766,7 @@ export async function createDb(sql: SqlClient, options: CreateDbOptions) {
       const placeholders = ids.map(() => "?").join(",");
       const result = await sql
         .prepare(
-          `UPDATE family_messages SET read = 1 WHERE family_user_id = ? AND id IN (${placeholders})`
+          `UPDATE family_messages SET \`read\` = 1 WHERE family_user_id = ? AND id IN (${placeholders})`
         )
         .run(familyUserId, ...ids);
       return result.changes;
@@ -542,7 +774,7 @@ export async function createDb(sql: SqlClient, options: CreateDbOptions) {
     async listByElder(elderId: string, limit = 50): Promise<DbFamilyMessage[]> {
       const rows = (await sql
         .prepare(
-          "SELECT id, elder_id, family_user_id, from_role, content, kind, read, created_at FROM family_messages WHERE elder_id = ? ORDER BY created_at DESC LIMIT ?"
+          "SELECT id, elder_id, family_user_id, from_role, content, kind, `read`, created_at FROM family_messages WHERE elder_id = ? ORDER BY created_at DESC LIMIT ?"
         )
         .all(elderId, limit)) as Record<string, unknown>[];
       return rows.map((r) => ({
@@ -561,7 +793,7 @@ export async function createDb(sql: SqlClient, options: CreateDbOptions) {
       const placeholders = ids.map(() => "?").join(",");
       const result = await sql
         .prepare(
-          `UPDATE family_messages SET read = 1 WHERE elder_id = ? AND id IN (${placeholders})`
+          `UPDATE family_messages SET \`read\` = 1 WHERE elder_id = ? AND id IN (${placeholders})`
         )
         .run(elderId, ...ids);
       return result.changes;
@@ -578,6 +810,85 @@ export async function createDb(sql: SqlClient, options: CreateDbOptions) {
         birthYear: row.birth_year === null ? null : Number(row.birth_year),
         gender: row.gender === null ? null : String(row.gender)
       };
+    },
+    async create(input: {
+      id: string;
+      displayName: string;
+      birthYear?: number | null;
+      gender?: string | null;
+      createdAt: number;
+    }): Promise<DbElder> {
+      await sql
+        .prepare(
+          "INSERT INTO elders (id, display_name, birth_year, gender, cognitive_note_enc, created_at) VALUES (?, ?, ?, ?, NULL, ?)"
+        )
+        .run(
+          input.id,
+          input.displayName,
+          input.birthYear ?? null,
+          input.gender ?? null,
+          input.createdAt
+        );
+      return (await elders.getById(input.id))!;
+    }
+  };
+
+  function mapHealthProfile(row: any): DbHealthProfile {
+    return {
+      elderId: String(row.elder_id),
+      conditions: parseJson<string[]>(row.conditions_json, []).filter(
+        (item): item is string => typeof item === "string"
+      ),
+      allergies: parseJson<string[]>(row.allergies_json, []).filter(
+        (item): item is string => typeof item === "string"
+      ),
+      dietNotes: row.diet_notes ? String(row.diet_notes) : null,
+      homeAddress: row.home_address ? String(row.home_address) : null,
+      updatedAt: Number(row.updated_at)
+    };
+  }
+
+  const healthProfiles = {
+    async getByElder(elderId: string): Promise<DbHealthProfile | null> {
+      const row = await sql.prepare("SELECT * FROM health_profiles WHERE elder_id = ?").get(elderId) as any;
+      return row ? mapHealthProfile(row) : null;
+    },
+    async upsert(input: {
+      elderId: string;
+      conditions: string[];
+      allergies: string[];
+      dietNotes?: string | null;
+      homeAddress?: string | null;
+    }): Promise<DbHealthProfile> {
+      const now = Date.now();
+      const statement = isMysql
+        ? `INSERT INTO health_profiles
+             (elder_id, conditions_json, allergies_json, diet_notes, home_address, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?)
+           ON DUPLICATE KEY UPDATE
+             conditions_json = VALUES(conditions_json),
+             allergies_json = VALUES(allergies_json),
+             diet_notes = VALUES(diet_notes),
+             home_address = VALUES(home_address),
+             updated_at = VALUES(updated_at)`
+        : `INSERT INTO health_profiles
+             (elder_id, conditions_json, allergies_json, diet_notes, home_address, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?)
+           ON CONFLICT(elder_id) DO UPDATE SET
+             conditions_json = excluded.conditions_json,
+             allergies_json = excluded.allergies_json,
+             diet_notes = excluded.diet_notes,
+             home_address = excluded.home_address,
+             updated_at = excluded.updated_at`;
+      await sql.prepare(statement).run(
+        input.elderId,
+        JSON.stringify(input.conditions),
+        JSON.stringify(input.allergies),
+        input.dietNotes ?? null,
+        input.homeAddress ?? null,
+        now
+      );
+      return (await healthProfiles.getByElder(input.elderId))!;
     }
   };
 
@@ -1146,7 +1457,7 @@ export async function createDb(sql: SqlClient, options: CreateDbOptions) {
     return {
       id: String(row.id),
       elderId: String(row.elder_id),
-      elderName: String(row.elder_name ?? "老人"),
+      elderName: String(row.elder_name ?? "长辈"),
       birthYear: row.birth_year === null || typeof row.birth_year === "undefined" ? null : Number(row.birth_year),
       lastSeenText: dec<string>(row.last_seen_text_enc) ?? "",
       lastSeenTs: row.last_seen_ts === null ? null : Number(row.last_seen_ts),
@@ -2016,14 +2327,27 @@ export async function createDb(sql: SqlClient, options: CreateDbOptions) {
 
   return {
     sql,
+    /** 清空演示业务数据并重新种子化；用于演示前一键恢复初始状态。 */
+    async resetDemoData() {
+      await sql.transaction(async (tx) => {
+        for (const table of DEMO_RESET_TABLES) {
+          await tx.exec(`DELETE FROM ${table}`);
+        }
+        await seedDemo(tx, options.masterKey);
+      });
+      return { tables: DEMO_RESET_TABLES.length };
+    },
     users,
     elders,
+    healthProfiles,
     sessions,
     confirmations,
     coolingOffs,
     familyConfirms,
     familyLinks,
     familyMessages,
+    authCodes,
+    elderInvites,
     medications,
     locations,
     toolLogs,
