@@ -19,6 +19,12 @@
   transition: top 160ms ease;
 }
 
+.yl-shell .yl-skipLink,
+.ys-rolePage .yl-skipLink,
+.ys-kioskShell .yl-skipLink {
+  color: #fff;
+}
+
 .yl-skipLink:focus {
   top: 0;
 }

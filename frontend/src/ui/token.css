@@ -467,6 +467,24 @@ body {
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.4), transparent);
 }
 
+/* 恢复实色按钮底色：上面的 .btn 会覆盖 styles.css 中同优先级的
+   .btnPrimary / .btnAccent / .btnDanger 底色，导致白字压在白底上 */
+.btnPrimary {
+  background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+  color: #ffffff;
+  border-color: transparent;
+}
+.btnAccent {
+  background: linear-gradient(135deg, var(--accent), var(--accent-light, #4ade80));
+  color: #ffffff;
+  border-color: transparent;
+}
+.btnDanger {
+  background: rgba(255, 71, 87, 0.12);
+  border-color: rgba(255, 71, 87, 0.5);
+  color: var(--danger);
+}
+
 /* hover 可见度修复：实色按钮（Primary/Accent/Danger）hover 时保持实色底 + 白字，
    避免被 .btn:hover 的浅灰底覆盖后白字看不清 */
 .btnPrimary:hover {
@@ -487,6 +505,15 @@ body {
 /* ghost 按钮 hover 也保持深字可见 */
 .btn--ghost:hover {
   color: var(--primary-700);
+}
+/* 禁用态保持标签可读，避免白字压在低透明度实色底上 */
+.btn:disabled.btnPrimary,
+.btn:disabled.btnAccent,
+.btn:disabled.btnDanger {
+  background: var(--gray-100);
+  color: var(--gray-500);
+  border-color: var(--border);
+  opacity: 1;
 }
 
 /* #7 .weatherTemp 渐变字：浅色底上浅渐变文字看不清 → 实色 */

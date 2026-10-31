@@ -3,8 +3,7 @@
  * 不使用紫色渐变、玻璃拟态和重阴影。
  */
 
-.yl-shell,
-.ys-rolePage {
+:root {
   --ys-paper: #f2f4ef;
   --ys-paper-deep: #e7ebe3;
   --ys-surface: #fafbf7;
@@ -22,7 +21,11 @@
   --ys-radius: 2px;
   --ys-serif: "Songti SC", "Noto Serif SC", "STSong", "SimSun", "Source Han Serif SC", serif;
   --ys-sans: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+}
 
+.yl-shell,
+.ys-rolePage,
+.ys-kioskShell {
   /* 兼容旧组件使用的设计变量 */
   --bg: var(--ys-paper);
   --text: var(--ys-ink);
@@ -31,8 +34,10 @@
   --border: var(--ys-line);
   --border-strong: var(--ys-line-strong);
   --primary: var(--ys-celadon);
+  --primary-light: var(--ys-celadon);
   --primary-600: var(--ys-celadon);
   --primary-700: var(--ys-celadon-deep);
+  --primary-dark: var(--ys-celadon-deep);
   --primary-50: var(--ys-celadon-soft);
   --accent: var(--ys-celadon);
   --danger: var(--ys-seal);
@@ -1666,12 +1671,12 @@ body {
 
 .yl-bubble {
   border-radius: 2px;
-  background: var(--ys-paper-deep);
-  color: var(--ys-ink);
+  background: var(--ys-paper-deep, #e7ebe3);
+  color: var(--ys-ink, #1c2724);
 }
 
 .yl-chatMsg--user .yl-bubble {
-  background: var(--ys-celadon-deep);
+  background: var(--ys-celadon-deep, #3e5a4e);
   color: #fff;
 }
 
