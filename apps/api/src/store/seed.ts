@@ -51,6 +51,35 @@ export async function seedDemo(db: SqlClient, masterKey: Buffer) {
   // 演示库每次启动都会 seed：为历史已存在的家人链接补上联系电话
   await db.exec("UPDATE family_links SET phone = '13800001234' WHERE id = 'fl_1' AND phone IS NULL");
 
+  // 每天留一条未读家人留言和一条长辈回话，首次进入长辈端/家人端就能看到真实互动。
+  const messageYmd = `${new Date(now).getFullYear()}${String(new Date(now).getMonth() + 1).padStart(2, "0")}${String(new Date(now).getDate()).padStart(2, "0")}`;
+  const familyMessage = db.prepare(
+    `INSERT INTO family_messages
+      (id, elder_id, family_user_id, from_role, content, kind, \`read\`, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+     ${ignoreExisting}`
+  );
+  await familyMessage.run(
+    `msg_seed_family_${messageYmd}`,
+    "e_li",
+    "u_family",
+    "family",
+    "妈，今天降温，出门记得加件外套。",
+    "care",
+    0,
+    now - 8 * 60 * 1000
+  );
+  await familyMessage.run(
+    `msg_seed_elder_${messageYmd}`,
+    "e_li",
+    "u_family",
+    "elder",
+    "我今天在小区走了两圈，挺好的，你们放心。",
+    "peace",
+    0,
+    now - 40 * 60 * 1000
+  );
+
   const med = db.prepare(
     `INSERT INTO medications
       (id, elder_id, name, generic_name, spec, dosage, schedule_json, photo_upload_id, notes_enc, created_at, updated_at)
@@ -96,6 +125,38 @@ export async function seedDemo(db: SqlClient, masterKey: Buffer) {
          ${ignoreExisting}`
       )
       .run(`ml_seed_${ymd}`, "med_1", "e_li", "taken", "08:00", eight.getTime());
+  }
+
+  // 过去 6 天补一份接近真实的服药记录（17/18 次），让家人周报的依从率有参考价值。
+  const historicalDoses = [
+    { medicationId: "med_1", time: "08:00" },
+    { medicationId: "med_2", time: "08:00" },
+    { medicationId: "med_2", time: "18:00" }
+  ] as const;
+  const historicalLog = db.prepare(
+    `INSERT INTO medication_logs (id, medication_id, elder_id, status, scheduled_time, ts)
+     VALUES (?, ?, ?, ?, ?, ?)
+     ${ignoreExisting}`
+  );
+  for (let daysAgo = 1; daysAgo <= 6; daysAgo += 1) {
+    const day = new Date(now);
+    day.setDate(day.getDate() - daysAgo);
+    const ymd = `${day.getFullYear()}${String(day.getMonth() + 1).padStart(2, "0")}${String(day.getDate()).padStart(2, "0")}`;
+    for (const [index, dose] of historicalDoses.entries()) {
+      // 留一次漏服，让周报既真实又有可讲的建议。
+      if (daysAgo === 2 && index === 2) continue;
+      const [hour, minute] = dose.time.split(":").map(Number);
+      const ts = new Date(day);
+      ts.setHours(hour ?? 0, minute ?? 0, 0, 0);
+      await historicalLog.run(
+        `ml_seed_hist_${ymd}_${dose.medicationId}_${hour}${minute}`,
+        dose.medicationId,
+        "e_li",
+        "taken",
+        dose.time,
+        ts.getTime()
+      );
+    }
   }
 
   const loc = db.prepare(

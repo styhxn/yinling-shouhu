@@ -50,7 +50,8 @@ describe("demo reset", () => {
       headers: { cookie: elderCookie }
     });
     expect(inboxBefore.statusCode).toBe(200);
-    expect((inboxBefore.json() as any).items).toHaveLength(1);
+    const beforeItems = (inboxBefore.json() as any).items as Array<{ content: string }>;
+    expect(beforeItems.some((item) => item.content === "重置前的一条留言")).toBe(true);
 
     const reset = await server.inject({
       method: "POST",
@@ -73,7 +74,9 @@ describe("demo reset", () => {
       url: "/api/family/elder/messages",
       headers: { cookie: elderCookie }
     });
-    expect((inboxAfter.json() as any).items).toHaveLength(0);
+    const afterItems = (inboxAfter.json() as any).items as Array<{ content: string }>;
+    expect(afterItems.length).toBeGreaterThanOrEqual(1);
+    expect(afterItems.some((item) => item.content === "重置前的一条留言")).toBe(false);
 
     const memories = await server.inject({
       method: "GET",

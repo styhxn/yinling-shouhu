@@ -160,8 +160,10 @@ export const familyRoutes: FastifyPluginAsync = async (server) => {
   });
 
   // 长辈读取家人发来的站内消息（按当前长辈聚合，含家人姓名；未读自动标记已读）
+  // peek=1 只预览未读消息，不改变已读状态，供陪伴屏做新消息提醒。
   server.get("/elder/messages", { preHandler: requireRole("elder") }, async (req, reply) => {
     const elderId = req.user!.elderId!;
+    const peek = (req.query as { peek?: string } | undefined)?.peek === "1";
     const items = await server.db.familyMessages.listByElder(elderId);
     const links = await server.db.users.listFamilyLinks(elderId);
     const names = new Map<string, string>();
@@ -174,11 +176,12 @@ export const familyRoutes: FastifyPluginAsync = async (server) => {
     const unreadIds = items
       .filter((item) => !item.read && item.fromRole === "family")
       .map((item) => item.id);
-    if (unreadIds.length > 0) {
+    if (!peek && unreadIds.length > 0) {
       await server.db.familyMessages.markReadElder(elderId, unreadIds);
     }
     return {
       ok: true,
+      unreadCount: unreadIds.length,
       items: items.map((item) => ({
         id: item.id,
         elderId: item.elderId,
