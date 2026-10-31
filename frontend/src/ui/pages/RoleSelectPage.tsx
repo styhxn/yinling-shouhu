@@ -1,6 +1,7 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
 import heroUrl from "../assets/landing/hero.webp";
+import dawnUrl from "../assets/landing/dawn.webp";
 import assistantShot from "../assets/landing/assistant.webp";
 import safetyShot from "../assets/landing/safety.webp";
 import healthShot from "../assets/landing/health.webp";
@@ -405,11 +406,11 @@ export function RoleSelectPage() {
                 水韵江苏 · 银龄守护
               </p>
               <h1 className="lp-heroTitle">
-                让 AI 住进
-                <em>爸妈的日常</em>
+                AI 守护
+                <em>家人健康</em>
               </h1>
               <p className="lp-heroLead">
-                会倾听、会提醒、会守护。让长辈被照顾，也让家人被安心。
+                会倾听、会提醒、会守护。用药、防骗、回忆，还有家人的牵挂，都在一处照看。
               </p>
               <p className="lp-heroTags">AI 陪伴 · 安全守护 · 健康照护 · 回忆留存</p>
               <div className="lp-heroActions">
@@ -528,13 +529,18 @@ export function RoleSelectPage() {
         ))}
 
         <section id="entry" className="lp-entry" aria-labelledby="entry-title">
-          <div className="lp-entryRing" aria-hidden="true" />
+          <img className="lp-entryBackdrop" src={dawnUrl} alt="" aria-hidden="true" loading="lazy" decoding="async" />
+          <p className="lp-entryPoem lp-reveal" aria-hidden="true">
+            <span>晨雾散时</span>
+            <span>家里有人应声</span>
+            <i>家</i>
+          </p>
           <div className="lp-wrap lp-entryInner">
             <div className="lp-entryHead lp-reveal">
               <p className="lp-eyebrow lp-eyebrow--entry">
-                <span className="lp-eyebrowNum">现在</span>
+                <span className="lp-eyebrowNum">06</span>
                 <span className="lp-eyebrowLine" aria-hidden="true" />
-                <span>进入系统</span>
+                <span>清晨 · 进入系统</span>
               </p>
               <h2 id="entry-title">
                 让今天，从一句
