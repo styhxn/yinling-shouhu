@@ -38,10 +38,10 @@ import type {
   WeeklyReport
 } from "./types.js";
 
-function query(params: Record<string, string | undefined>) {
+function query(params: Record<string, string | number | undefined>) {
   const search = new URLSearchParams();
   for (const [key, value] of Object.entries(params)) {
-    if (value) search.set(key, value);
+    if (value !== undefined && value !== "") search.set(key, String(value));
   }
   const text = search.toString();
   return text ? `?${text}` : "";
@@ -293,7 +293,14 @@ export const api = {
         `/safety/location/latest${query({ elderId })}`
       );
     },
-    helpHome(input: { elderId?: string; lat?: number; lng?: number } = {}) {
+    reverseGeocode(lat: number, lng: number) {
+      return httpJson<{
+        ok: boolean;
+        address: string | null;
+        source: "amap" | "cache" | "unavailable";
+      }>(`/safety/location/address${query({ lat, lng })}`);
+    },
+    helpHome(input: { elderId?: string; lat?: number; lng?: number; accuracy?: number } = {}) {
       return httpJson<{ ok: boolean; card: HelpHomeCard; alertId: string }>(
         "/safety/help-home",
         {

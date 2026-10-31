@@ -727,6 +727,7 @@ a {
   font-weight: 700;
   font-size: 15px;
   cursor: pointer;
+  text-decoration: none;
   transition: all var(--transition-normal);
   position: relative;
   overflow: hidden;

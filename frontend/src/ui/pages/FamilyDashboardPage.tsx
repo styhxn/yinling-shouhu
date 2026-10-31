@@ -48,19 +48,35 @@ function alertLabel(type: string) {
   return "安全提醒";
 }
 
+function formatDistance(meters: number) {
+  return meters < 1000 ? `${Math.round(meters)} 米` : `${(meters / 1000).toFixed(1)} 公里`;
+}
+
 function alertDetail(alert: SafetyAlert) {
   const payload = alert.payload ?? {};
   if (alert.type === "geofence.exit") {
     const name = typeof payload.geofenceName === "string" ? payload.geofenceName : "安全区域";
     const distance =
-      typeof payload.distanceMeters === "number" ? `，距离约 ${payload.distanceMeters} 米` : "";
-    return `已离开${name}${distance}`;
+      typeof payload.distanceMeters === "number"
+        ? `，距离约 ${formatDistance(payload.distanceMeters)}`
+        : "";
+    const address =
+      typeof payload.address === "string" && payload.address ? `，位置在${payload.address}附近` : "";
+    return `已离开${name}${distance}${address}`;
   }
   if (alert.type === "scam.high") return "检测到高风险信息，请尽快电话确认";
   if (alert.type === "cooling_off") return "转账处于冷静期，等待家人处理";
   if (alert.type === "help_home") {
-    const address = typeof payload.address === "string" ? payload.address : "家附近";
-    return `长辈发起了回家求助，位置在${address}附近，请立即联系。`;
+    const currentAddress =
+      typeof payload.currentAddress === "string" ? payload.currentAddress : null;
+    if (currentAddress) {
+      return `长辈发起了回家求助，位置在${currentAddress}附近，请立即联系。`;
+    }
+    const last = payload.lastLocation as { lat?: unknown; lng?: unknown } | null;
+    if (typeof last?.lat === "number" && typeof last.lng === "number") {
+      return `长辈发起了回家求助，最后位置 ${last.lat.toFixed(5)}, ${last.lng.toFixed(5)}，请立即联系。`;
+    }
+    return "长辈发起了回家求助，请立即联系。";
   }
   return "";
 }
@@ -358,8 +374,21 @@ export function FamilyDashboardPage() {
           <section className="ys-summaryStrip">
             <div className="ys-summaryItem">
               <span>位置</span>
-              <strong>{summary?.location ? "已更新" : "暂无"}</strong>
-              <small>{formatTime(summary?.location?.ts)}</small>
+              <strong>
+                {summary?.location
+                  ? summary.location.source === "demo"
+                    ? "演示位置"
+                    : summary.location.live
+                      ? "实时定位"
+                      : "最后位置"
+                  : "暂无"}
+              </strong>
+              <small title={summary?.location?.address ?? undefined}>
+                {summary?.location
+                  ? summary.location.address ??
+                    `坐标 ${summary.location.lat.toFixed(5)}, ${summary.location.lng.toFixed(5)}`
+                  : "等待长辈开启位置共享"}
+              </small>
             </div>
             <div className="ys-summaryItem">
               <span>用药</span>

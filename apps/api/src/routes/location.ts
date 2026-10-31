@@ -57,6 +57,11 @@ const TimeRangeSchema = z.object({
   to: z.coerce.number().optional()
 });
 
+const ReverseQuerySchema = z.object({
+  lat: z.coerce.number().min(-90).max(90),
+  lng: z.coerce.number().min(-180).max(180)
+});
+
 function escapeHtml(value: string) {
   return value
     .replace(/&/g, "&amp;")
@@ -204,6 +209,7 @@ export const locationRoutes: FastifyPluginAsync = async (server) => {
     const geofences = await server.db.geofences.listByElder(elderId);
     const inside = geofences.every((geofence) => isInsideGeofence(point, geofence.shape));
     const alerts = [];
+    let exitAddress: string | null | undefined;
 
     for (const geofence of geofences) {
       if (!geofence.notifyOn.includes("exit")) continue;
@@ -212,6 +218,17 @@ export const locationRoutes: FastifyPluginAsync = async (server) => {
         continue;
       }
       const distance = Math.round(distanceToGeofence(point, geofence.shape));
+      if (typeof exitAddress === "undefined") {
+        if (point.source === "demo") {
+          exitAddress = null;
+        } else {
+          try {
+            exitAddress = (await server.address.reverse(point))?.address ?? null;
+          } catch {
+            exitAddress = null;
+          }
+        }
+      }
       const alert = await server.db.safetyAlerts.create({
         elderId,
         type: "geofence.exit",
@@ -220,7 +237,10 @@ export const locationRoutes: FastifyPluginAsync = async (server) => {
           geofenceId: geofence.id,
           geofenceName: geofence.name,
           distanceMeters: distance,
-          lastPoint: { lat: point.lat, lng: point.lng, ts: point.ts }
+          address: exitAddress,
+          lastPoint: { lat: point.lat, lng: point.lng, ts: point.ts },
+          accuracy: point.accuracy,
+          locationSource: point.source
         }
       });
       alerts.push(alert);
@@ -232,6 +252,21 @@ export const locationRoutes: FastifyPluginAsync = async (server) => {
     }
 
     return { ok: true, point, inside, alerts };
+  });
+
+  server.get("/location/address", { preHandler: requireAuth }, async (req, reply) => {
+    const query = ReverseQuerySchema.safeParse(req.query);
+    if (!query.success) return reply.code(400).send({ error: "invalid_body" });
+    try {
+      const resolved = await server.address.reverse(query.data);
+      return {
+        ok: true,
+        address: resolved?.address ?? null,
+        source: resolved?.source ?? "unavailable"
+      };
+    } catch {
+      return { ok: true, address: null, source: "unavailable" };
+    }
   });
 
   server.get("/location/latest", { preHandler: requireAuth }, async (req, reply) => {

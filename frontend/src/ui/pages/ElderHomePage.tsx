@@ -180,9 +180,19 @@ export function ElderHomePage() {
         </div>
         <div className="ys-todayItem">
           <span>位置</span>
-          <strong>{summary?.location ? "已更新" : "暂无"}</strong>
+          <strong>
+            {summary?.location
+              ? summary.location.source === "demo"
+                ? "演示"
+                : summary.location.live
+                  ? "已更新"
+                  : "最后位置"
+              : "暂无"}
+          </strong>
           <small>
-            {summary?.location ? `最后更新 ${formatClock(summary.location.ts)}` : "家人可设置安全区域"}
+            {summary?.location
+              ? `${summary.location.source === "demo" ? "演示位置 · " : ""}最后更新 ${formatClock(summary.location.ts)}`
+              : "家人可设置安全区域"}
           </small>
         </div>
         <div className="ys-todayItem">

@@ -350,6 +350,8 @@ export type LocationPoint = {
   lng: number;
   accuracy: number | null;
   source: string;
+  address?: string | null;
+  live?: boolean;
   ts: number;
 };
 
@@ -555,14 +557,17 @@ export type MedicationSafety = {
 
 export type HelpHomeCard = {
   homeName: string;
-  address: string;
+  homeAddress: string | null;
+  currentAddress: string | null;
   distanceMeters: number | null;
   direction: string | null;
   walkMinutes: number | null;
   steps: string[];
   familyPhone: string | null;
   familyRelation: string | null;
-  lastLocation: { lat: number; lng: number; ts: number } | null;
+  lastLocation: { lat: number; lng: number; accuracy: number | null; ts: number } | null;
+  locationSource: string | null;
+  locationLive: boolean;
   spoken: string;
   disclaimer: string;
 };

@@ -17,6 +17,7 @@ import { readCookie, verifySessionToken } from "./services/auth/session.js";
 import type { SessionUser } from "./services/auth/types.js";
 import { loadOrCreateMasterKey } from "./services/crypto.js";
 import { createEventBus } from "./services/eventBus.js";
+import { createAddressService } from "./services/location/address.js";
 import { createLocationService } from "./services/location/location.js";
 import { createModelRouter } from "./services/llm/router.js";
 import type { ModelRouter } from "./services/llm/types.js";
@@ -62,10 +63,11 @@ export async function createServer(options: CreateServerOptions = {}) {
   const modelRouter = createModelRouter(config);
   const rateLimiter = createRateLimiter(config.rateLimit.enabled);
   const weather = createWeatherService(config);
-  const location = createLocationService(db);
+  const address = createAddressService({ config });
+  const location = createLocationService(db, address);
   const antiFraud = createAntiFraudService(modelRouter);
   const coolingOff = createCoolingOffService({ db, eventBus });
-  const helpHome = createHelpHomeService({ db, eventBus });
+  const helpHome = createHelpHomeService({ db, eventBus, address });
   const interview = createInterviewService(db, modelRouter);
   const story = createStoryService(db, modelRouter);
   const diet = createDietService({ db, modelRouter });
@@ -124,6 +126,7 @@ export async function createServer(options: CreateServerOptions = {}) {
   server.decorate("antiFraud", antiFraud);
   server.decorate("coolingOff", coolingOff);
   server.decorate("helpHome", helpHome);
+  server.decorate("address", address);
   server.decorate("weather", weather);
   server.decorate("interview", interview);
   server.decorate("story", story);
@@ -164,7 +167,8 @@ export async function createServer(options: CreateServerOptions = {}) {
         ? { name: "ai", max: config.rateLimit.aiMax }
         : pathname === "/api/uploads"
           ? { name: "upload", max: config.rateLimit.uploadMax }
-          : pathname === "/api/safety/location"
+          : pathname === "/api/safety/location" ||
+              pathname === "/api/safety/location/address"
             ? { name: "location", max: config.rateLimit.locationMax }
             : { name: "default", max: config.rateLimit.max };
 
@@ -342,6 +346,7 @@ declare module "fastify" {
     antiFraud: AntiFraudService;
     coolingOff: CoolingOffService;
     helpHome: HelpHomeService;
+    address: ReturnType<typeof createAddressService>;
     weather: ReturnType<typeof createWeatherService>;
     interview: InterviewService;
     story: StoryService;

@@ -617,6 +617,46 @@
   font-size: 13px;
 }
 
+.ys-helpFinePrint {
+  margin: 4px 0 0;
+  color: #8a978f;
+  font-size: 13px;
+}
+
+.ys-helpWarn {
+  margin: 12px 0 0;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: #f7e9e6;
+  color: #8c3b2e;
+  font-size: 15px;
+  line-height: 1.6;
+}
+
+.ys-helpHomeLine {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 12px 0 0;
+  padding: 10px 14px;
+  border: 1px solid rgba(55, 82, 70, 0.14);
+  border-radius: 14px;
+  background: #f8f8f2;
+}
+
+.ys-helpHomeLine span {
+  color: #7b8982;
+  font-size: 14px;
+}
+
+.ys-helpHomeLine strong {
+  color: #263a30;
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1.5;
+}
+
 .ys-helpAddress {
   margin: 20px 0 16px;
 }

@@ -41,6 +41,7 @@
   --primary-50: var(--ys-celadon-soft);
   --accent: var(--ys-celadon);
   --danger: var(--ys-seal);
+  --danger-light: #a84635;
   --ok: var(--ys-celadon-deep);
   --radius: var(--ys-radius);
 
@@ -242,7 +243,8 @@ body {
 
 /* ---------- 通用控件 ---------- */
 .yl-shell .btn,
-.ys-rolePage .btn {
+.ys-rolePage .btn,
+.ys-kioskShell .btn {
   border-radius: 2px;
   border-color: var(--ys-line);
   background: var(--ys-surface);
@@ -253,29 +255,41 @@ body {
 }
 
 .yl-shell .btn:hover,
-.ys-rolePage .btn:hover {
+.ys-rolePage .btn:hover,
+.ys-kioskShell .btn:hover {
   border-color: var(--ys-celadon);
   background: var(--ys-celadon-soft);
 }
 
 .yl-shell .btnPrimary,
-.ys-rolePage .btnPrimary {
+.ys-rolePage .btnPrimary,
+.ys-kioskShell .btnPrimary {
   background: var(--ys-celadon-deep);
   border-color: var(--ys-celadon-deep);
   color: #fff;
 }
 
 .yl-shell .btnPrimary:hover,
-.ys-rolePage .btnPrimary:hover {
+.ys-rolePage .btnPrimary:hover,
+.ys-kioskShell .btnPrimary:hover {
   background: #324b40;
   border-color: #324b40;
   color: #fff;
 }
 
 .yl-shell .btnDanger,
-.ys-rolePage .btnDanger {
+.ys-rolePage .btnDanger,
+.ys-kioskShell .btnDanger {
   background: var(--ys-seal);
   border-color: var(--ys-seal);
+  color: #fff;
+}
+
+.yl-shell .btnDanger:hover,
+.ys-rolePage .btnDanger:hover,
+.ys-kioskShell .btnDanger:hover {
+  background: #7b3227;
+  border-color: #7b3227;
   color: #fff;
 }
 
@@ -1258,11 +1272,30 @@ body {
 .ys-mapMeta {
   display: flex;
   justify-content: space-between;
-  gap: 12px;
+  flex-wrap: wrap;
+  gap: 8px 12px;
   padding: 10px 0;
   border-bottom: 1px solid var(--ys-line);
   color: var(--ys-muted);
   font-size: 11px;
+}
+
+.ys-mapDistance {
+  margin: 8px 0 0;
+  color: var(--ys-muted);
+  font-size: 11px;
+  line-height: 1.6;
+}
+
+.ys-mapDemoNote {
+  margin: 8px 0 0;
+  padding: 8px 10px;
+  border: 1px solid #e6d7b8;
+  border-radius: 8px;
+  background: #faf4e6;
+  color: #75592c;
+  font-size: 11px;
+  line-height: 1.6;
 }
 
 .ys-mapCard .ys-inlineActions {

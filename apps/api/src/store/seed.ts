@@ -127,6 +127,20 @@ export async function seedDemo(db: SqlClient, masterKey: Buffer) {
       .run(`ml_seed_${ymd}`, "med_1", "e_li", "taken", "08:00", eight.getTime());
   }
 
+  // 早上第二种药也补一条已服记录：演示时“今天 2/3 次、还差晚上一次”更完整。
+  const morningSecond = new Date(now);
+  morningSecond.setHours(8, 25, 0, 0);
+  if (now >= morningSecond.getTime()) {
+    const ymd = `${morningSecond.getFullYear()}${String(morningSecond.getMonth() + 1).padStart(2, "0")}${String(morningSecond.getDate()).padStart(2, "0")}`;
+    await db
+      .prepare(
+        `INSERT INTO medication_logs (id, medication_id, elder_id, status, scheduled_time, ts)
+         VALUES (?, ?, ?, ?, ?, ?)
+         ${ignoreExisting}`
+      )
+      .run(`ml_seed_morning_${ymd}`, "med_2", "e_li", "taken", "08:00", morningSecond.getTime());
+  }
+
   // 过去 6 天补一份接近真实的服药记录（17/18 次），让家人周报的依从率有参考价值。
   const historicalDoses = [
     { medicationId: "med_1", time: "08:00" },
@@ -174,9 +188,17 @@ export async function seedDemo(db: SqlClient, masterKey: Buffer) {
     now - 120_000
   );
   // 每次启动刷新演示位置时间，避免首页显示几小时前的旧位置。
-  await db
-    .prepare("UPDATE location_points SET ts = ? WHERE id = 'loc_seed'")
-    .run(now - 120_000);
+  // 但只要长辈上报过真实定位，就不能再用演示位置抢占“最新位置”。
+  const hasRealLocation = await db
+    .prepare(
+      "SELECT 1 FROM location_points WHERE elder_id = 'e_li' AND id <> 'loc_seed' AND source <> 'demo' LIMIT 1"
+    )
+    .get();
+  if (!hasRealLocation) {
+    await db
+      .prepare("UPDATE location_points SET ts = ? WHERE id = 'loc_seed'")
+      .run(now - 120_000);
+  }
 
   const geofence = db.prepare(
     `INSERT INTO geofences
@@ -194,6 +216,56 @@ export async function seedDemo(db: SqlClient, masterKey: Buffer) {
     now,
     now
   );
+
+  // 两条安全记录：一条待家人查看的越界提醒，一条已处理的回家求助，演示列表不再空白。
+  const alert = db.prepare(
+    `INSERT INTO safety_alerts
+      (id, elder_id, type, level, payload_json, status, created_at, handled_by, handled_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+     ${ignoreExisting}`
+  );
+  await alert.run(
+    "al_seed_geofence",
+    "e_li",
+    "geofence.exit",
+    "warn",
+    JSON.stringify({
+      geofenceName: "家附近",
+      distanceMeters: 1200,
+      address: "湖南路与云南路交叉口"
+    }),
+    "open",
+    now - 38 * 60 * 1000,
+    null,
+    null
+  );
+  await alert.run(
+    "al_seed_help",
+    "e_li",
+    "help_home",
+    "high",
+    JSON.stringify({
+      currentAddress: "湖南路菜场",
+      homeAddress: "南京市鼓楼区湖南路街道 3 号院 2 栋",
+      lastLocation: {
+        lat: 32.046,
+        lng: 118.786,
+        accuracy: 30,
+        ts: now - 2 * 24 * 60 * 60 * 1000
+      },
+      locationSource: "browser",
+      locationLive: false,
+      note: "家人已接回"
+    }),
+    "resolved",
+    now - 2 * 24 * 60 * 60 * 1000,
+    "u_family",
+    now - 2 * 24 * 60 * 60 * 1000 + 15 * 60 * 1000
+  );
+  // 每次启动刷新未处理提醒的时间，演示时不会显示成几天前的旧消息。
+  await db
+    .prepare("UPDATE safety_alerts SET created_at = ? WHERE id = 'al_seed_geofence' AND status = 'open'")
+    .run(now - 38 * 60 * 1000);
 
   const memory = db.prepare(
     `INSERT INTO memories

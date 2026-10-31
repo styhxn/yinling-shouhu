@@ -13,7 +13,7 @@ const MemberSchema = z.object({
 });
 
 export const familyRoutes: FastifyPluginAsync = async (server) => {
-  const family = createFamilyService(server.db);
+  const family = createFamilyService(server.db, server.address);
 
   server.get("/summary", { preHandler: requireAuth }, async (req, reply) => {
     const query = QuerySchema.safeParse(req.query);

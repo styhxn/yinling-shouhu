@@ -1,4 +1,7 @@
 import type { AppDb } from "../../store/db.js";
+import type { AddressService } from "../location/address.js";
+
+const LIVE_WINDOW_MS = 10 * 60 * 1000;
 
 const ALERT_LABELS: Record<string, string> = {
   "geofence.exit": "离开安全范围",
@@ -18,12 +21,20 @@ function startOfToday() {
   return d.getTime();
 }
 
-export function createFamilyService(db: AppDb) {
+export function createFamilyService(db: AppDb, address: AddressService) {
   async function summary(elderId: string) {
     const elder = await db.elders.getById(elderId);
     if (!elder) throw new Error("not_found");
 
     const location = await db.locations.latest(elderId);
+    let resolved: Awaited<ReturnType<AddressService["reverse"]>> = null;
+    if (location && location.source !== "demo") {
+      try {
+        resolved = await address.reverse(location);
+      } catch {
+        resolved = null;
+      }
+    }
     const medications = await db.medications.listByElder(elderId);
     const logs = await db.medicationLogs.listByElder(elderId, startOfToday(), Date.now());
     const dueToday = medications.reduce((count, med) => count + med.schedule.length, 0);
@@ -47,6 +58,10 @@ export function createFamilyService(db: AppDb) {
             lng: location.lng,
             accuracy: location.accuracy,
             source: location.source,
+            address: resolved?.address ?? null,
+            live:
+              location.source !== "demo" &&
+              Date.now() - location.ts <= LIVE_WINDOW_MS,
             ts: location.ts
           }
         : null,

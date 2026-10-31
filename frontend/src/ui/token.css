@@ -210,12 +210,12 @@ body {
   --primary-dark: var(--primary-700, #4338ca);
   --accent: var(--accent-600, #0d9488);
   --accent-light: var(--accent-500, #14b8a6);
-  --danger: var(--danger, #dc2626);
-  --danger-light: var(--danger-light, #ef4444);
+  --danger: #dc2626;
+  --danger-light: #ef4444;
   --ok: var(--success, #16a34a);
-  --warning: var(--warning, #d97706);
+  --warning: #d97706;
   --shadow: var(--shadow-md);
-  --shadow-lg: var(--shadow-lg);
+  --shadow-lg: 0 12px 32px rgba(15, 23, 42, 0.12), 0 4px 8px rgba(15, 23, 42, 0.06);
   --bg-gradient: none;
 }
 

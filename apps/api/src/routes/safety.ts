@@ -28,7 +28,8 @@ const CoolingOffRespondSchema = z.object({ action: z.enum(["cancel", "continue"]
 const HelpHomeSchema = z.object({
   elderId: z.string().max(80).optional(),
   lat: z.number().min(-90).max(90).optional(),
-  lng: z.number().min(-180).max(180).optional()
+  lng: z.number().min(-180).max(180).optional(),
+  accuracy: z.number().nonnegative().max(5_000).optional()
 });
 const PendingQuerySchema = z.object({ elderId: z.string().max(80).optional() });
 const ConfirmRespondSchema = z.object({
@@ -144,7 +145,11 @@ export const safetyRoutes: FastifyPluginAsync = async (server) => {
     }
     const point =
       typeof parsed.data.lat === "number" && typeof parsed.data.lng === "number"
-        ? { lat: parsed.data.lat, lng: parsed.data.lng }
+        ? {
+            lat: parsed.data.lat,
+            lng: parsed.data.lng,
+            accuracy: parsed.data.accuracy ?? null
+          }
         : undefined;
     const result = await server.helpHome.requestHelp({
       elderId,

@@ -4,7 +4,8 @@ import { createDietService } from "./services/diet/diet.js";
 import { evaluateFood, buildRuleDietPlan } from "./services/diet/rules.js";
 import type { ChatJSONRequest, ChatStreamEvent, ModelRouter, VisionJSONRequest } from "./services/llm/types.js";
 import { buildMedicationSafety, findDrugDrugWarnings } from "./services/medication/interactions.js";
-import { bearingDegrees, directionLabel } from "./services/safety/helpHome.js";
+import { createHelpHomeService, bearingDegrees, directionLabel } from "./services/safety/helpHome.js";
+import { createLocationService } from "./services/location/location.js";
 import { cookieFrom, testConfig } from "./testUtils.js";
 
 const health = {
@@ -347,6 +348,9 @@ describe("help-home api", () => {
       expect(body.card.distanceMeters).toBeGreaterThan(800);
       // 老人在家的北边，所以“家”在老人的南边。
       expect(body.card.direction).toBe("南");
+      expect(body.card.currentAddress).toBeNull();
+      expect(body.card.homeAddress).toContain("南京");
+      expect(body.card.locationLive).toBe(true);
       expect(body.card.steps.join(" ")).toContain("比较远");
       expect(body.card.spoken).toContain("等家人来接");
       expect(events.some((event) => event.type === "safety.alert")).toBe(true);
@@ -355,6 +359,8 @@ describe("help-home api", () => {
       const alert = alerts.find((item) => item.id === body.alertId);
       expect(alert?.type).toBe("help_home");
       expect(alert?.level).toBe("critical");
+      expect((alert?.payload as any).currentAddress).toBeNull();
+      expect((alert?.payload as any).lastLocation).toMatchObject({ lat: 32.051, lng: 118.781 });
 
       const messages = await server.inject({
         method: "GET",
@@ -364,6 +370,7 @@ describe("help-home api", () => {
       expect(messages.statusCode).toBe(200);
       const sos = (messages.json() as any).items.find((item: any) => item.kind === "sos");
       expect(sos?.content).toContain("找不到家");
+      expect(sos?.content).not.toContain("湖南路");
       expect(sos?.fromRole).toBe("elder");
     } finally {
       unsubscribe();
@@ -390,6 +397,102 @@ describe("help-home api", () => {
     expect(card.distanceMeters).not.toBeNull();
     expect(card.familyPhone).toBe("13800001234");
     expect(card.steps.length).toBeGreaterThan(0);
+  });
+
+  it("sends the actual current address, not the registered home address", async () => {
+    const service = createHelpHomeService({
+      db: server.db,
+      eventBus: server.eventBus,
+      address: {
+        reverse: async () => ({
+          address: "上海市黄浦区南京东路街道",
+          province: "上海市",
+          city: null,
+          district: "黄浦区",
+          township: "南京东路街道",
+          source: "amap" as const
+        })
+      }
+    });
+    const result = await service.requestHelp({
+      elderId: "e_li",
+      userId: "u_family",
+      point: { lat: 31.2304, lng: 121.4737, accuracy: 25 }
+    });
+    expect(result.card.currentAddress).toBe("上海市黄浦区南京东路街道");
+    expect(result.card.homeAddress).toContain("南京");
+    expect(result.card.locationLive).toBe(true);
+    expect(result.card.lastLocation?.accuracy).toBe(25);
+    expect(result.card.spoken).toContain("上海市黄浦区南京东路街道");
+
+    const alerts = await server.db.safetyAlerts.listByElder("e_li");
+    const alert = alerts.find((item) => item.id === result.alertId);
+    expect((alert?.payload as any).currentAddress).toBe("上海市黄浦区南京东路街道");
+    expect((alert?.payload as any).locationLive).toBe(true);
+
+    const messages = await server.inject({
+      method: "GET",
+      url: "/api/family/messages",
+      headers: { cookie: familyCookie }
+    });
+    const sos = (messages.json() as any).items.find(
+      (item: any) => item.kind === "sos" && item.content.includes("上海市黄浦区南京东路街道")
+    );
+    expect(sos?.content).toContain("我在上海市黄浦区南京东路街道附近找不到家了");
+    expect(sos?.content).not.toContain("湖南路");
+  });
+
+  it("describes browser locations from their own coordinates or address", async () => {
+    const service = createLocationService(server.db, {
+      reverse: async () => ({
+        address: "上海市黄浦区南京东路街道",
+        province: "上海市",
+        city: null,
+        district: "黄浦区",
+        township: "南京东路街道",
+        source: "amap" as const
+      })
+    });
+    await server.db.locations.insert({
+      elderId: "e_li",
+      lat: 31.2304,
+      lng: 121.4737,
+      accuracy: 20,
+      source: "browser",
+      ts: Date.now() + 1_000
+    });
+    const summary = await service.latest("e_li");
+    expect(summary?.address).toBe("上海市黄浦区南京东路街道");
+    expect(summary?.text).toContain("上海市黄浦区南京东路街道");
+    expect(summary?.text).toContain("手机定位");
+    expect(summary?.text).not.toContain("南京市鼓楼区");
+
+    await server.db.locations.insert({
+      elderId: "e_li",
+      lat: 32.044,
+      lng: 118.783,
+      accuracy: null,
+      source: "demo",
+      ts: Date.now() + 2_000
+    });
+    const demo = await createLocationService(server.db, {
+      reverse: async () => {
+        throw new Error("demo locations must not call the geocoder");
+      }
+    }).latest("e_li");
+    expect(demo?.address).toBeNull();
+    expect(demo?.text).toContain("演示位置");
+  });
+
+  it("returns no guessed address when reverse geocoding is unavailable", async () => {
+    const res = await server.inject({
+      method: "GET",
+      url: "/api/safety/location/address?lat=31.2304&lng=121.4737",
+      headers: { cookie: elderCookie }
+    });
+    expect(res.statusCode).toBe(200);
+    expect((res.json() as any).address).toBeNull();
+    expect((res.json() as any).source).toBe("unavailable");
   });
 });
 

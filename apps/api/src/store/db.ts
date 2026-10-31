@@ -271,6 +271,12 @@ export type AgentBriefContent = {
   engine: "rules" | "rules+llm";
   model: string;
   traceId?: string;
+  location?: {
+    lat: number;
+    lng: number;
+    ts: number;
+    source: string;
+  } | null;
 };
 
 export type AgentDecision = {

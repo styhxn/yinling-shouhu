@@ -23,16 +23,16 @@ function greeting(hour = new Date().getHours()) {
 
 function locationText(summary: FamilySummary | null | undefined) {
   if (!summary?.location) return "暂无位置";
+  if (summary.location.source === "demo") return "演示位置";
+  if (!summary.location.live) return "最后位置";
   if (summary.alerts.open > 0) return `${summary.alerts.open} 条提醒`;
-  return "在安全区域内";
+  return "位置已更新";
 }
 
 function locationHint(summary: FamilySummary | null | undefined) {
   if (!summary?.location) return "家人可设置安全区域";
-  return `最后更新 ${new Date(summary.location.ts).toLocaleTimeString("zh-CN", {
-    hour: "2-digit",
-    minute: "2-digit"
-  })}`;
+  if (summary.location.address) return summary.location.address;
+  return `坐标 ${summary.location.lat.toFixed(4)}, ${summary.location.lng.toFixed(4)}`;
 }
 
 export function ChatWelcome({

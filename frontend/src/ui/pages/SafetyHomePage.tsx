@@ -15,6 +15,27 @@ function formatTime(ts: number) {
   });
 }
 
+function distanceMeters(aLat: number, aLng: number, bLat: number, bLng: number) {
+  const toRad = (value: number) => (value * Math.PI) / 180;
+  const dLat = toRad(bLat - aLat);
+  const dLng = toRad(bLng - aLng);
+  const h =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(toRad(aLat)) * Math.cos(toRad(bLat)) * Math.sin(dLng / 2) ** 2;
+  return 2 * 6_371_000 * Math.asin(Math.sqrt(h));
+}
+
+function formatMeters(meters: number) {
+  return meters < 1000 ? `${Math.round(meters)} 米` : `${(meters / 1000).toFixed(1)} 公里`;
+}
+
+function locationSourceLabel(source: string) {
+  if (source === "browser") return "手机定位";
+  if (source === "wearable") return "手环定位";
+  if (source === "demo") return "演示位置，非真实";
+  return "位置记录";
+}
+
 function alertLabel(type: string) {
   if (type === "geofence.exit") return "离开安全区域";
   if (type === "scam.high") return "高风险信息";
@@ -28,14 +49,26 @@ function alertDetail(alert: SafetyAlert) {
   if (alert.type === "geofence.exit") {
     const name = typeof payload.geofenceName === "string" ? payload.geofenceName : "安全区域";
     const distance =
-      typeof payload.distanceMeters === "number" ? `，距离约 ${payload.distanceMeters} 米` : "";
-    return `已离开${name}${distance}`;
+      typeof payload.distanceMeters === "number"
+        ? `，距离约 ${formatMeters(payload.distanceMeters)}`
+        : "";
+    const address =
+      typeof payload.address === "string" && payload.address ? `，位置在${payload.address}附近` : "";
+    return `已离开${name}${distance}${address}`;
   }
   if (alert.type === "scam.high") return "检测到高风险信息，请先停止转账";
   if (alert.type === "cooling_off") return "转账已进入冷静期，等待家人确认";
   if (alert.type === "help_home") {
-    const address = typeof payload.address === "string" ? payload.address : "家附近";
-    return `长辈发起了回家求助，位置在${address}附近，请立即联系。`;
+    const currentAddress =
+      typeof payload.currentAddress === "string" ? payload.currentAddress : null;
+    if (currentAddress) {
+      return `长辈发起了回家求助，位置在${currentAddress}附近，请立即联系。`;
+    }
+    const last = payload.lastLocation as { lat?: unknown; lng?: unknown } | null;
+    if (typeof last?.lat === "number" && typeof last.lng === "number") {
+      return `长辈发起了回家求助，最后位置 ${last.lat.toFixed(5)}, ${last.lng.toFixed(5)}，请立即联系。`;
+    }
+    return "长辈发起了回家求助，请立即联系。";
   }
   return "";
 }
@@ -44,6 +77,7 @@ export function SafetyHomePage() {
   const toast = useToast();
   const [geofences, setGeofences] = React.useState<Geofence[]>([]);
   const [latest, setLatest] = React.useState<LocationPoint | null>(null);
+  const [address, setAddress] = React.useState<string | null>(null);
   const [alerts, setAlerts] = React.useState<SafetyAlert[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [busy, setBusy] = React.useState(false);
@@ -62,6 +96,7 @@ export function SafetyHomePage() {
   const [ackId, setAckId] = React.useState<string | null>(null);
   const watchIdRef = React.useRef<number | null>(null);
   const lastSentRef = React.useRef<{ ts: number; lat: number; lng: number } | null>(null);
+  const addressRef = React.useRef<{ lat: number; lng: number; at: number } | null>(null);
 
   async function load() {
     setLoading(true);
@@ -88,23 +123,55 @@ export function SafetyHomePage() {
 
   React.useEffect(() => {
     let alive = true;
-    Promise.allSettled([api.healthProfile.get(), api.family.members()]).then(
-      ([profileRes, membersRes]) => {
+    api.family
+      .members()
+      .then((membersRes) => {
         if (!alive) return;
-        if (profileRes.status === "fulfilled") {
-          const address = profileRes.value.profile.homeAddress?.trim();
-          if (address) setLastSeenText((prev) => (prev.trim() ? prev : address));
-        }
-        if (membersRes.status === "fulfilled") {
-          const phone = membersRes.value.members.find((member) => member.phone)?.phone;
-          if (phone) setContact((prev) => (prev.trim() ? prev : phone));
-        }
-      }
-    );
+        const phone = membersRes.members.find((member) => member.phone)?.phone;
+        if (phone) setContact((prev) => (prev.trim() ? prev : phone));
+      })
+      .catch(() => undefined);
     return () => {
       alive = false;
     };
   }, []);
+
+  React.useEffect(() => {
+    if (!latest || latest.source === "demo") return;
+    const label = address ?? `坐标 ${latest.lat.toFixed(5)}, ${latest.lng.toFixed(5)}`;
+    setLastSeenText((prev) => (prev.trim() ? prev : label));
+  }, [address, latest]);
+
+  React.useEffect(() => {
+    if (!latest || latest.source === "demo") {
+      setAddress(null);
+      addressRef.current = null;
+      return;
+    }
+    const previous = addressRef.current;
+    const moved =
+      !previous ||
+      Math.abs(previous.lat - latest.lat) > 0.0015 ||
+      Math.abs(previous.lng - latest.lng) > 0.0015;
+    const aged = !previous || Date.now() - previous.at > 10 * 60 * 1000;
+    if (!moved && !aged) return;
+    let cancelled = false;
+    api.safety
+      .reverseGeocode(latest.lat, latest.lng)
+      .then((res) => {
+        if (cancelled) return;
+        setAddress(res.address);
+        addressRef.current = { lat: latest.lat, lng: latest.lng, at: Date.now() };
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setAddress(null);
+        addressRef.current = { lat: latest.lat, lng: latest.lng, at: Date.now() };
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [latest]);
 
   React.useEffect(() => {
     const event = lastEvent;
@@ -149,11 +216,6 @@ export function SafetyHomePage() {
       Math.abs(last.lat - position.coords.latitude) > 0.0002 ||
       Math.abs(last.lng - position.coords.longitude) > 0.0002;
     if (last && now - last.ts < 20_000 && !moved) return;
-    lastSentRef.current = {
-      ts: now,
-      lat: position.coords.latitude,
-      lng: position.coords.longitude
-    };
     try {
       const result = await api.safety.reportLocation({
         lat: position.coords.latitude,
@@ -161,6 +223,11 @@ export function SafetyHomePage() {
         accuracy: Math.min(5000, Math.round(position.coords.accuracy || 0)),
         source: "browser"
       });
+      lastSentRef.current = {
+        ts: now,
+        lat: position.coords.latitude,
+        lng: position.coords.longitude
+      };
       setLatest(result.point);
       setLastShareAt(Date.now());
       setShareError(null);
@@ -178,6 +245,7 @@ export function SafetyHomePage() {
         }
       }
     } catch (err) {
+      lastSentRef.current = null;
       setShareError(err instanceof Error ? err.message : "位置上报失败，正在重试");
     }
   }
@@ -187,21 +255,33 @@ export function SafetyHomePage() {
       setShareError("当前浏览器不支持定位，请换用手机浏览器。");
       return;
     }
+    if (!window.isSecureContext) {
+      setShareError("浏览器只允许 HTTPS 页面获取定位，请用 HTTPS 地址打开后再共享位置。");
+      return;
+    }
     if (watchIdRef.current !== null) return;
     setShareError(null);
     setSharing(true);
+    const handleError = (geoError: GeolocationPositionError) => {
+      if (geoError.code === geoError.PERMISSION_DENIED) {
+        stopSharing();
+        setShareError("定位权限被拒绝。请在浏览器里允许定位后重试。");
+        return;
+      }
+      setShareError("暂时无法获取位置，正在重试…");
+    };
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        void reportBrowserLocation(position);
+      },
+      handleError,
+      { enableHighAccuracy: true, maximumAge: 0, timeout: 15_000 }
+    );
     watchIdRef.current = navigator.geolocation.watchPosition(
       (position) => {
         void reportBrowserLocation(position);
       },
-      (geoError) => {
-        if (geoError.code === geoError.PERMISSION_DENIED) {
-          stopSharing();
-          setShareError("定位权限被拒绝。请在浏览器里允许定位后重试。");
-          return;
-        }
-        setShareError("暂时无法获取位置，正在重试…");
-      },
+      handleError,
       { enableHighAccuracy: true, maximumAge: 10_000, timeout: 20_000 }
     );
   }
@@ -222,15 +302,103 @@ export function SafetyHomePage() {
     }
   }
 
+  const activeFence = geofences.find((geofence) => geofence.active) ?? geofences[0];
+  const fenceCenter = activeFence
+    ? { lat: activeFence.shape.center[1], lng: activeFence.shape.center[0] }
+    : null;
+  const distanceFromCenter =
+    latest && fenceCenter
+      ? distanceMeters(latest.lat, latest.lng, fenceCenter.lat, fenceCenter.lng)
+      : null;
+  const inside =
+    latest && activeFence && distanceFromCenter !== null
+      ? distanceFromCenter <= activeFence.shape.radius
+      : null;
+  const mapCenter = fenceCenter ?? (latest ? { lat: latest.lat, lng: latest.lng } : null);
+  const mapRadius = activeFence?.shape.radius ?? 800;
+  const pxPerMeter = 74 / mapRadius;
+  let marker = { x: 210, y: 132, clamped: false };
+  if (latest && mapCenter) {
+    const metersPerDegLat = 111_320;
+    const metersPerDegLng = 111_320 * Math.cos((mapCenter.lat * Math.PI) / 180);
+    const x = 210 + (latest.lng - mapCenter.lng) * metersPerDegLng * pxPerMeter;
+    const y = 132 - (latest.lat - mapCenter.lat) * metersPerDegLat * pxPerMeter;
+    const clamped = x < 18 || x > 402 || y < 18 || y > 242;
+    marker = {
+      x: Math.min(402, Math.max(18, x)),
+      y: Math.min(242, Math.max(18, y)),
+      clamped
+    };
+  }
+  const statusText =
+    !latest
+      ? "等待位置"
+      : !activeFence || inside === null
+        ? "未设置安全区域"
+        : inside
+          ? "在安全区域内"
+          : "已离开安全区域";
+  const statusWarn = Boolean(latest && activeFence && inside === false);
+  const addressText = latest
+    ? latest.source === "demo"
+      ? `坐标 ${latest.lat.toFixed(5)}, ${latest.lng.toFixed(5)}`
+      : address ?? `坐标 ${latest.lat.toFixed(5)}, ${latest.lng.toFixed(5)}`
+    : "还没有位置记录";
+  const distanceText =
+    latest && activeFence && distanceFromCenter !== null
+      ? inside
+        ? `距安全区域中心约 ${formatMeters(distanceFromCenter)}`
+        : `已离开安全区域约 ${formatMeters(distanceFromCenter - activeFence.shape.radius)}`
+      : !latest
+        ? "等待位置更新"
+        : "还没有安全区域";
+  const accuracyText =
+    latest && latest.accuracy !== null ? `精度约 ±${Math.round(latest.accuracy)} 米` : "";
+  const realMapUrl =
+    latest && latest.source !== "demo"
+      ? "https://uri.amap.com/marker" +
+        `?position=${latest.lng.toFixed(6)},${latest.lat.toFixed(6)}` +
+        `&name=${encodeURIComponent("长辈当前位置")}` +
+        "&coordinate=wgs84&callnative=1&src=yinling-shouhu"
+      : null;
+  const secureContext = typeof window === "undefined" ? true : window.isSecureContext;
+  const shareStatusText = shareError
+    ? shareError
+    : sharing
+      ? lastShareAt
+        ? `正在共享位置 · 最近上报 ${formatTime(lastShareAt)}`
+        : "正在获取定位…"
+      : !secureContext
+        ? "当前页面不是 HTTPS，浏览器不会返回手机定位。"
+        : latest?.source === "browser"
+          ? "上次位置由手机定位上报"
+          : latest?.source === "demo"
+            ? "当前显示演示位置，开启共享后会上报真实位置"
+            : "未开启实时位置共享";
+
   async function createHomeGeofence() {
+    if (!latest || latest.source === "demo" || Date.now() - latest.ts > 10 * 60 * 1000) {
+      toast.push({
+        kind: "danger",
+        title: "先拿到当前位置",
+        detail:
+          latest?.source === "demo"
+            ? "当前是演示位置，请先开启位置共享，拿到手机定位后再设置安全区域。"
+            : "请先开启位置共享，确认拿到当前位置后再设置安全区域。"
+      });
+      return;
+    }
     setBusy(true);
     try {
-      const center: [number, number] = latest ? [latest.lng, latest.lat] : [118.781, 32.041];
       await api.safety.createGeofence({
         name: "家附近",
-        shape: { type: "circle", center, radius: 800 }
+        shape: { type: "circle", center: [latest.lng, latest.lat], radius: 800 }
       });
-      toast.push({ kind: "ok", title: "已设置安全区域", detail: "家附近 800 米" });
+      toast.push({
+        kind: "ok",
+        title: "已设置安全区域",
+        detail: "以最后定位为中心，家附近 800 米"
+      });
       await load();
     } catch (err) {
       toast.push({
@@ -246,22 +414,41 @@ export function SafetyHomePage() {
   async function simulateExit() {
     setBusy(true);
     try {
+      if (!activeFence) {
+        toast.push({
+          kind: "normal",
+          title: "还没有安全区域",
+          detail: "请先设置安全区域，再模拟越界。"
+        });
+        return;
+      }
+      const [centerLng, centerLat] = activeFence.shape.center;
+      const offsetMeters = activeFence.shape.radius + 300;
+      const lat = centerLat + offsetMeters / 111_320;
+      const lng =
+        centerLng + offsetMeters / (111_320 * Math.cos((centerLat * Math.PI) / 180));
       const result = await api.safety.reportLocation({
-        lat: 32.12,
-        lng: 118.88,
+        lat,
+        lng,
         source: "demo"
       });
       if (!result.alerts.length) {
         toast.push({
           kind: "ok",
-          title: "位置已更新",
+          title: "演示位置已写入",
           detail: "当前仍在安全区域内。"
         });
       } else if (!connected) {
         toast.push({
           kind: "danger",
-          title: "已离开安全区域",
-          detail: "已生成越界提醒，家人端可以看到。"
+          title: "已生成越界提醒",
+          detail: "这是演示数据，家人端会看到一条越界提醒。"
+        });
+      } else {
+        toast.push({
+          kind: "normal",
+          title: "已生成越界提醒",
+          detail: "这是演示数据，不是手机实时定位。"
         });
       }
       await load();
@@ -302,9 +489,6 @@ export function SafetyHomePage() {
     }
   }
 
-  const homeFence = geofences[0];
-  const outside = alerts.some((alert) => alert.type === "geofence.exit");
-
   return (
     <div className="yl-page ys-safetyPage">
       <section className="ys-pageHeader">
@@ -328,20 +512,25 @@ export function SafetyHomePage() {
           <div className="ys-mapHead">
             <div>
               <span className="ys-kicker">安全区域</span>
-              <h2>{homeFence ? homeFence.name : "还没有设置"}</h2>
+              <h2>{activeFence ? activeFence.name : "还没有设置"}</h2>
             </div>
-            <span className={`ys-stateMark ${outside ? "ys-stateMark--warn" : ""}`}>
-              {outside ? "已离开安全区域" : "在安全区域内"}
+            <span className={`ys-stateMark ${statusWarn ? "ys-stateMark--warn" : ""}`}>
+              {statusText}
             </span>
           </div>
 
-          <svg className="ys-mapSvg" viewBox="0 0 420 260" role="img" aria-label="安全区域示意图">
+          <svg
+            className="ys-mapSvg"
+            viewBox="0 0 420 260"
+            role="img"
+            aria-label={`安全区域示意图，${statusText}`}
+          >
             <rect width="420" height="260" fill="#F7F8F3" />
             <path d="M-20 78 C 70 54, 122 96, 206 72 S 348 56, 440 88" stroke="#D6E0D8" strokeWidth="24" fill="none" opacity="0.55" />
             <path d="M-20 112 C 82 88, 132 128, 214 104 S 352 90, 440 120" stroke="#E4EBE5" strokeWidth="10" fill="none" opacity="0.8" />
             <path d="M48 260 C 68 190, 110 158, 154 142" stroke="#D6E0D8" strokeWidth="14" fill="none" opacity="0.5" />
             <path d="M330 260 C 310 204, 276 176, 244 152" stroke="#D6E0D8" strokeWidth="14" fill="none" opacity="0.5" />
-            {homeFence && (
+            {activeFence && (
               <circle
                 cx="210"
                 cy="132"
@@ -352,31 +541,59 @@ export function SafetyHomePage() {
                 strokeDasharray="5 6"
               />
             )}
-            <circle cx={outside ? 336 : 210} cy={outside ? 76 : 132} r="7" fill={outside ? "#8C3B2E" : "#3F5A50"} />
-            <circle cx={outside ? 336 : 210} cy={outside ? 76 : 132} r="16" fill="none" stroke={outside ? "#8C3B2E" : "#3F5A50"} opacity="0.25" />
+            {latest && activeFence && (
+              <line
+                x1="210"
+                y1="132"
+                x2={marker.x}
+                y2={marker.y}
+                stroke={inside === false ? "#8C3B2E" : "#3F5A50"}
+                strokeWidth="1.2"
+                strokeDasharray="3 5"
+                opacity="0.55"
+              />
+            )}
+            <circle
+              cx={marker.x}
+              cy={marker.y}
+              r="7"
+              fill={inside === false ? "#8C3B2E" : "#3F5A50"}
+            />
+            <circle
+              cx={marker.x}
+              cy={marker.y}
+              r="16"
+              fill="none"
+              stroke={inside === false ? "#8C3B2E" : "#3F5A50"}
+              opacity="0.25"
+            />
             <text x="210" y="222" textAnchor="middle" fill="#7A8883" fontSize="12">
-              {homeFence ? `${homeFence.name} · ${homeFence.shape.radius}m` : "设置安全区域后显示围栏"}
+              {activeFence
+                ? `${activeFence.name} · 半径 ${activeFence.shape.radius} 米`
+                : "设置安全区域后显示围栏"}
             </text>
           </svg>
 
           <div className="ys-mapMeta">
-            <span>{latest ? `最后位置 ${latest.lat.toFixed(3)}, ${latest.lng.toFixed(3)}` : "还没有位置记录"}</span>
-            <span>{latest ? formatTime(latest.ts) : "等待更新"}</span>
+            <span>{addressText}</span>
+            <span>
+              {latest ? `${locationSourceLabel(latest.source)} · ${formatTime(latest.ts)}` : "等待更新"}
+            </span>
           </div>
+          <p className="ys-mapDistance">
+            {distanceText}
+            {accuracyText ? ` · ${accuracyText}` : ""}
+            {marker.clamped ? " · 实际位置在更远方向，圆点已贴边显示" : ""}
+          </p>
+          {latest?.source === "demo" ? (
+            <p className="ys-mapDemoNote">
+              这是演示数据，不是手机实时定位；开启位置共享后会显示真实位置。
+            </p>
+          ) : null}
 
           <div className={`ys-shareStatus ${shareError ? "ys-shareStatus--warn" : ""}`}>
             <Icon name={sharing ? "activity" : "mapPin"} size="sm" />
-            <span>
-              {shareError
-                ? shareError
-                : sharing
-                  ? lastShareAt
-                    ? `正在共享位置 · 最近上报 ${formatTime(lastShareAt)}`
-                    : "正在获取定位…"
-                  : latest?.source === "browser"
-                    ? "上次位置由手机定位上报"
-                    : "未开启实时位置共享"}
-            </span>
+            <span>{shareStatusText}</span>
           </div>
 
           <div className="ys-inlineActions">
@@ -391,15 +608,21 @@ export function SafetyHomePage() {
                 开始共享位置
               </button>
             )}
-            {homeFence ? (
+            {realMapUrl ? (
+              <a className="btn" href={realMapUrl} target="_blank" rel="noreferrer">
+                <Icon name="mapPin" size="sm" />
+                在真实地图中查看
+              </a>
+            ) : null}
+            {activeFence ? (
               <button type="button" className="btn" disabled={busy} onClick={() => void simulateExit()}>
                 <Icon name="refresh" size="sm" />
-                {busy ? "更新中…" : "模拟走出围栏"}
+                {busy ? "更新中…" : "演示 · 模拟走出围栏"}
               </button>
             ) : (
               <button type="button" className="btn" disabled={busy} onClick={() => void createHomeGeofence()}>
                 <Icon name="plus" size="sm" />
-                设置家附近 800m
+                以当前位置设置 800m
               </button>
             )}
             <a className="btn" href="tel:110">
@@ -466,7 +689,7 @@ export function SafetyHomePage() {
                 <input
                   className="input"
                   value={lastSeenText}
-                  placeholder="如：鼓楼区某小区北门（可从健康档案读取）"
+                  placeholder="如：鼓楼区某小区北门（有定位时自动填入）"
                   onChange={(e) => setLastSeenText(e.target.value)}
                 />
               </label>

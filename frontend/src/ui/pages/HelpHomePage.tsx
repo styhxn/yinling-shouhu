@@ -35,8 +35,11 @@ function formatTime(ts: number) {
       });
 }
 
-function isStale(ts: number) {
-  return Date.now() - ts > 10 * 60 * 1000;
+function sourceLabel(source: string | null) {
+  if (source === "browser") return "手机实时定位";
+  if (source === "wearable") return "手环定位";
+  if (source === "demo") return "演示位置，非实时";
+  return "位置记录";
 }
 
 export function HelpHomePage() {
@@ -49,7 +52,7 @@ export function HelpHomePage() {
 
   React.useEffect(() => () => stopSpeaking(), []);
 
-  async function requestHelp(point?: { lat: number; lng: number }) {
+  async function requestHelp(point?: { lat: number; lng: number; accuracy?: number }) {
     if (busy) return;
     setBusy(true);
     setError(null);
@@ -65,9 +68,23 @@ export function HelpHomePage() {
     }
   }
 
-  function useCurrentLocation() {
-    if (!navigator.geolocation) {
-      toast.push({ kind: "normal", title: "这个设备不能定位", detail: "先用最后一次位置通知家人。" });
+  function notifyFamily() {
+    if (busy || locating) return;
+    if (!("geolocation" in navigator)) {
+      toast.push({
+        kind: "normal",
+        title: "这个设备不能定位",
+        detail: "先按最后一次记录的位置通知家人。"
+      });
+      void requestHelp();
+      return;
+    }
+    if (!window.isSecureContext) {
+      toast.push({
+        kind: "normal",
+        title: "当前页面不能获取实时位置",
+        detail: "浏览器只允许 HTTPS 页面定位，先按最后一次记录通知家人。"
+      });
       void requestHelp();
       return;
     }
@@ -77,7 +94,8 @@ export function HelpHomePage() {
         setLocating(false);
         void requestHelp({
           lat: position.coords.latitude,
-          lng: position.coords.longitude
+          lng: position.coords.longitude,
+          accuracy: Math.min(5000, Math.round(position.coords.accuracy || 0))
         });
       },
       () => {
@@ -85,15 +103,34 @@ export function HelpHomePage() {
         toast.push({
           kind: "normal",
           title: "没拿到当前位置",
-          detail: "先用最后一次记录的位置通知家人。"
+          detail: "先按最后一次记录的位置通知家人，请保持电话畅通。"
         });
         void requestHelp();
       },
-      { enableHighAccuracy: true, timeout: 6000, maximumAge: 30_000 }
+      { enableHighAccuracy: true, timeout: 8_000, maximumAge: 0 }
     );
   }
 
   const rotation = card?.direction ? (DIRECTIONS[card.direction] ?? 0) - 90 : 0;
+  const currentTitle =
+    card?.currentAddress ?? (card?.lastLocation ? "已定位到您的位置" : "暂未拿到位置");
+  const currentDetail = card
+    ? card.currentAddress
+      ? `${sourceLabel(card.locationSource)} · ${card.lastLocation ? formatTime(card.lastLocation.ts) : "暂无时间"}`
+      : card.lastLocation
+        ? `坐标 ${card.lastLocation.lat.toFixed(5)}, ${card.lastLocation.lng.toFixed(5)} · ${formatTime(card.lastLocation.ts)}`
+        : "先站在安全的地方，给家人打电话"
+    : "";
+  const accuracyText =
+    card?.lastLocation && card.lastLocation.accuracy !== null
+      ? `定位精度约 ±${card.lastLocation.accuracy} 米`
+      : "";
+  const distanceDisplay =
+    card && card.distanceMeters !== null
+      ? card.distanceMeters >= 1000
+        ? { value: (card.distanceMeters / 1000).toFixed(1), unit: "公里" }
+        : { value: String(card.distanceMeters), unit: "米" }
+      : { value: "—", unit: "米" };
 
   return (
     <div className="yl-page ys-helpPage">
@@ -112,24 +149,20 @@ export function HelpHomePage() {
             <Icon name="mapPin" size="xl" />
           </div>
           <h2>先别走动，按下面的大按钮</h2>
-          <p>系统会把最后一次位置发给家人，并告诉您家大概在哪个方向。</p>
+          <p>系统会先获取您现在的位置；拿不到定位时，再用最后一次记录通知家人。</p>
+          {!window.isSecureContext ? (
+            <p className="ys-helpWarn">
+              当前页面不是 HTTPS，浏览器不会返回实时位置；会先用最后一次记录通知家人。
+            </p>
+          ) : null}
           <button
             type="button"
             className="ys-helpBigBtn"
             disabled={busy || locating}
-            onClick={() => void requestHelp()}
+            onClick={notifyFamily}
           >
             <Icon name="shieldCheck" size="lg" />
-            {busy ? "正在通知家人…" : "通知家人，带我回家"}
-          </button>
-          <button
-            type="button"
-            className="btn"
-            disabled={busy || locating}
-            onClick={useCurrentLocation}
-          >
-            <Icon name="mapPin" size="sm" />
-            {locating ? "正在定位…" : "用我现在的位置通知"}
+            {locating ? "正在获取当前位置…" : busy ? "正在通知家人…" : "通知家人，带我回家"}
           </button>
           <div className="ys-helpFallback">
             <span>电话打不通？</span>
@@ -150,14 +183,26 @@ export function HelpHomePage() {
               </span>
               <span className="ys-helpTime">
                 位置时间：{card.lastLocation ? formatTime(card.lastLocation.ts) : "暂无"}
-                {card.lastLocation && isStale(card.lastLocation.ts) ? " · 位置较旧，建议同时打电话确认" : ""}
+                {card.lastLocation && card.locationLive ? " · 刚刚定位" : ""}
               </span>
             </div>
             <div className="ys-helpAddress">
-              <span className="ys-kicker">您的家</span>
-              <h2>{card.address}</h2>
-              <p>{card.homeName}</p>
+              <span className="ys-kicker">您现在的位置</span>
+              <h2>{currentTitle}</h2>
+              <p>{currentDetail}</p>
+              {accuracyText ? <p className="ys-helpFinePrint">{accuracyText}</p> : null}
             </div>
+            {!card.locationLive ? (
+              <p className="ys-helpWarn">
+                {card.locationSource === "demo"
+                  ? "当前没有实时定位，下面是演示位置，不能代表您现在站的地方。"
+                  : "这不是实时定位，可能和您现在的位置不一致，请同时给家人打电话确认。"}
+              </p>
+            ) : null}
+            <p className="ys-helpHomeLine">
+              <span>您的家</span>
+              <strong>{card.homeAddress ?? "家庭地址还没登记"}</strong>
+            </p>
             <div className="ys-helpCompassRow">
               <div className="ys-helpCompass">
                 <span className="ys-helpCompassNorth">北</span>
@@ -173,8 +218,8 @@ export function HelpHomePage() {
                 </span>
               </div>
               <div className="ys-helpDistance">
-                <strong>{card.distanceMeters === null ? "—" : card.distanceMeters}</strong>
-                <span>米</span>
+                <strong>{distanceDisplay.value}</strong>
+                <span>{distanceDisplay.unit}</span>
                 <small>
                   {card.walkMinutes === null
                     ? "等待家人确认位置"
@@ -200,11 +245,11 @@ export function HelpHomePage() {
               <button
                 type="button"
                 className="btn"
-                disabled={busy}
-                onClick={() => void requestHelp()}
+                disabled={busy || locating}
+                onClick={notifyFamily}
               >
                 <Icon name="refresh" size="sm" />
-                {busy ? "通知中…" : "再通知一次"}
+                {locating ? "正在定位…" : busy ? "通知中…" : "用当前位置再通知一次"}
               </button>
             </div>
           </section>
