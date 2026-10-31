@@ -279,10 +279,26 @@
     width: auto;
   }
 
-  /* 收起态保持一个小按钮，避免整条横栏压住页面底部操作 */
+  /* 收起态改为右下角圆形小按钮，避免压住左侧正文与底部主操作 */
   .yl-a11y--collapsed {
-    right: auto;
+    left: auto;
+    right: 12px;
+    bottom: 12px;
     width: auto;
+  }
+
+  .yl-a11y--collapsed .yl-a11y__reopen {
+    width: 44px;
+    min-height: 44px;
+    padding: 0;
+    gap: 0;
+    border-radius: 50%;
+    font-size: 0;
+  }
+
+  .yl-a11y--collapsed .yl-a11y__reopen svg {
+    width: 20px;
+    height: 20px;
   }
 
   .yl-a11y__btn {

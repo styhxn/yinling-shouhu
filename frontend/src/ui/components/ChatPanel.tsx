@@ -7,6 +7,7 @@ import { asrErrorZh, asrSupportIssue, AsrError, startRecognizeZhBuffered, type A
 import { speakNow, stopSpeaking } from "../voice/tts.js";
 import { useToast } from "../state/toast.js";
 import { useAuth } from "../state/auth.js";
+import { ChatWelcome, type ChatWelcomeContext } from "./ChatWelcome.js";
 import type { ChatMessage, PendingConfirmation, ToolEvent } from "../../lib/types.js";
 import "./assistant.css";
 
@@ -43,6 +44,57 @@ function nowLabel() {
 
 function toolLabel(name: string) {
   return TOOL_LABELS[name] ?? name;
+}
+
+function renderInline(text: string): React.ReactNode[] {
+  return text.split(/(\*\*[^*]+\*\*)/g).map((part, index) => {
+    if (part.startsWith("**") && part.endsWith("**") && part.length > 4) {
+      return <strong key={index}>{part.slice(2, -2)}</strong>;
+    }
+    return part;
+  });
+}
+
+function FormattedText({ content }: { content: string }) {
+  return (
+    <div className="yl-richText">
+      {content.split(/\r?\n/).map((raw, index) => {
+        const line = raw.trim();
+        if (!line) return <span key={index} className="yl-richTextGap" aria-hidden="true" />;
+        const heading = line.match(/^#{1,4}\s+(.*)$/);
+        if (heading) {
+          return <strong key={index} className="yl-richTextHeading">{renderInline(heading[1] ?? "")}</strong>;
+        }
+        const ordered = line.match(/^(\d+)[.、]\s*(.*)$/);
+        if (ordered) {
+          return (
+            <p key={index} className="yl-richTextItem">
+              <span className="yl-richTextNum" aria-hidden="true">{ordered[1]}</span>
+              <span>{renderInline(ordered[2] ?? "")}</span>
+            </p>
+          );
+        }
+        const bullet = line.match(/^[-*•]\s+(.*)$/);
+        if (bullet) {
+          return (
+            <p key={index} className="yl-richTextItem">
+              <span className="yl-richTextNum" aria-hidden="true">·</span>
+              <span>{renderInline(bullet[1] ?? "")}</span>
+            </p>
+          );
+        }
+        return <p key={index}>{renderInline(line)}</p>;
+      })}
+    </div>
+  );
+}
+
+function speechText(content: string) {
+  return content
+    .replace(/\*\*/g, "")
+    .replace(/^#{1,4}\s+/gm, "")
+    .replace(/^\s*[-*•]\s+/gm, "")
+    .replace(/^\s*(\d+)[.、]\s*/gm, "$1、");
 }
 
 function ToolChip({ tool }: { tool: ToolEvent }) {
@@ -94,7 +146,9 @@ function MessageBubble({
           </div>
         )}
         {message.content ? (
-          <div className={`yl-bubble ${message.error ? "yl-bubble--error" : ""}`}>{message.content}</div>
+          <div className={`yl-bubble ${message.error ? "yl-bubble--error" : ""}`}>
+            <FormattedText content={message.content} />
+          </div>
         ) : message.toolEvents.length === 0 ? (
           <div className="yl-bubble yl-bubble--typing">
             <span className="yl-dot" />
@@ -261,7 +315,9 @@ export function ChatPanel({
   muted = false,
   onToggleMute,
   autoSpeak = false,
-  autoStartVoice = false
+  autoStartVoice = false,
+  welcomeContext,
+  onAcknowledgeFamilyMessage
 }: {
   onClose?: () => void;
   variant?: "page" | "float" | "kiosk";
@@ -269,6 +325,8 @@ export function ChatPanel({
   onToggleMute?: () => void;
   autoSpeak?: boolean;
   autoStartVoice?: boolean;
+  welcomeContext?: ChatWelcomeContext | null;
+  onAcknowledgeFamilyMessage?: () => void;
 }) {
   const toast = useToast();
   const [messages, setMessages] = React.useState<ChatMessage[]>([]);
@@ -389,7 +447,7 @@ export function ChatPanel({
           const reply = lastAssistantTextRef.current.trim();
           if (reply) {
             stopSpeaking();
-            speakNow(reply);
+            speakNow(speechText(reply));
           }
         }
         setStatus("idle");
@@ -433,7 +491,7 @@ export function ChatPanel({
   function readAloud(content: string) {
     if (muted && onToggleMute) onToggleMute();
     stopSpeaking();
-    speakNow(content);
+    speakNow(speechText(content));
   }
 
   async function send(text: string) {
@@ -564,20 +622,28 @@ export function ChatPanel({
 
       <div className="yl-chatList" ref={scrollRef} onScroll={handleChatScroll}>
         {messages.length === 0 ? (
-          <div className="yl-chatEmpty">
-            <div className="yl-chatEmptyIcon">
-              <Icon name="bot" size="xl" />
+          welcomeContext ? (
+            <ChatWelcome
+              context={welcomeContext}
+              onPrompt={(text) => void send(text)}
+              onAcknowledgeFamilyMessage={onAcknowledgeFamilyMessage}
+            />
+          ) : (
+            <div className="yl-chatEmpty">
+              <div className="yl-chatEmptyIcon">
+                <Icon name="bot" size="xl" />
+              </div>
+              <strong>我在呢，您慢慢说</strong>
+              <p>您可以直接说话，也可以点下面的问题试试。</p>
+              <div className="yl-quickGrid">
+                {QUICK_PROMPTS.map((prompt) => (
+                  <button key={prompt} type="button" className="yl-quickPrompt" onClick={() => void send(prompt)}>
+                    {prompt}
+                  </button>
+                ))}
+              </div>
             </div>
-            <strong>我在呢，您慢慢说</strong>
-            <p>您可以直接说话，也可以点下面的问题试试。</p>
-            <div className="yl-quickGrid">
-              {QUICK_PROMPTS.map((prompt) => (
-                <button key={prompt} type="button" className="yl-quickPrompt" onClick={() => void send(prompt)}>
-                  {prompt}
-                </button>
-              ))}
-            </div>
-          </div>
+          )
         ) : (
           messages.map((message) => (
             <MessageBubble key={message.id} message={message} onRead={readAloud} />

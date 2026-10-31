@@ -21,6 +21,8 @@ const TYPE_LABEL: Record<string, string> = {
   emergency: "紧急呼救"
 };
 
+const QUICK_REPLIES = ["记得按时吃药", "我下班回来看您", "有事随时给我留言"];
+
 function describePayload(payload: Record<string, unknown>) {
   const amount = typeof payload.amount === "number" ? `金额 ¥${payload.amount}` : "";
   const counterparty = typeof payload.counterparty === "string" ? `对方：${payload.counterparty}` : "";
@@ -247,12 +249,81 @@ export function FamilyDashboardPage() {
   }
 
   const adherence = summary?.medications.adherencePct;
+  const attentionCount = (summary?.pendingConfirms ?? 0) + (summary?.alerts.open ?? 0);
+  const reportAdherence = report?.adherencePct;
+  const reportTone =
+    typeof reportAdherence === "number"
+      ? reportAdherence >= 80
+        ? "good"
+        : reportAdherence >= 60
+          ? "warn"
+          : "bad"
+      : "empty";
+
+  const pendingSection = (
+    <section className="ys-panel ys-pendingPanel" id="family-confirms">
+      <div className="ys-sectionTitle">
+        <Icon name="shieldCheck" size="sm" />
+        待确认事项
+        {items.length > 0 ? <span className="ys-sectionCount">{items.length}</span> : null}
+      </div>
+      {items.length === 0 ? (
+        <div className="ys-emptyBlock ys-emptyBlock--inline">
+          <Icon name="check" size="lg" />
+          <strong>暂时没有待确认事项</strong>
+          <p>长辈发起转账时，确认请求会出现在这里。</p>
+        </div>
+      ) : (
+        <div className="ys-confirmList">
+          {items.map((item) => (
+            <article key={item.id} className="ys-confirmCard">
+              <div className="ys-confirmTop">
+                <span className="ys-confirmType">{TYPE_LABEL[item.type] ?? item.type}</span>
+                <span className="ys-confirmTime">{formatTime(item.createdAt)}</span>
+              </div>
+              <p className="ys-confirmDesc">{describePayload(item.payload)}</p>
+              <div className="ys-inlineActions">
+                <button
+                  type="button"
+                  className="btn btnDanger"
+                  disabled={busyId === item.id}
+                  onClick={() => void respond(item, "denied")}
+                >
+                  拒绝/阻止
+                </button>
+                <button
+                  type="button"
+                  className="btn"
+                  disabled={busyId === item.id}
+                  onClick={() => void respond(item, "approved")}
+                >
+                  确认
+                </button>
+                <a className="btn" href="tel:96110">
+                  <Icon name="phone" size="sm" />
+                  96110
+                </a>
+              </div>
+            </article>
+          ))}
+        </div>
+      )}
+    </section>
+  );
 
   return (
     <div className="yl-page ys-familyPage">
       <section className="ys-pageHeader">
         <div>
-          <p className="ys-kicker">照护概览</p>
+          <div className="ys-pageHeaderMeta">
+            <p className="ys-kicker">照护概览</p>
+            {summary ? (
+              <span className={`ys-pageStatus ${attentionCount > 0 ? "is-attention" : "is-calm"}`}>
+                <span className="ys-pageStatusDot" />
+                {attentionCount > 0 ? `有 ${attentionCount} 项需要关注` : "今日状态平稳"}
+              </span>
+            ) : null}
+          </div>
           <h1>{summary?.elder.displayName ?? "家人"}</h1>
           <p>位置、用药、安全和本周照护简报，都在这一页。</p>
         </div>
@@ -342,6 +413,8 @@ export function FamilyDashboardPage() {
             </section>
           )}
 
+          {pendingSection}
+
           <section className="ys-panel">
             <div className="ys-sectionTitle">
               <Icon name="message" size="sm" />
@@ -377,6 +450,13 @@ export function FamilyDashboardPage() {
               </div>
             )}
             <div className="ys-replyBox">
+              <div className="ys-quickReplies" aria-label="快捷回复">
+                {QUICK_REPLIES.map((text) => (
+                  <button key={text} type="button" onClick={() => setReplyText(text)}>
+                    {text}
+                  </button>
+                ))}
+              </div>
               <textarea
                 className="input ys-msgInput"
                 value={replyText}
@@ -453,6 +533,30 @@ export function FamilyDashboardPage() {
             </div>
             {report && (
               <>
+                <div className={`ys-reportMeter ys-reportMeter--${reportTone}`}>
+                  <div className="ys-reportMeterHead">
+                    <span>本周用药依从率</span>
+                    <strong>
+                      {typeof reportAdherence === "number" ? `${reportAdherence}%` : "暂无记录"}
+                    </strong>
+                  </div>
+                  {typeof reportAdherence === "number" ? (
+                    <div
+                      className="ys-reportMeterTrack"
+                      role="meter"
+                      aria-valuemin={0}
+                      aria-valuemax={100}
+                      aria-valuenow={reportAdherence}
+                    >
+                      <span style={{ width: `${Math.max(0, Math.min(100, reportAdherence))}%` }} />
+                    </div>
+                  ) : null}
+                  <small>
+                    {typeof reportAdherence === "number" && reportAdherence >= 80
+                      ? "整体规律，继续保持；今天到点的药也别忘了提醒。"
+                      : "可以设一个固定提醒，或在饭后给长辈打个电话。"}
+                  </small>
+                </div>
                 <div className="ys-reportGrid">
                   {report.sections.map((section) => (
                     <div key={section.title} className="ys-reportSection">
@@ -471,54 +575,6 @@ export function FamilyDashboardPage() {
                 </div>
                 <p className="ys-finePrint">{report.disclaimer}</p>
               </>
-            )}
-          </section>
-
-          <section className="ys-panel">
-            <div className="ys-sectionTitle">
-              <Icon name="shieldCheck" size="sm" />
-              待确认事项
-            </div>
-            {items.length === 0 ? (
-              <div className="ys-emptyBlock ys-emptyBlock--inline">
-                <Icon name="check" size="lg" />
-                <strong>暂时没有待确认事项</strong>
-                <p>长辈发起转账时，确认请求会出现在这里。</p>
-              </div>
-            ) : (
-              <div className="ys-confirmList">
-                {items.map((item) => (
-                  <article key={item.id} className="ys-confirmCard">
-                    <div className="ys-confirmTop">
-                      <span className="ys-confirmType">{TYPE_LABEL[item.type] ?? item.type}</span>
-                      <span className="ys-confirmTime">{formatTime(item.createdAt)}</span>
-                    </div>
-                    <p className="ys-confirmDesc">{describePayload(item.payload)}</p>
-                    <div className="ys-inlineActions">
-                      <button
-                        type="button"
-                        className="btn btnDanger"
-                        disabled={busyId === item.id}
-                        onClick={() => void respond(item, "denied")}
-                      >
-                        拒绝/阻止
-                      </button>
-                      <button
-                        type="button"
-                        className="btn"
-                        disabled={busyId === item.id}
-                        onClick={() => void respond(item, "approved")}
-                      >
-                        确认
-                      </button>
-                      <a className="btn" href="tel:96110">
-                        <Icon name="phone" size="sm" />
-                        96110
-                      </a>
-                    </div>
-                  </article>
-                ))}
-              </div>
             )}
           </section>
         </>

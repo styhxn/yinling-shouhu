@@ -94,6 +94,24 @@
   cursor: pointer;
 }
 
+.ys-kioskA11y {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: #6f7f76;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.ys-kioskA11y:hover {
+  border-color: rgba(55, 82, 70, 0.18);
+  background: rgba(255, 255, 255, 0.55);
+}
+
 .ys-kioskMain {
   padding-top: clamp(18px, 3vh, 34px);
 }
@@ -180,11 +198,88 @@
   cursor: pointer;
 }
 
+.ys-kioskMessage {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-top: 12px;
+  padding: 10px 16px;
+  border: 1px solid #e4d7c3;
+  border-left: 3px solid #8f3f30;
+  background: rgba(255, 251, 242, 0.9);
+  box-shadow: 0 6px 18px rgba(43, 58, 48, 0.05);
+}
+
+.ys-kioskMessageIcon {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  background: #f2e6d3;
+  color: #8f3f30;
+}
+
+.ys-kioskMessageBody {
+  flex: 1;
+  min-width: 0;
+}
+
+.ys-kioskMessageBody strong {
+  display: block;
+  font-family: "Songti SC", "STSong", "SimSun", serif;
+  font-size: 17px;
+  color: #4b342e;
+}
+
+.ys-kioskMessageBody p {
+  margin: 3px 0 0;
+  color: #4a4a42;
+  font-size: 16px;
+  line-height: 1.5;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.ys-kioskMessageActions {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.ys-kioskMessageRead,
+.ys-kioskMessageDone {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 42px;
+  padding: 8px 13px;
+  border-radius: 999px;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.ys-kioskMessageRead {
+  border: 1px solid #b98b72;
+  background: #fffdf7;
+  color: #6f3a2c;
+}
+
+.ys-kioskMessageDone {
+  border: 1px solid rgba(55, 82, 70, 0.2);
+  background: transparent;
+  color: #4d5d55;
+}
+
 .ys-kioskTalk {
   display: grid;
   justify-items: center;
   gap: 14px;
-  margin: clamp(18px, 3.5vh, 40px) 0;
+  margin: clamp(10px, 1.8vh, 20px) 0;
 }
 
 .ys-kioskTalkBtn {
@@ -475,6 +570,30 @@
     align-items: flex-start;
     flex-direction: column;
   }
+
+  .ys-kioskBrief p {
+    flex: 0 0 auto;
+  }
+
+  .ys-kioskMessage {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .ys-kioskMessageBody {
+    flex: 1 1 200px;
+  }
+
+  .ys-kioskMessageActions {
+    width: 100%;
+    padding-left: 56px;
+  }
+
+  .ys-kioskMessageRead,
+  .ys-kioskMessageDone {
+    flex: 1;
+    justify-content: center;
+  }
   .ys-kioskGrid {
     grid-template-columns: 1fr;
   }
@@ -492,5 +611,23 @@
     width: 100vw;
     height: 100vh;
     border-radius: 0;
+  }
+}
+
+/* 陪伴屏把无障碍入口放进顶栏，窄屏时不再显示悬浮小按钮 */
+@media (max-width: 640px) {
+  body.kiosk-mode .yl-a11y--collapsed {
+    display: none;
+  }
+
+  .ys-kioskA11y span {
+    display: none;
+  }
+
+  .ys-kioskA11y {
+    width: 40px;
+    height: 40px;
+    justify-content: center;
+    padding: 0;
   }
 }

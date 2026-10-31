@@ -134,18 +134,37 @@ export function RoleplayPage() {
         loading ? (
           <p className="ys-mutedText">正在准备演练场景…</p>
         ) : (
-          <section className="ys-scenarioGrid">
-            {scenarios.map((item) => (
-              <article key={item.id} className="ys-scenarioCard">
-                <span className="ys-kicker">模拟剧本</span>
-                <h3>{item.title}</h3>
-                <p>{item.subtitle}</p>
-                <button type="button" className="btn btnPrimary" disabled={busy} onClick={() => void start(item)}>
-                  开始演练
-                </button>
-              </article>
-            ))}
-          </section>
+          <>
+            <section className="ys-scenarioGrid">
+              {scenarios.map((item) => (
+                <article key={item.id} className="ys-scenarioCard">
+                  <span className="ys-kicker">模拟剧本</span>
+                  <h3>{item.title}</h3>
+                  <p>{item.subtitle}</p>
+                  <button type="button" className="btn btnPrimary" disabled={busy} onClick={() => void start(item)}>
+                    开始演练
+                  </button>
+                </article>
+              ))}
+            </section>
+            <section className="ys-roleplayTips" aria-label="演练提示">
+              <span className="ys-kicker">上场前先记住</span>
+              <div className="ys-roleplayTipsGrid">
+                <div>
+                  <strong>先停一下</strong>
+                  <p>对方越催，越说明有问题。先说“我要问家里人”。</p>
+                </div>
+                <div>
+                  <strong>不报验证码</strong>
+                  <p>验证码、银行卡号、屏幕共享，都不能给陌生人。</p>
+                </div>
+                <div>
+                  <strong>挂断后核实</strong>
+                  <p>自己拨打 110 或 96110，不要回拨对方给的号码。</p>
+                </div>
+              </div>
+            </section>
+          </>
         )
       ) : report ? (
         <section className="ys-roleplayReport">
@@ -237,6 +256,18 @@ export function RoleplayPage() {
           </div>
 
           <div className="ys-roleplayComposer">
+            <div className="ys-rpSuggestions" aria-label="回应建议">
+              <span>不知道怎么回？点一句：</span>
+              <button type="button" onClick={() => setInput("我先挂断，自己打 110 核实。")}>
+                我先挂断，自己核实
+              </button>
+              <button type="button" onClick={() => setInput("这件事我要先问问家里人。")}>
+                先问问家里人
+              </button>
+              <button type="button" onClick={() => setInput("我不会转账，也不会点陌生链接。")}>
+                不转账、不点链接
+              </button>
+            </div>
             <textarea
               className="input ys-textarea"
               value={input}

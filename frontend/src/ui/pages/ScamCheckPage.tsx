@@ -25,6 +25,25 @@ const TYPE_LABEL: Record<string, string> = {
   other: "其他"
 };
 
+const SCAM_SAMPLES = [
+  {
+    label: "冒充公检法",
+    text: "我是警察，你涉嫌洗钱，请把钱转到安全账户，不要告诉家里人。"
+  },
+  {
+    label: "虚假投资",
+    text: "内部导师带你投资，稳赚不赔，提现前先交一笔保证金。"
+  },
+  {
+    label: "保健品",
+    text: "免费义诊，这个药能根治高血压和糖尿病，今天买三盒送一盒。"
+  },
+  {
+    label: "刷单兼职",
+    text: "动动手指日赚三百，先垫付一单，马上把本金和佣金返给你。"
+  }
+];
+
 function CoolingOffPanel({
   cooling,
   busy,
@@ -217,12 +236,31 @@ export function ScamCheckPage() {
         </div>
 
         {tab === "text" && (
-          <textarea
-            className="input yl-textarea"
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-            placeholder="例如：我是警察，你涉嫌洗钱，把钱转到安全账户，不要告诉家里人……"
-          />
+          <>
+            <textarea
+              className="input yl-textarea"
+              value={text}
+              onChange={(e) => setText(e.target.value)}
+              placeholder="例如：我是警察，你涉嫌洗钱，把钱转到安全账户，不要告诉家里人……"
+            />
+            <div className="ys-scamSamples">
+              <span>不知道怎么写？点一条试试：</span>
+              <div>
+                {SCAM_SAMPLES.map((sample) => (
+                  <button
+                    key={sample.label}
+                    type="button"
+                    onClick={() => {
+                      setText(sample.text);
+                      setError(null);
+                    }}
+                  >
+                    {sample.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </>
         )}
 
         {tab === "url" && (
@@ -359,6 +397,30 @@ export function ScamCheckPage() {
           <p className="yl-disclaimer">{result.disclaimer}</p>
         </section>
       )}
+
+      <section className="ys-scamPrinciples" aria-label="防骗三句话">
+        <div className="ys-scamPrinciplesHead">
+          <Icon name="shieldCheck" size="lg" />
+          <div>
+            <span className="ys-kicker">不管对方说得多急</span>
+            <h2>先记住这三句话</h2>
+          </div>
+        </div>
+        <ol>
+          <li>
+            <strong>公检法不会让您转账。</strong>
+            <span>提到“安全账户”“资金审查”，直接挂断，拨打 96110 核实。</span>
+          </li>
+          <li>
+            <strong>不点陌生链接，不装陌生软件。</strong>
+            <span>尤其是让您开屏幕共享、报验证码的，一律先问家人。</span>
+          </li>
+          <li>
+            <strong>拿不准就先停一停。</strong>
+            <span>把对方的话发给家人或小助手看一眼，停十分钟不会误事。</span>
+          </li>
+        </ol>
+      </section>
     </div>
   );
 }

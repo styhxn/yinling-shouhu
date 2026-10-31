@@ -3,9 +3,10 @@ import { Link, useNavigate } from "react-router-dom";
 import { Icon } from "../components/Icon.js";
 import { ChatPanel } from "../components/ChatPanel.js";
 import { api } from "../../lib/api.js";
-import type { AgentBrief, DietPlan, FamilySummary } from "../../lib/types.js";
+import type { AgentBrief, DietPlan, ElderMessage, FamilySummary } from "../../lib/types.js";
 import { useAuth } from "../state/auth.js";
 import { useA11y } from "../state/a11y.js";
+import { useRealtime } from "../state/realtime.js";
 import { useToast } from "../state/toast.js";
 import { speakNow, stopSpeaking } from "../voice/tts.js";
 import "./kiosk.css";
@@ -59,10 +60,33 @@ export function KioskPage() {
   const [busy, setBusy] = React.useState(false);
   const [peaceSent, setPeaceSent] = React.useState(false);
   const [chatOpen, setChatOpen] = React.useState(false);
+  const [familyNotice, setFamilyNotice] = React.useState<ElderMessage | null>(null);
+  const [noticeCount, setNoticeCount] = React.useState(0);
+  const { lastEvent } = useRealtime();
+
+  const loadFamilyNotice = React.useCallback(async () => {
+    try {
+      const res = await api.elderMessages.list({ peek: true });
+      const unread = res.items.find(
+        (item) => item.fromRole === "family" && !item.read
+      ) ?? null;
+      setFamilyNotice(unread);
+      setNoticeCount(res.unreadCount);
+      return res.unreadCount;
+    } catch {
+      // 留言提醒是增强信息，读取失败不打扰长辈。
+      return 0;
+    }
+  }, []);
 
   React.useEffect(() => {
     const timer = window.setInterval(() => setNow(new Date()), 30_000);
     return () => window.clearInterval(timer);
+  }, []);
+
+  React.useEffect(() => {
+    document.body.classList.add("kiosk-mode");
+    return () => document.body.classList.remove("kiosk-mode");
   }, []);
 
   React.useEffect(() => {
@@ -99,11 +123,19 @@ export function KioskPage() {
       .catch(() => {
         if (alive) setDietState("error");
       });
+    void loadFamilyNotice();
     return () => {
       alive = false;
       stopSpeaking();
     };
-  }, []);
+  }, [loadFamilyNotice]);
+
+  React.useEffect(() => {
+    if (lastEvent?.type !== "elder.message") return;
+    void loadFamilyNotice().then((count) => {
+      if (count > 0 && voiceEnabled) speakNow("家人来消息了，按念给我听就能听。");
+    });
+  }, [lastEvent, loadFamilyNotice, voiceEnabled]);
 
   const name = me?.user.displayName ?? "您好";
   const family = members[0] ?? null;
@@ -156,6 +188,22 @@ export function KioskPage() {
     nav("/", { replace: true });
   }
 
+  function readNotice() {
+    if (!familyNotice) return;
+    stopSpeaking();
+    speakNow(`${familyNotice.familyName}给您留言：${familyNotice.content}`);
+  }
+
+  async function acknowledgeNotice() {
+    try {
+      await api.elderMessages.list();
+    } catch {
+      // 标记已读失败也先收起提醒，避免挡住主界面。
+    }
+    setFamilyNotice(null);
+    setNoticeCount(0);
+  }
+
   return (
     <div className="ys-kiosk">
       <header className="ys-kioskTop">
@@ -170,6 +218,15 @@ export function KioskPage() {
           <span className="ys-kioskDot" />
           {brief?.engine === "rules+llm" ? "AI 陪伴中" : "守护中"}
         </div>
+        <button
+          type="button"
+          className="ys-kioskA11y"
+          onClick={() => window.dispatchEvent(new CustomEvent("yl:open-a11y"))}
+          aria-label="打开无障碍工具"
+        >
+          <Icon name="settings" size="sm" />
+          <span>无障碍</span>
+        </button>
         <button type="button" className="ys-kioskSwitch" onClick={() => void switchIdentity()}>
           <Icon name="logOut" size="sm" />
           切换
@@ -202,6 +259,30 @@ export function KioskPage() {
             </button>
           </div>
         </section>
+
+        {familyNotice ? (
+          <section className="ys-kioskMessage" aria-live="polite" aria-label="家人的新留言">
+            <span className="ys-kioskMessageIcon">
+              <Icon name="message" size="lg" />
+            </span>
+            <div className="ys-kioskMessageBody">
+              <strong>
+                {familyNotice.familyName}给您留言
+                {noticeCount > 1 ? `（还有 ${noticeCount} 条）` : ""}
+              </strong>
+              <p>{familyNotice.content}</p>
+            </div>
+            <div className="ys-kioskMessageActions">
+              <button type="button" className="ys-kioskMessageRead" onClick={readNotice}>
+                <Icon name="volume" size="sm" />
+                念给我听
+              </button>
+              <button type="button" className="ys-kioskMessageDone" onClick={() => void acknowledgeNotice()}>
+                知道了
+              </button>
+            </div>
+          </section>
+        ) : null}
 
         <section className="ys-kioskTalk">
           <button

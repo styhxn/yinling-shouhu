@@ -440,6 +440,16 @@ export function ElderHomeFeatures({ brief }: { brief?: AgentBrief | null }) {
                   <span className="ys-messageTime">{formatTime(m.createdAt)}</span>
                 </div>
                 <p className="ys-messageContent">{m.content}</p>
+                {m.fromRole === "family" ? (
+                  <button
+                    type="button"
+                    className="ys-msgRead"
+                    onClick={() => speakNow(`${m.familyName}说：${m.content}`)}
+                  >
+                    <Icon name="volume" size="sm" />
+                    念给我听
+                  </button>
+                ) : null}
               </article>
             ))}
           </div>

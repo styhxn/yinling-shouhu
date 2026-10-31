@@ -43,6 +43,12 @@ export function A11yDock() {
   React.useEffect(() => onTtsError(setTtsError), []);
 
   React.useEffect(() => {
+    const open = () => setCollapsed(false);
+    window.addEventListener("yl:open-a11y", open);
+    return () => window.removeEventListener("yl:open-a11y", open);
+  }, []);
+
+  React.useEffect(() => {
     const synth = window.speechSynthesis;
     if (!synth) return;
     const refresh = () => setVoiceOptions(listTtsVoices());

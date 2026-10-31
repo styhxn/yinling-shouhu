@@ -1633,9 +1633,14 @@ body {
 
 .ys-replyBox {
   display: flex;
+  flex-wrap: wrap;
   gap: 10px;
   margin-top: 14px;
   align-items: flex-end;
+}
+
+.ys-quickReplies {
+  flex: 0 0 100%;
 }
 
 .ys-replyBox .ys-msgInput {
@@ -2927,4 +2932,374 @@ body {
   background: rgba(94, 127, 113, 0.1);
   color: #3f5a50;
   font-size: 12px;
+}
+
+/* ---------- 家人端：状态标识、优先事项与周报可视化 ---------- */
+.ys-pageHeaderMeta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.ys-pageHeaderMeta .ys-kicker {
+  margin: 0;
+}
+
+.ys-pageStatus {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border: 1px solid var(--ys-line);
+  color: var(--ys-ink-soft);
+  font-size: 11px;
+  letter-spacing: 0.02em;
+}
+
+.ys-pageStatusDot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.ys-pageStatus.is-calm {
+  border-color: #cfdcd1;
+  background: #f1f6ef;
+  color: #3f6a53;
+}
+
+.ys-pageStatus.is-attention {
+  border-color: #e5cfc8;
+  background: #fbf1ed;
+  color: #8f3f30;
+}
+
+.ys-sectionCount {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  margin-left: 4px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: #f2e2dd;
+  color: #8f3f30;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.ys-pendingPanel {
+  border-color: #e8d9d2;
+}
+
+.ys-quickReplies {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.ys-quickReplies button {
+  padding: 5px 10px;
+  border: 1px solid var(--ys-line);
+  background: var(--ys-paper);
+  color: var(--ys-ink-soft);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.ys-quickReplies button:hover {
+  border-color: var(--ys-celadon);
+  color: var(--ys-celadon-deep);
+}
+
+.ys-reportMeter {
+  margin: 16px 0 4px;
+  padding: 14px 16px;
+  border: 1px solid var(--ys-line);
+  background: var(--ys-paper);
+}
+
+.ys-reportMeterHead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.ys-reportMeterHead span {
+  color: var(--ys-ink-soft);
+  font-size: 13px;
+}
+
+.ys-reportMeterHead strong {
+  font-family: var(--ys-serif);
+  font-size: 26px;
+  line-height: 1;
+}
+
+.ys-reportMeterTrack {
+  height: 8px;
+  background: var(--ys-paper-deep);
+  overflow: hidden;
+}
+
+.ys-reportMeterTrack span {
+  display: block;
+  height: 100%;
+  background: var(--ys-celadon-deep);
+  transition: width 0.5s ease;
+}
+
+.ys-reportMeter--good .ys-reportMeterHead strong {
+  color: #3f6a53;
+}
+
+.ys-reportMeter--good .ys-reportMeterTrack span {
+  background: #4f7d68;
+}
+
+.ys-reportMeter--warn .ys-reportMeterHead strong {
+  color: #8a6428;
+}
+
+.ys-reportMeter--warn .ys-reportMeterTrack span {
+  background: #b08a45;
+}
+
+.ys-reportMeter--bad .ys-reportMeterHead strong {
+  color: var(--ys-seal);
+}
+
+.ys-reportMeter--bad .ys-reportMeterTrack span {
+  background: var(--ys-seal);
+}
+
+.ys-reportMeter small {
+  display: block;
+  margin-top: 8px;
+  color: var(--ys-muted);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+@media (max-width: 640px) {
+  .ys-pageHeaderMeta {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .ys-reportMeterHead strong {
+    font-size: 22px;
+  }
+}
+
+/* ---------- 反诈鉴定：示例与三句话 ---------- */
+.ys-scamSamples {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.ys-scamSamples > span {
+  color: var(--ys-muted);
+  font-size: 12px;
+}
+
+.ys-scamSamples > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.ys-scamSamples button {
+  padding: 6px 11px;
+  border: 1px solid var(--ys-line);
+  background: var(--ys-paper);
+  color: var(--ys-ink-soft);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.ys-scamSamples button:hover {
+  border-color: var(--ys-seal);
+  color: var(--ys-seal);
+}
+
+.ys-scamPrinciples {
+  margin-top: 22px;
+  padding: 22px 24px 24px;
+  border: 1px solid var(--ys-line);
+  background:
+    linear-gradient(180deg, rgba(214, 228, 215, 0.28), transparent 55%),
+    var(--ys-paper);
+}
+
+.ys-scamPrinciplesHead {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 16px;
+  color: var(--ys-celadon-deep);
+}
+
+.ys-scamPrinciplesHead h2 {
+  margin: 2px 0 0;
+  font-family: var(--ys-serif);
+  font-size: clamp(22px, 2.4vw, 28px);
+  color: var(--ys-ink);
+}
+
+.ys-scamPrinciples ol {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: scam-principle;
+}
+
+.ys-scamPrinciples li {
+  position: relative;
+  padding: 16px 16px 16px 50px;
+  border: 1px solid var(--ys-line);
+  background: var(--ys-surface);
+  counter-increment: scam-principle;
+}
+
+.ys-scamPrinciples li::before {
+  content: counter(scam-principle);
+  position: absolute;
+  left: 16px;
+  top: 16px;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border: 1px solid var(--ys-seal);
+  color: var(--ys-seal);
+  font-family: var(--ys-serif);
+  font-size: 13px;
+}
+
+.ys-scamPrinciples li strong {
+  display: block;
+  margin-bottom: 4px;
+  font-family: var(--ys-serif);
+  font-size: 16px;
+}
+
+.ys-scamPrinciples li span {
+  display: block;
+  color: var(--ys-ink-soft);
+  font-size: 13px;
+  line-height: 1.65;
+}
+
+/* ---------- 反诈演练：提示与快捷回应 ---------- */
+.ys-roleplayTips {
+  margin-top: 22px;
+  padding: 20px 22px;
+  border-top: 1px solid var(--ys-line);
+  border-bottom: 1px solid var(--ys-line);
+}
+
+.ys-roleplayTipsGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 18px;
+  margin-top: 10px;
+}
+
+.ys-roleplayTipsGrid strong {
+  display: block;
+  margin-bottom: 4px;
+  font-family: var(--ys-serif);
+  font-size: 16px;
+}
+
+.ys-roleplayTipsGrid p {
+  margin: 0;
+  color: var(--ys-ink-soft);
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+.ys-rpSuggestions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.ys-rpSuggestions > span {
+  color: var(--ys-muted);
+  font-size: 12px;
+}
+
+.ys-rpSuggestions button {
+  padding: 5px 10px;
+  border: 1px solid var(--ys-line);
+  background: var(--ys-paper);
+  color: var(--ys-ink-soft);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.ys-rpSuggestions button:hover {
+  border-color: var(--ys-celadon);
+  color: var(--ys-celadon-deep);
+}
+
+@media (max-width: 820px) {
+  .ys-scamPrinciples ol,
+  .ys-roleplayTipsGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.ys-msgRead {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 8px;
+  padding: 4px 9px;
+  border: 1px solid #d9c5a9;
+  background: #fffdf7;
+  color: var(--ys-ink-soft);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.ys-msgRead:hover {
+  border-color: var(--ys-seal);
+  color: var(--ys-seal);
+}
+
+@media (max-width: 720px) {
+  .yl-nav {
+    gap: 0;
+  }
+
+  .yl-navLink {
+    flex: 1 0 auto;
+    justify-content: center;
+    padding: 8px 3px;
+    font-size: 12.5px;
+    gap: 3px;
+  }
+
+  .yl-navLink svg {
+    width: 14px;
+    height: 14px;
+  }
 }

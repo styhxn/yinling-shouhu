@@ -418,8 +418,10 @@ export const api = {
   },
 
   elderMessages: {
-    list() {
-      return httpJson<{ ok: boolean; items: ElderMessage[] }>(`/family/elder/messages`);
+    list(params: { peek?: boolean } = {}) {
+      return httpJson<{ ok: boolean; items: ElderMessage[]; unreadCount: number }>(
+        `/family/elder/messages${query({ peek: params.peek ? "1" : undefined })}`
+      );
     }
   },
 
